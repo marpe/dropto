@@ -116,7 +116,7 @@ describe('SenderView', () => {
 
     expect(screen.getByText(/choosing where to save/i)).toBeDefined();
     expect(screen.getByText('report.pdf')).toBeDefined();
-    expect(screen.getByRole('button', { name: /select files/i })).toBeDefined();
+    expect(screen.getByTestId('pick-files')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancelTransfer).toHaveBeenCalledTimes(1);
   });
@@ -134,19 +134,17 @@ describe('SenderView', () => {
     expect(container.querySelector('[data-file-kind="pdf"]')).not.toBeNull();
   });
 
-  it('explains the basics on the landing page and offers receiving by code', () => {
+  it('offers receiving by code on the landing page', () => {
     const onSwitchToReceive = vi.fn();
     renderSenderView({ onSwitchToReceive });
 
-    expect(screen.getByText(/no account/i)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: /receive files/i }));
     expect(onSwitchToReceive).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves the landing extras out once files are queued', () => {
+  it('stops offering to receive once files are queued', () => {
     renderSenderView({ files: [queuedFile], onSwitchToReceive: () => {} });
 
-    expect(screen.queryByText(/no account/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /receive files/i })).toBeNull();
   });
 

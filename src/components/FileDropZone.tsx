@@ -5,6 +5,9 @@ import { Button } from './ui/Button';
 import { IconBadge } from './ui/IconBadge';
 import { cn } from '../utils/cn';
 
+// Line breaks may only fall between facts, never inside one
+const FACTS = ['Files or whole folders, any size', 'No account', 'Nothing stored', 'Straight from your device to theirs'];
+
 interface FileDropZoneProps {
   onAddFiles: (files: File[]) => void;
   /** Lets other controls (e.g. the approval dialog) open the file picker */
@@ -27,6 +30,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
   // Dropping is handled page-wide (usePageFileDrop); this is the visible invitation plus the pickers
   return (
     <div
+      data-testid="drop-zone"
       className={cn(
         'group border-2 border-dashed rounded-3xl text-center transition-colors border-zinc-200 dark:border-zinc-800 hover:border-brand-500/60 bg-white dark:bg-supabase-surface',
         isCompact ? 'p-5' : 'p-8'
@@ -39,9 +43,14 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
             className="mx-auto mb-4 motion-safe:group-hover:scale-110 transition-transform"
             iconClassName="motion-safe:animate-float"
           />
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drag & Drop files or folders anywhere</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
-            Files or whole folders, any size.
+          <h1 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drop files to send</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-xl mx-auto">
+            {FACTS.map((fact, index) => (
+              <React.Fragment key={fact}>
+                {index > 0 && ' · '}
+                <span className="whitespace-nowrap">{fact}</span>
+              </React.Fragment>
+            ))}
           </p>
         </>
       )}
@@ -54,9 +63,9 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
           className="hidden"
           onChange={(e) => addFromInput(e, onAddFiles)}
         />
-        <Button size={isCompact ? 'sm' : 'md'} onClick={() => fileInputRef.current?.click()}>
+        <Button data-testid="pick-files" size={isCompact ? 'sm' : 'md'} onClick={() => fileInputRef.current?.click()}>
           <FileUp className="w-4 h-4" />
-          <span>Select Files</span>
+          <span>File</span>
         </Button>
 
         <input
@@ -68,9 +77,14 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
           className="hidden"
           onChange={(e) => addFromInput(e, onAddFiles)}
         />
-        <Button variant="secondary" size={isCompact ? 'sm' : 'md'} onClick={() => folderInputRef.current?.click()}>
+        <Button
+          data-testid="pick-folder"
+          variant="secondary"
+          size={isCompact ? 'sm' : 'md'}
+          onClick={() => folderInputRef.current?.click()}
+        >
           <FolderUp className="w-4 h-4" />
-          <span>Select Folder</span>
+          <span>Folder</span>
         </Button>
         {isCompact && <span className="text-xs text-zinc-500 dark:text-zinc-400">or drop more anywhere</span>}
       </div>

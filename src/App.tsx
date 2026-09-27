@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Settings } from 'lucide-react';
-import { BrandMark } from './components/BrandMark';
 import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
@@ -85,8 +84,6 @@ export const App: React.FC = () => {
       )}
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-12 pb-10 sm:pt-20 space-y-8">
-        <BrandMark />
-
         {mode === 'send' ? (
           <SenderView
             roomCode={sender.state.roomCode}

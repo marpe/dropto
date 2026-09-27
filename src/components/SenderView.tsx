@@ -142,17 +142,14 @@ export const SenderView: React.FC<SenderViewProps> = ({
       <FileDropZone onAddFiles={onAddFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />
 
       {isLanding && (
-        <div className="text-center space-y-4">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            No account · Nothing stored · Straight from your device to theirs
-          </p>
-          {onSwitchToReceive && (
+        onSwitchToReceive && (
+          <div className="text-center">
             <LinkButton onClick={onSwitchToReceive}>
               Got a code? Receive files
               <ArrowRight className="w-4 h-4" />
             </LinkButton>
-          )}
-        </div>
+          </div>
+        )
       )}
 
       {files.length > 0 && <FileQueue files={files} onRemoveFile={onRemoveFile} onClearFiles={onClearFiles} />}
