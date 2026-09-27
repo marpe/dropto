@@ -41,12 +41,9 @@ export const App: React.FC = () => {
         connected={isConnected}
       />
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
+      {isSettingsOpen && (
+        <SettingsModal onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={saveSettings} />
+      )}
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
         {/* Switching modes tears down the other session, so it is hidden mid-transfer */}

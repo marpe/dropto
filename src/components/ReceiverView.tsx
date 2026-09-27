@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, HardDriveDownload } from 'lucide-react';
+import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, AlertTriangle, HardDriveDownload } from 'lucide-react';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
@@ -123,16 +123,30 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             ))}
           </div>
 
-          {/* Disk streaming notice */}
-          <div className="p-3.5 mb-6 rounded-xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#3ECF8E] shrink-0 mt-0.5" />
-            <div className="text-xs text-zinc-700 dark:text-zinc-300">
-              <span className="font-semibold block text-zinc-900 dark:text-white">
-                {isNativeFSA ? 'Zero-RAM Native Disk Streaming Supported' : 'Streaming Download Active'}
-              </span>
-              Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream direct to disk to prevent memory overflows.
+          {/* Storage notice: only Chromium can stream to disk; elsewhere files are buffered in RAM */}
+          {isNativeFSA ? (
+            <div className="p-3.5 mb-6 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-700 dark:text-zinc-300">
+                <span className="font-semibold block text-zinc-900 dark:text-white">
+                  Zero-RAM Native Disk Streaming Supported
+                </span>
+                Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream
+                direct to disk to prevent memory overflows.
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-3.5 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-xs text-zinc-700 dark:text-zinc-300">
+                <span className="font-semibold block text-zinc-900 dark:text-white">
+                  This Browser Can’t Stream to Disk
+                </span>
+                Each file is held in memory until its download finishes. Files larger than about 1&nbsp;GB may
+                crash this tab — use Chrome or Edge for large transfers.
+              </div>
+            </div>
+          )}
 
           <button
             onClick={handleStartSaveClick}
