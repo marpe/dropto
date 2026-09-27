@@ -24,11 +24,10 @@ export class WebRtcService {
   ];
 
   public generateRoomId(): string {
+    // 32 symbols divide 256 evenly, so `byte % 32` is unbiased
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    const code = Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
     return `DW-${code}`;
   }
 
