@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { DataConnection } from 'peerjs';
-import { DEFAULT_CHUNK_SIZE } from '../services/transferEngine';
-import type { TransferResult } from '../services/transferEngine';
 import { soundService } from '../services/sound';
-import type { AppSettings, SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
+import type { AppSettings, SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
 import { defaultSessionServices } from './sessionServices';
-import type { SessionConnection, SessionEngine, SessionServices } from './sessionServices';
+import type { SessionConnection, SessionSender, SessionServices } from './sessionServices';
 
 export interface SenderSessionState {
   status: SenderStatus;
@@ -129,10 +127,6 @@ function toTransferFile(file: File): TransferFile {
     relativePath: file.webkitRelativePath || undefined,
     lastModified: file.lastModified,
     rawFile: file,
-    chunkSize: DEFAULT_CHUNK_SIZE,
-    totalChunks: Math.ceil(file.size / DEFAULT_CHUNK_SIZE),
-    status: 'pending',
-    bytesTransferred: 0,
   };
 }
 
@@ -146,7 +140,7 @@ interface UseSenderSessionOptions {
 export function useSenderSession({ active, settings, services = defaultSessionServices }: UseSenderSessionOptions) {
   const [state, dispatch] = useReducer(senderReducer, initialSenderState);
   const connectionRef = useRef<SessionConnection | null>(null);
-  const engineRef = useRef<SessionEngine | null>(null);
+  const engineRef = useRef<SessionSender | null>(null);
   const pendingConnRef = useRef<DataConnection | null>(null);
   const settingsRef = useRef(settings);
 
@@ -203,13 +197,16 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     openRoom();
     return () => {
       const connection = connectionRef.current;
+      if (engineRef.current) {
+        services.effects.onTransferEnded(false);
+      }
       connectionRef.current = null;
       engineRef.current = null;
       pendingConnRef.current = null;
       connection?.destroy();
       dispatch({ type: 'ROOM_CLOSED' });
     };
-  }, [active, openRoom]);
+  }, [active, openRoom, services]);
 
   const approvePeer = () => {
     const conn = pendingConnRef.current;
@@ -219,9 +216,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     }
     pendingConnRef.current = null;
 
-    const engine = services.createEngine();
-    engineRef.current = engine;
-    // Events from an engine that has since been replaced or torn down are ignored
+    // Events from a sender that has since been replaced or torn down are ignored
     const ifCurrent =
       <A extends unknown[]>(handler: (...args: A) => void) =>
       (...args: A) => {
@@ -229,29 +224,33 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
           handler(...args);
         }
       };
-    const endTransfer = () => {
+    const endTransfer = (isSuccessful: boolean) => {
       engineRef.current = null;
-      connectionRef.current?.disconnectPeer();
+      services.effects.onTransferEnded(isSuccessful);
     };
 
-    engine.init(conn, true, {
+    const engine = services.createSender(conn, {
       onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
       onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
       onAllCompleted: ifCurrent((result) => {
-        engineRef.current = null;
+        endTransfer(true);
         dispatch({ type: 'COMPLETED', result });
       }),
       onError: ifCurrent((error) => {
-        endTransfer();
+        endTransfer(false);
+        connectionRef.current?.disconnectPeer();
         dispatch({ type: 'FAILED', error });
       }),
       onCancelled: ifCurrent(() => {
-        endTransfer();
+        endTransfer(false);
+        connectionRef.current?.disconnectPeer();
         dispatch({ type: 'CANCELLED' });
       }),
     });
+    engineRef.current = engine;
+    services.effects.onTransferStarted();
     dispatch({ type: 'TRANSFER_STARTED' });
-    engine.startSenderTransfer(state.files, state.pin);
+    engine.start(state.files, state.pin);
   };
 
   const rejectPeer = () => {
@@ -264,7 +263,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   const cancel = () => {
     const engine = engineRef.current;
     engineRef.current = null;
-    engine?.cancel();
+    if (engine) {
+      engine.cancel();
+      services.effects.onTransferEnded(false);
+    }
     connectionRef.current?.disconnectPeer();
     dispatch({ type: 'CANCELLED' });
   };

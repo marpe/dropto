@@ -1,0 +1,150 @@
+import type { DataConnection } from 'peerjs';
+import type { ControlMessage, TransferEvents, TransferMetrics } from '../../types/transfer';
+import { TransferMetricsTracker } from './metrics';
+import { parseControlMessage, toArrayBuffer } from './protocol';
+
+interface NamedFile {
+  name: string;
+  relativePath?: string;
+}
+
+/**
+ * Protocol plumbing shared by both ends of one transfer over one connection: ordered message
+ * handling, pause/cancel/error propagation, disconnect detection and completion bookkeeping.
+ */
+export abstract class TransferPeer<Events extends TransferEvents> {
+  protected readonly conn: DataConnection;
+  protected readonly events: Events;
+  protected metrics: TransferMetricsTracker | null = null;
+  protected isPaused = false;
+  protected isStopped = false;
+  // From transfer start until completion or stop; losing the connection in this window is a failure
+  private isActive = false;
+  private incomingQueue: Promise<void> = Promise.resolve();
+  private corruptedFiles: string[] = [];
+
+  constructor(conn: DataConnection, events: Events) {
+    this.conn = conn;
+    this.events = events;
+    if (conn.dataChannel) {
+      conn.dataChannel.binaryType = 'arraybuffer';
+    }
+
+    // One ordered queue: disk writes never overlap and messages are handled in arrival order
+    conn.on('data', (data) => {
+      this.incomingQueue = this.incomingQueue.then(() => this.receive(data)).catch((err) => this.failTransfer(err));
+    });
+    conn.on('close', () => this.handleConnectionLost());
+  }
+
+  public togglePause(): boolean {
+    this.isPaused = !this.isPaused;
+    this.send({ type: this.isPaused ? 'TRANSFER_PAUSE' : 'TRANSFER_RESUME' });
+    this.events.onPaused?.(this.isPaused);
+    return this.isPaused;
+  }
+
+  public cancel() {
+    this.stop();
+    this.send({ type: 'TRANSFER_CANCEL' });
+  }
+
+  protected abstract handleMessage(message: ControlMessage): Promise<void> | void;
+  protected abstract handleChunk(buffer: ArrayBuffer): Promise<void>;
+
+  /** Stop-time cleanup specific to one side (e.g. discarding a partial file). */
+  protected onStop() {}
+
+  protected send(message: ControlMessage) {
+    if (this.conn.open) {
+      this.conn.send(JSON.stringify(message));
+    }
+  }
+
+  protected beginTransfer(totalBytes: number, totalFiles: number) {
+    this.isActive = true;
+    this.corruptedFiles = [];
+    this.metrics = new TransferMetricsTracker(totalBytes, totalFiles);
+  }
+
+  protected recordVerification(file: NamedFile | undefined, isVerified: boolean) {
+    if (!isVerified && file) {
+      this.corruptedFiles.push(file.relativePath || file.name);
+    }
+  }
+
+  protected completeTransfer() {
+    this.isActive = false;
+    this.events.onAllCompleted?.({ corruptedFiles: [...this.corruptedFiles] });
+  }
+
+  protected emitMetrics(metrics: TransferMetrics | null | undefined) {
+    if (metrics) {
+      this.events.onMetrics?.(metrics);
+    }
+  }
+
+  /** Local fatal error: tell the peer, stop, and surface it to the UI. */
+  protected failTransfer(err: unknown) {
+    if (this.isStopped) {
+      return;
+    }
+    console.error('Transfer failed:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    this.send({ type: 'ERROR', payload: { message } });
+    this.stop();
+    this.events.onError?.(message);
+  }
+
+  private stop() {
+    this.isActive = false;
+    this.isStopped = true;
+    this.onStop();
+  }
+
+  private async receive(data: unknown) {
+    // After a cancel or failure, late messages must not resume or complete the transfer
+    if (this.isStopped) {
+      return;
+    }
+    const buffer = await toArrayBuffer(data);
+    if (buffer) {
+      await this.handleChunk(buffer);
+      return;
+    }
+    const message = typeof data === 'string' ? parseControlMessage(data) : null;
+    if (!message) {
+      throw new Error('Received an invalid message from the peer');
+    }
+    await this.dispatch(message);
+  }
+
+  private async dispatch(message: ControlMessage) {
+    switch (message.type) {
+      case 'TRANSFER_PAUSE':
+      case 'TRANSFER_RESUME':
+        this.isPaused = message.type === 'TRANSFER_PAUSE';
+        this.events.onPaused?.(this.isPaused);
+        return;
+      case 'TRANSFER_CANCEL':
+        // The peer cancelled: stop without echoing the cancel back
+        this.stop();
+        this.events.onCancelled?.();
+        return;
+      case 'ERROR':
+        this.stop();
+        this.events.onError?.(message.payload.message);
+        return;
+      default:
+        await this.handleMessage(message);
+    }
+  }
+
+  private handleConnectionLost() {
+    if (!this.isActive) {
+      return;
+    }
+    this.stop();
+    this.events.onError?.('Connection to peer lost');
+  }
+}

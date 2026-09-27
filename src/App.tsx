@@ -9,6 +9,7 @@ import { useSettings } from './hooks/useSettings';
 import { useSenderSession } from './hooks/useSenderSession';
 import { useReceiverSession } from './hooks/useReceiverSession';
 import { useLeaveGuard } from './hooks/useLeaveGuard';
+import { useProgressTitle } from './hooks/useProgressTitle';
 
 type Mode = 'send' | 'receive';
 
@@ -31,6 +32,9 @@ export const App: React.FC = () => {
 
   const isTransferring = sender.state.status === 'transferring' || receiver.state.status === 'transferring';
   useLeaveGuard(isTransferring);
+  const activeMetrics =
+    sender.state.status === 'transferring' ? sender.state.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
+  useProgressTitle(activeMetrics ? activeMetrics.overallPercent : null);
   const isConnected =
     !!sender.state.connectedPeerId || ['waiting_approval', 'pin_required', 'verifying_pin', 'connected', 'transferring'].includes(receiver.state.status);
 

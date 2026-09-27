@@ -90,8 +90,8 @@ describe('useSenderSession', () => {
     });
 
     const engine = session.engines[0];
-    expect(engine.init).toHaveBeenCalledWith(peerConn, true, expect.any(Object));
-    expect(engine.startSenderTransfer).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt', size: 5 })], '4321');
+    expect(engine.conn).toBe(peerConn);
+    expect(engine.start).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt', size: 5 })], '4321');
     expect(session.result.current.state.status).toBe('transferring');
     expect(session.result.current.state.pendingPeerId).toBeNull();
     expect(session.result.current.state.connectedPeerId).toBe('receiver-1');
@@ -165,7 +165,7 @@ describe('useSenderSession', () => {
     const { engine, result } = await startTransfer();
 
     act(() => {
-      engine.callbacks.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
+      engine.events.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
     });
 
     expect(result.current.state.status).toBe('completed');
@@ -176,7 +176,7 @@ describe('useSenderSession', () => {
     const { engine, connection, result } = await startTransfer();
 
     act(() => {
-      engine.callbacks.onError?.('Connection to peer lost');
+      engine.events.onError?.('Connection to peer lost');
     });
 
     expect(result.current.state.status).toBe('failed');
@@ -194,7 +194,7 @@ describe('useSenderSession', () => {
     const { engine, connection, result } = await startTransfer();
 
     act(() => {
-      engine.callbacks.onCancelled?.();
+      engine.events.onCancelled?.();
     });
 
     expect(result.current.state.status).toBe('waiting');
@@ -214,6 +214,28 @@ describe('useSenderSession', () => {
     expect(result.current.state.status).toBe('waiting');
   });
 
+  it('holds device effects (wake lock, sounds) for exactly the length of the transfer', async () => {
+    const { engine, effects } = await startTransfer();
+    expect(effects.onTransferStarted).toHaveBeenCalledTimes(1);
+    expect(effects.onTransferEnded).not.toHaveBeenCalled();
+
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    expect(effects.onTransferEnded).toHaveBeenCalledWith(true);
+  });
+
+  it('ends device effects as unsuccessful when the transfer fails', async () => {
+    const { engine, effects } = await startTransfer();
+
+    act(() => {
+      engine.events.onError?.('Connection to peer lost');
+    });
+
+    expect(effects.onTransferEnded).toHaveBeenCalledWith(false);
+  });
+
   it('mirrors the pause state reported by the engine', async () => {
     const { engine, result } = await startTransfer();
 
@@ -223,7 +245,7 @@ describe('useSenderSession', () => {
     expect(engine.togglePause).toHaveBeenCalled();
 
     act(() => {
-      engine.callbacks.onPaused?.(true);
+      engine.events.onPaused?.(true);
     });
     expect(result.current.state.isPaused).toBe(true);
   });
@@ -233,7 +255,7 @@ describe('useSenderSession', () => {
 
     rerender({ active: false });
     act(() => {
-      engine.callbacks.onError?.('Connection to peer lost');
+      engine.events.onError?.('Connection to peer lost');
     });
 
     expect(connection.destroy).toHaveBeenCalled();
@@ -244,7 +266,7 @@ describe('useSenderSession', () => {
   it('starts over with an empty queue after "send more files"', async () => {
     const { engine, connection, result } = await startTransfer();
     act(() => {
-      engine.callbacks.onAllCompleted?.({ corruptedFiles: [] });
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
     });
 
     act(() => {

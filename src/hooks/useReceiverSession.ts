@@ -1,9 +1,15 @@
 import { useEffect, useReducer, useRef } from 'react';
-import type { PinPrompt, TransferResult } from '../services/transferEngine';
 import { soundService } from '../services/sound';
-import type { AppSettings, ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
+import type {
+  AppSettings,
+  PinPrompt,
+  ReceiverStatus,
+  TransferManifest,
+  TransferMetrics,
+  TransferResult,
+} from '../types/transfer';
 import { defaultSessionServices } from './sessionServices';
-import type { SessionConnection, SessionEngine, SessionServices } from './sessionServices';
+import type { SessionConnection, SessionReceiver, SessionServices } from './sessionServices';
 
 export interface ReceiverSessionState {
   status: ReceiverStatus;
@@ -59,7 +65,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         ...state,
         status: 'pin_required',
         pinPrompt: action.prompt,
-        pin: action.prompt.incorrect ? '' : state.pin,
+        pin: action.prompt.isIncorrect ? '' : state.pin,
       };
     case 'PIN_SUBMITTED':
       return { ...state, status: 'verifying_pin' };
@@ -123,15 +129,25 @@ export function useReceiverSession({
 }: UseReceiverSessionOptions) {
   const [state, dispatch] = useReducer(receiverReducer, { ...initialReceiverState, roomCode: initialRoomCode });
   const connectionRef = useRef<SessionConnection | null>(null);
-  const engineRef = useRef<SessionEngine | null>(null);
+  const engineRef = useRef<SessionReceiver | null>(null);
+  // True between the user starting to save and the transfer ending, for wake lock and sounds
+  const isRunningRef = useRef(false);
   const settingsRef = useRef(settings);
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
+  const endRun = (isSuccessful: boolean) => {
+    if (isRunningRef.current) {
+      isRunningRef.current = false;
+      services.effects.onTransferEnded(isSuccessful);
+    }
+  };
+
   const teardown = () => {
     const connection = connectionRef.current;
+    endRun(false);
     connectionRef.current = null;
     engineRef.current = null;
     connection?.destroy();
@@ -179,8 +195,7 @@ export function useReceiverSession({
         return;
       }
 
-      const engine = services.createEngine();
-      engineRef.current = engine;
+      // Events from a receiver that has since been replaced or torn down are ignored
       const ifCurrent =
         <A extends unknown[]>(handler: (...args: A) => void) =>
         (...args: A) => {
@@ -189,24 +204,28 @@ export function useReceiverSession({
           }
         };
 
-      engine.init(conn, false, {
+      const engine = services.createReceiver(conn, {
         onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
         onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
         onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
         onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
         onAllCompleted: ifCurrent((result) => {
+          endRun(true);
           leave();
           dispatch({ type: 'COMPLETED', result });
         }),
         onError: ifCurrent((error) => {
+          endRun(false);
           leave();
           dispatch({ type: 'FAILED', error });
         }),
         onCancelled: ifCurrent(() => {
+          endRun(false);
           leave();
           dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
         }),
       });
+      engineRef.current = engine;
       soundService.playConnect();
       dispatch({ type: 'CONNECTED' });
     } catch (err: any) {
@@ -226,9 +245,15 @@ export function useReceiverSession({
       return;
     }
     dispatch({ type: 'SAVING_STARTED' });
-    const started = await engine.startReceiving();
-    // A storage failure has already moved the session to 'error' via onError
-    if (!started && engineRef.current === engine) {
+    const isStarted = await engine.startReceiving();
+    if (engineRef.current !== engine) {
+      // A storage failure already moved the session to 'error' via onError
+      return;
+    }
+    if (isStarted) {
+      isRunningRef.current = true;
+      services.effects.onTransferStarted();
+    } else {
       dispatch({ type: 'SAVING_ABORTED' });
     }
   };
@@ -236,6 +261,7 @@ export function useReceiverSession({
   const cancel = () => {
     const engine = engineRef.current;
     engine?.cancel();
+    endRun(false);
     leave();
     dispatch({ type: 'CANCELLED' });
   };
