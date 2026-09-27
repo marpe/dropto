@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildShareUrl, generateShareKey, parseShareLink, stripShareKeyFromUrl } from '../utils/shareLink';
+import { buildShareUrl, generateShareKey, parseShareLink, parseShareUrl, stripShareKeyFromUrl } from '../utils/shareLink';
 
 describe('generateShareKey', () => {
   it('produces a URL-safe 128-bit key', () => {
@@ -41,5 +41,17 @@ describe('share links', () => {
     expect(stripShareKeyFromUrl('https://dropto.space/?room=DT-ABC234#key=secret')).toBe(
       'https://dropto.space/?room=DT-ABC234'
     );
+  });
+
+  it('recognises a whole share link pasted as text', () => {
+    expect(parseShareUrl('  https://dropto.space/?room=dt-abc234#key=Secret_1 ')).toEqual({
+      roomCode: 'DT-ABC234',
+      shareKey: 'Secret_1',
+    });
+  });
+
+  it('does not mistake a room code or an unrelated URL for a share link', () => {
+    expect(parseShareUrl('DT-ABC234')).toBeNull();
+    expect(parseShareUrl('https://example.com/page')).toBeNull();
   });
 });

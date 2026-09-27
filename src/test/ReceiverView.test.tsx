@@ -295,4 +295,13 @@ describe('ReceiverView Component UI & Interaction', () => {
 
     expect(onSwitchToSend).toHaveBeenCalledTimes(1);
   });
+
+  it('connects when Enter is pressed in the room code field', () => {
+    const onConnect = vi.fn();
+    renderWaiting('idle', { onConnect });
+
+    fireEvent.submit(screen.getByPlaceholderText(/XXXXXX/));
+
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
 });

@@ -29,6 +29,19 @@ export function parseShareLink(search: string, hash: string): ShareLink {
   return { roomCode, shareKey };
 }
 
+/** A share link pasted as text, or null if the text is not one (e.g. a bare room code). */
+export function parseShareUrl(text: string): ShareLink | null {
+  let url: URL;
+  try {
+    url = new URL(text.trim());
+  } catch {
+    // Not a URL at all: a typed room code
+    return null;
+  }
+  const link = parseShareLink(url.search, url.hash);
+  return link.roomCode ? link : null;
+}
+
 /** Keeps `?room=` so a reload still pre-fills the code, but drops the key from the visible address. */
 export function stripShareKeyFromUrl(href: string): string {
   const url = new URL(href);

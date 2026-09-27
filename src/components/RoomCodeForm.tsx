@@ -37,7 +37,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
       <IconBadge icon={DownloadCloud} className="mx-auto mb-4" iconClassName="motion-safe:animate-float" />
       <h2 className="text-xl font-bold text-center text-zinc-900 dark:text-white mb-2">Receive Files via P2P</h2>
       <p className="text-xs text-center text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
-        Enter the room code the sender gave you to connect directly over WebRTC.
+        Enter the room code the sender gave you, or paste their link.
       </p>
 
       {errorMessage && (
@@ -55,7 +55,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
             spellCheck={false}
             placeholder={`${getActiveBrand().roomPrefix}-XXXXXX`}
             value={roomCode}
-            onChange={(e) => onRoomCodeChange(e.target.value.toUpperCase())}
+            onChange={(e) => onRoomCodeChange(e.target.value)}
             className="sm:text-2xl font-bold"
           />
         </label>
