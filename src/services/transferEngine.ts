@@ -28,6 +28,7 @@ export class TransferEngine {
   private callbacks: EngineEventCallback = {};
   // True from manifest until completion/cancel; a disconnect in this window is a failure
   private isActive: boolean = false;
+  private incomingQueue: Promise<void> = Promise.resolve();
 
   // Sender state
   private files: TransferFile[] = [];
@@ -64,8 +65,11 @@ export class TransferEngine {
       rawChannel.bufferedAmountLowThreshold = LOW_WATERMARK;
     }
 
+    // Process messages strictly in arrival order so disk writes never overlap
     conn.on('data', (data) => {
-      this.handleIncomingData(data);
+      this.incomingQueue = this.incomingQueue
+        .then(() => this.handleIncomingData(data))
+        .catch((err) => this.failTransfer(err));
     });
 
     conn.on('close', () => {
@@ -246,8 +250,7 @@ export class TransferEngine {
 
       return true;
     } catch (err: any) {
-      console.error('Storage preparation failed:', err);
-      this.callbacks.onError?.(`Failed to prepare disk storage: ${err.message}`);
+      this.failTransfer(new Error(`Failed to prepare disk storage: ${err?.message ?? err}`));
       return false;
     }
   }
@@ -280,6 +283,11 @@ export class TransferEngine {
   // =================== PROTOCOL CONTROL FRAMES ===================
 
   private async handleIncomingData(data: any) {
+    // After a cancel or failure, late messages from the peer must not resume or complete the transfer
+    if (this.isCancelled) {
+      return;
+    }
+
     let buffer: ArrayBuffer | null = null;
 
     if (data instanceof ArrayBuffer) {
@@ -310,7 +318,7 @@ export class TransferEngine {
     }
 
     if (msg) {
-      this.handleControlMessage(msg);
+      await this.handleControlMessage(msg);
     }
   }
 
@@ -338,8 +346,9 @@ export class TransferEngine {
 
       case 'FILE_START': {
         // Sender received confirmation from receiver to begin streaming file
+        // Not awaited: streaming a file must not block pause/cancel messages in the queue
         const { fileIndex, resumeFromChunk } = msg.payload;
-        this.proceedWithFileSend(fileIndex, resumeFromChunk || 0);
+        this.proceedWithFileSend(fileIndex, resumeFromChunk || 0).catch((err) => this.failTransfer(err));
         break;
       }
 
@@ -366,7 +375,7 @@ export class TransferEngine {
         // Check if there are more files in manifest
         if (this.manifest && fileIndex + 1 < this.manifest.files.length) {
           // Prepare next file
-          this.prepareAndStartReceiverFile(fileIndex + 1);
+          await this.prepareAndStartReceiverFile(fileIndex + 1);
         } else {
           this.isActive = false;
           wakeLockService.release();
@@ -410,6 +419,8 @@ export class TransferEngine {
       }
 
       case 'ERROR': {
+        // Peer hit a fatal error; stop streaming to it
+        this.stop();
         this.callbacks.onError?.(msg.payload?.message || 'Transfer error occurred');
         break;
       }
@@ -438,6 +449,18 @@ export class TransferEngine {
     this.sendControlMessage({
       type: 'TRANSFER_CANCEL',
     });
+  }
+
+  /** Local fatal error: tell the peer, stop, and surface it to the UI. */
+  private failTransfer(err: unknown) {
+    console.error('Transfer failed:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    this.sendControlMessage({
+      type: 'ERROR',
+      payload: { message },
+    });
+    this.stop();
+    this.callbacks.onError?.(message);
   }
 
   private handleConnectionLost() {
