@@ -37,7 +37,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
           <div>
             <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
               <span>{isSender ? 'Streaming to Receiver' : 'Receiving Direct to Disk'}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
+              <span className="text-2xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
                 Active P2P
               </span>
             </h3>

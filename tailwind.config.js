@@ -22,6 +22,10 @@ export default {
           border: '#27272a',
         },
       },
+      // Micro-labels (header badge, field captions); nothing smaller than this
+      fontSize: {
+        '2xs': '0.625rem',
+      },
       keyframes: {
         float: {
           '0%, 100%': { transform: 'translateY(0)' },
