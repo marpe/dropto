@@ -10,6 +10,7 @@ export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KB
 const HIGH_WATERMARK = 1024 * 1024; // 1 MB
 const LOW_WATERMARK = 256 * 1024; // 256 KB
 const HEADER_SIZE = 16; // 4 + 8 + 4 bytes
+const METRICS_INTERVAL_MS = 200;
 
 export type TransferResult = {
   /** Paths of files whose end-to-end checksum did not match */
@@ -56,6 +57,8 @@ export class TransferEngine {
   private totalBytesTransferred: number = 0;
   private speedWindow: { time: number; bytes: number }[] = [];
   private startTime: number = 0;
+  private lastMetricsEmit: number = 0;
+  private originalTitle: string | null = null;
 
   public init(conn: DataConnection, isSender: boolean, callbacks: EngineEventCallback) {
     this.conn = conn;
@@ -237,7 +240,7 @@ export class TransferEngine {
     this.receiverChecksum.reset();
 
     // Immediately emit initial metrics so UI switches to metrics dashboard
-    this.emitMetrics(fileMeta.name, 0);
+    this.emitMetrics(fileMeta.name, 0, true);
 
     try {
       this.currentWriter = this.createWriter(fileMeta);
@@ -481,6 +484,7 @@ export class TransferEngine {
 
   private completeTransfer() {
     this.isActive = false;
+    this.restoreTitle();
     wakeLockService.release();
     soundService.playComplete();
     this.callbacks.onAllCompleted?.({ corruptedFiles: [...this.corruptedFiles] });
@@ -508,6 +512,7 @@ export class TransferEngine {
 
   private stop() {
     this.isActive = false;
+    this.restoreTitle();
     this.isCancelled = true;
     wakeLockService.release();
     if (this.currentWriter) {
@@ -534,7 +539,15 @@ export class TransferEngine {
     return windowBytes / duration;
   }
 
-  private emitMetrics(currentFileName: string, currentFilePercent: number) {
+  private emitMetrics(currentFileName: string, currentFilePercent: number, force = false) {
+    // Every chunk would otherwise trigger a React render (~1,600/s at 100 MB/s)
+    const now = Date.now();
+    const isFileEnd = currentFilePercent >= 100;
+    if (!force && !isFileEnd && now - this.lastMetricsEmit < METRICS_INTERVAL_MS) {
+      return;
+    }
+    this.lastMetricsEmit = now;
+
     const currentSpeed = this.calculateCurrentSpeed();
     const elapsedSec = Math.max((Date.now() - this.startTime) / 1000, 1);
     const averageSpeed = this.totalBytesTransferred / elapsedSec;
@@ -557,10 +570,18 @@ export class TransferEngine {
 
     // Update document title with progress
     if (typeof document !== 'undefined') {
+      this.originalTitle ??= document.title;
       document.title = `(${Math.round(overallPercent)}%) DropWave — Transferring`;
     }
 
     this.callbacks.onMetrics?.(metrics);
+  }
+
+  private restoreTitle() {
+    if (this.originalTitle !== null && typeof document !== 'undefined') {
+      document.title = this.originalTitle;
+      this.originalTitle = null;
+    }
   }
 }
 
