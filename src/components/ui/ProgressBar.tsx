@@ -15,7 +15,7 @@ const trackClasses: Record<ProgressBarVariant, string> = {
 };
 
 const fillClasses: Record<ProgressBarVariant, string> = {
-  primary: 'bg-gradient-to-r from-brand-600 via-brand-500 to-brand-400 shadow-[0_0_12px] shadow-brand-500/40',
+  primary: 'bg-linear-to-r from-brand-600 via-brand-500 to-brand-400 shadow-[0_0_12px] shadow-brand-500/40',
   subtle: 'bg-brand-500/60',
 };
 

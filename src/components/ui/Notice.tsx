@@ -24,7 +24,7 @@ export const Notice: React.FC<NoticeProps> = ({ tone, icon: Icon, title, childre
     <Icon className={cn('w-4 h-4 shrink-0 mt-0.5', toneClasses[tone].icon)} />
     <div
       className={cn(
-        'min-w-0 break-words',
+        'min-w-0 wrap-break-word',
         tone === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300'
       )}
     >

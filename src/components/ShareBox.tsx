@@ -80,7 +80,7 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
           <span className="text-2xs uppercase font-bold tracking-wider text-zinc-400 block">Room Code</span>
           {!roomCode && errorMessage ? (
             <div className="flex items-center justify-center sm:justify-start gap-3">
-              <span className="text-sm text-red-500 break-words min-w-0">{errorMessage}</span>
+              <span className="text-sm text-red-500 wrap-break-word min-w-0">{errorMessage}</span>
               <Button variant="secondary" size="sm" onClick={onRetryRoom} className="shrink-0">
                 Retry
               </Button>
@@ -97,17 +97,17 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
             size="sm"
             disabled={!roomCode}
             onClick={() => copyCode(roomCode)}
-            className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-sm"
+            className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 shadow-xs"
           >
             {copiedCode ? <Check className="w-3.5 h-3.5 text-brand-500" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
           </Button>
-          <Button size="sm" disabled={!roomCode} onClick={() => copyLink(shareUrl)} className="px-4 py-2 shadow-sm">
+          <Button size="sm" disabled={!roomCode} onClick={() => copyLink(shareUrl)} className="px-4 py-2 shadow-xs">
             {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedLink ? 'Link Copied' : 'Copy Link'}</span>
           </Button>
           {canWebShare && (
-            <Button size="sm" disabled={!roomCode} onClick={() => shareLink(shareUrl)} className="px-4 py-2 shadow-sm">
+            <Button size="sm" disabled={!roomCode} onClick={() => shareLink(shareUrl)} className="px-4 py-2 shadow-xs">
               <Share2 className="w-3.5 h-3.5" />
               <span>Share</span>
             </Button>
