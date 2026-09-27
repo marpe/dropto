@@ -5,16 +5,24 @@ import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
 import { IconButton } from './components/ui/IconButton';
+import { DropOverlay } from './components/DropOverlay';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useSenderSession } from './hooks/useSenderSession';
 import { useReceiverSession } from './hooks/useReceiverSession';
 import { useLeaveGuard } from './hooks/useLeaveGuard';
 import { useProgressTitle } from './hooks/useProgressTitle';
+import { usePageFileDrop } from './hooks/usePageFileDrop';
+import type { ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
 import type { ShareLink } from './utils/shareLink';
 
 type Mode = 'send' | 'receive';
+
+// Files can join the queue until the receiver starts downloading
+const CAN_ADD_FILES: SenderStatus[] = ['idle', 'waiting', 'awaiting_receiver'];
+// From the room-code form, dropping files means "actually, I want to send"
+const CAN_SWITCH_TO_SENDING: ReceiverStatus[] = ['idle', 'error'];
 
 /** Reads the link the page was opened with, then hides its key from the address bar, history and screenshots. */
 function readShareLink(): ShareLink {
@@ -45,6 +53,14 @@ export const App: React.FC = () => {
     sender.state.status === 'transferring' ? sender.state.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
   useProgressTitle(activeMetrics ? activeMetrics.overallPercent : null);
 
+  const addDroppedFiles = (files: File[]) => {
+    setMode('send');
+    sender.actions.addFiles(files);
+  };
+  const canTakeFiles =
+    mode === 'send' ? CAN_ADD_FILES.includes(sender.state.status) : CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
+  const { isDraggingFiles } = usePageFileDrop(canTakeFiles ? addDroppedFiles : null);
+
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 text-zinc-900 dark:bg-supabase-bg dark:text-zinc-100 supabase-glow transition-colors">
       <IconButton
@@ -54,6 +70,8 @@ export const App: React.FC = () => {
       >
         <Settings className="w-5 h-5" />
       </IconButton>
+
+      {isDraggingFiles && <DropOverlay />}
 
       {isSettingsOpen && (
         <SettingsModal

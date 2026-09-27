@@ -9,14 +9,14 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(page.locator('text=DropWave').first()).toBeVisible();
     await expect(page.locator('header')).toHaveCount(0);
     await expect(page.locator('footer')).toHaveCount(0);
-    await expect(page.getByText('Drag & Drop files or directories here')).toBeVisible();
+    await expect(page.getByText('Drag & Drop files or folders anywhere')).toBeVisible();
     await expect(page.getByText(/No account · Nothing stored/)).toBeVisible();
 
     // Receiving by code is one click away, and there is a way back
     await page.getByRole('button', { name: /receive files/i }).click();
     await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
     await page.getByRole('button', { name: /send files instead/i }).click();
-    await expect(page.getByText('Drag & Drop files or directories here')).toBeVisible();
+    await expect(page.getByText('Drag & Drop files or folders anywhere')).toBeVisible();
 
     await page.getByTitle('Settings').click();
     await expect(page.locator('text=Transfer & Network Settings')).toBeVisible();
@@ -29,6 +29,31 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await page.locator('button:has-text("Cancel")').click();
     await expect(page.locator('text=Transfer & Network Settings')).not.toBeVisible();
+  });
+
+  test('files dropped anywhere on the page are queued, even from the receive form', async ({ page }) => {
+    await page.goto('/');
+    const dropOnPage = async (name: string) => {
+      const dataTransfer = await page.evaluateHandle((fileName) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File(['dropped'], fileName, { type: 'text/plain' }));
+        return transfer;
+      }, name);
+      // Deliberately outside the drop zone: the brand mark at the top of the page
+      await page.dispatchEvent('main > div:first-child', 'dragenter', { dataTransfer });
+      await expect(page.getByText('Drop to add files')).toBeVisible();
+      await page.dispatchEvent('main > div:first-child', 'drop', { dataTransfer });
+      await expect(page.getByText('Drop to add files')).toHaveCount(0);
+    };
+
+    await dropOnPage('first.txt');
+    await expect(page.getByText('first.txt')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Clear All' }).click();
+    await page.getByRole('button', { name: /receive files/i }).click();
+    await dropOnPage('second.txt');
+    await expect(page.getByText('second.txt')).toBeVisible();
+    await expect(page.locator('text=Receive Files via P2P')).toHaveCount(0);
   });
 
   test('shows dropto.space branding and orange palette for the dropto brand', async ({ page }) => {
