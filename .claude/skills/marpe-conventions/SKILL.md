@@ -28,7 +28,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 
 - **Push styling down.** Views (`SenderView`, `ReceiverView`, `App`) own layout only (flex/grid, gaps, max-widths). Leaf components own typography, surfaces, borders, focus and hover states.
 - **A long or repeated class list means a component.** If you're copying a styled node, extract it with typed variant props instead.
-- **Encapsulate conceptual units.** Existing examples: `TransferCompleteCard` (success/corrupted states plus confetti), `PinEntryCard`, `MetricsDashboard`, `PeerApprovalModal`, `IceServerRow`, `ShareBox`, `FileQueue`, `RoomCodeForm`, `BrandMark`. New concepts get the same treatment.
+- **Encapsulate conceptual units.** Existing examples: `TransferCompleteCard` (success/corrupted states plus confetti), `PinEntryCard`, `MetricsDashboard`, `PeerApprovalModal`, `IceServerRow`, `ShareBox`, `FileQueue`, `RoomCodeForm`, `TransferFileList`. New concepts get the same treatment.
 - **Per-item state belongs in the row component.** Rows with their own edit, draft, copied or visibility state own it. Parents pass data and domain callbacks, never ID-keyed `Record<string, …>` state maps.
 - **Modals** use `components/ui/Modal` (overlay, panel, size `sm`/`md`). Pass `onClose` for a close button plus Escape; omit it when the user must choose (e.g. `PeerApprovalModal`). Parents mount modals conditionally — no `isOpen` props. Never use `alert()` / `confirm()` / `prompt()`.
 - **Transient "done" flags** (copied, saved) use `useCopyToClipboard` or the same pattern: timer cleared on re-trigger and unmount, and the flag set only when the action actually succeeded.
@@ -42,18 +42,19 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 - `components/ui/Notice` — inline callout (`tone`: `brand` | `warning` | `danger`, optional `title`).
 - `components/ui/TextInput` — `size` `sm` (settings fields) or `lg` (centred mono codes/PINs).
 - `components/ui/ProgressBar` — `primary` | `subtle`; animates `transform`, not `width`.
-- `components/ui/Pill` — small uppercase brand tag. `components/ui/AppLogo` — the header mark.
+- `components/ui/Pill` — small uppercase brand tag. `components/ui/LinkButton` — quiet text action. `components/ui/SegmentedControl` — mutually exclusive choices.
 - `components/ui/Spinner` — colour comes from `text-*` (it draws in `currentColor`), size from `w-/h-`.
 - `components/ui/GitHubIcon`.
 - `components/ui/FileTypeIcon` — lucide glyph + Catppuccin colour for a file name/MIME type (`utils/fileKind.ts`).
-- Icons: `lucide-react` first. A custom SVG becomes a component in `components/ui/` accepting `className` (see `AppLogo`, `GitHubIcon`). No inline `<svg>` blocks in views.
+- Icons: `lucide-react` first. A custom SVG becomes a component in `components/ui/` accepting `className` (see `GitHubIcon`). No inline `<svg>` blocks in views.
 
 ---
 
 ## 3. Button Labels
 
 - **Inside forms, dialogs and modals, use short verbs:** *Save*, *Cancel*, *Accept*, *Decline*, *Retry*, *Copy*. The surrounding UI supplies the noun.
-- **A page's primary call-to-action may carry a noun** when nothing else on screen names the action (e.g. *Select Files*, *Connect & Download*).
+- **Where the surrounding UI already says what happens, one word is enough** (the drop zone's *File* / *Folder*). A primary call-to-action may carry a noun when nothing else on screen names the action (e.g. *Connect & Download*).
+- **The page stays bare:** no header, footer or logo. Brand name lives in the tab title and Settings → About; copy is plain ("Drop files to send"), no marketing.
 - Don't bulk-relabel existing buttons; e2e tests select several by text.
 
 ---
@@ -105,6 +106,7 @@ Code explains *what*. Comments only explain *why*: invariants, browser quirks, p
 - Deliver the complete refactor in one pass, not a partial cleanup.
 - No scans inside loops (`.find`/`.filter` per iteration). Index once with a `Map`.
 - Prefer immutable transformations over mutable accumulators.
+- Tests find elements by role and accessible name, or by `data-testid` for things whose wording is likely to change (`drop-zone`, `pick-files`, `pick-folder`). Never assert on marketing copy; a test that only checks wording tests nothing.
 - Behaviour changes are test-first. Unit tests go in `src/test/`. Protocol tests pair a real `TransferSender` and `TransferReceiver` via `MockDataConnection`. Hooks are tested through `renderHook` with fake services. UI that depends on a real browser (WebRTC, brand CSS) is covered by Playwright.
 
 ---

@@ -6,17 +6,15 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await page.goto('/');
 
     await expect(page).toHaveTitle(/DropWave/i);
-    await expect(page.locator('text=DropWave').first()).toBeVisible();
     await expect(page.locator('header')).toHaveCount(0);
     await expect(page.locator('footer')).toHaveCount(0);
-    await expect(page.getByText('Drag & Drop files or folders anywhere')).toBeVisible();
-    await expect(page.getByText(/No account · Nothing stored/)).toBeVisible();
+    await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     // Receiving by code is one click away, and there is a way back
     await page.getByRole('button', { name: /receive files/i }).click();
     await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
     await page.getByRole('button', { name: /send files instead/i }).click();
-    await expect(page.getByText('Drag & Drop files or folders anywhere')).toBeVisible();
+    await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     await page.getByTitle('Settings').click();
     await expect(page.locator('text=Transfer & Network Settings')).toBeVisible();
@@ -39,10 +37,10 @@ test.describe('DropWave Application End-to-End Tests', () => {
         transfer.items.add(new File(['dropped'], fileName, { type: 'text/plain' }));
         return transfer;
       }, name);
-      // Deliberately outside the drop zone: the brand mark at the top of the page
-      await page.dispatchEvent('main > div:first-child', 'dragenter', { dataTransfer });
+      // Deliberately outside the drop zone: on the page background
+      await page.dispatchEvent('main', 'dragenter', { dataTransfer });
       await expect(page.getByText('Drop to add files')).toBeVisible();
-      await page.dispatchEvent('main > div:first-child', 'drop', { dataTransfer });
+      await page.dispatchEvent('main', 'drop', { dataTransfer });
       await expect(page.getByText('Drop to add files')).toHaveCount(0);
     };
 
@@ -61,7 +59,6 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await page.goto('/?brand=dropto');
 
     await expect(page).toHaveTitle('dropto.space — 10GB P2P WebRTC Transfer');
-    await expect(page.getByText('dropto.space', { exact: true }).first()).toBeVisible();
     await expect(page.locator('text=DropWave')).toHaveCount(0);
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon-dropto.svg');
     const brand500 = await page.evaluate(() =>
@@ -114,7 +111,6 @@ test.describe('DropWave Application End-to-End Tests', () => {
     const { senderPage, receiverPage, close } = await openPeers(browser);
 
     await senderPage.goto('/');
-    await expect(senderPage.locator('text=DropWave').first()).toBeVisible();
     await addFile(senderPage, 'sample-dataset.dat', 'Simulated 10GB dataset test buffer payload.');
     await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
     const roomCode = await readRoomCode(senderPage);
@@ -249,7 +245,7 @@ async function openPeers(browser: Browser) {
 
 async function addFile(page: Page, name: string, content: string, mimeType = 'text/plain') {
   const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.locator('button:has-text("Select Files")').click();
+  await page.getByTestId('pick-files').click();
   await (await fileChooserPromise).setFiles([{ name, mimeType, buffer: Buffer.from(content) }]);
   await expect(page.locator(`text=${name}`)).toBeVisible();
 }
