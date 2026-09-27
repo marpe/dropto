@@ -53,7 +53,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 code
 ## 3. Button Labels
 
 - **Inside forms, dialogs and modals, use short verbs:** *Save*, *Cancel*, *Accept*, *Decline*, *Retry*, *Copy*. The surrounding UI supplies the noun.
-- **Where the surrounding UI already says what happens, one word is enough** (the drop zone's *File* / *Folder*). A primary call-to-action may carry a noun when nothing else on screen names the action (e.g. *Connect & Download*).
+- **Where the surrounding UI already says what happens, one word is enough** (the drop zone's *File* / *Folder*). A primary call-to-action may carry a noun when nothing else on screen names the action (e.g. *Receive files*).
 - **The page stays bare:** no header, footer or logo. Brand name lives in the tab title and Settings → About; copy is plain ("Drop files to send"), no marketing.
 - Don't bulk-relabel existing buttons; e2e tests select several by text.
 

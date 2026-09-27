@@ -60,7 +60,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
           />
         </label>
 
-        <Button type="submit" size="lg" disabled={!canConnect} className="w-full py-3 motion-safe:hover:scale-[1.02]">
+        <Button data-testid="connect" type="submit" size="lg" disabled={!canConnect} className="w-full py-3 motion-safe:hover:scale-[1.02]">
           {isConnecting ? (
             <>
               <Spinner />
@@ -68,7 +68,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
             </>
           ) : (
             <>
-              <span>Connect & Download</span>
+              <span>Connect</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}

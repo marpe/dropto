@@ -76,7 +76,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
     const roomInput = page.locator('input[placeholder="DW-XXXXXX"]');
     await expect(roomInput).toHaveValue('DW-998877');
-    await expect(page.locator('button:has-text("Connect & Download")')).toBeEnabled();
+    await expect(page.getByTestId('connect')).toBeEnabled();
   });
 
   test('verifies "Select Save Location & Start Download" initiates stream and storage', async ({ page }) => {
@@ -102,7 +102,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(roomInput).toHaveValue('DW-TEST01');
 
     // Verify Connect button is clickable
-    const connectBtn = page.locator('button:has-text("Connect & Download")');
+    const connectBtn = page.getByTestId('connect');
     await expect(connectBtn).toBeVisible();
     await expect(connectBtn).toBeEnabled();
   });
@@ -127,7 +127,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // No #key: the room code alone must still need the sender's approval
     await receiverPage.goto(`/?room=${roomCode}`);
     await expect(receiverPage.locator('text=Receive Files via P2P')).toBeVisible();
-    await receiverPage.locator('button:has-text("Connect & Download")').click();
+    await receiverPage.getByTestId('connect').click();
     await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
       timeout: 15000,
     });
@@ -187,7 +187,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     const roomCode = await readRoomCode(senderPage);
 
     await receiverPage.goto(`/?room=${roomCode}`);
-    await receiverPage.locator('button:has-text("Connect & Download")').click();
+    await receiverPage.getByTestId('connect').click();
     await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
       timeout: 15000,
     });
@@ -209,7 +209,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderPage.locator('input[placeholder="e.g. 1234"]').fill('2468');
 
     await receiverPage.goto(`/?room=${roomCode}`);
-    await receiverPage.locator('button:has-text("Connect & Download")').click();
+    await receiverPage.getByTestId('connect').click();
     await senderPage.locator('button:has-text("Accept")').click({ timeout: 15000 });
 
     // File names must stay hidden until the PIN is accepted
