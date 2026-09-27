@@ -49,6 +49,7 @@ export class TransferEngine {
   private createWriter: WriterFactory = () => createStorageWriter();
   private receiverChecksum = new FastStreamingChecksum();
   private receivedBytesForFile: number = 0;
+  private expectedChunkIdx: number = 0;
 
   // Metrics tracking
   private totalBytes: number = 0;
@@ -232,6 +233,7 @@ export class TransferEngine {
     const fileMeta = this.manifest.files[fileIndex];
     this.currentFileIdx = fileIndex;
     this.receivedBytesForFile = 0;
+    this.expectedChunkIdx = 0;
     this.receiverChecksum.reset();
 
     // Immediately emit initial metrics so UI switches to metrics dashboard
@@ -263,10 +265,28 @@ export class TransferEngine {
   private async handleBinaryChunk(buffer: ArrayBuffer) {
     if (!this.currentWriter || !this.manifest) return;
 
+    if (buffer.byteLength < HEADER_SIZE) {
+      throw new Error('Received a malformed data chunk');
+    }
     const view = new DataView(buffer);
     const fileIndex = view.getUint32(0, false);
-    // const chunkIndex = Number(view.getBigUint64(4, false));
+    const chunkIndex = Number(view.getBigUint64(4, false));
     const payloadLength = view.getUint32(12, false);
+
+    // Validate against the manifest before anything touches the checksum or disk
+    const currentFile = this.manifest.files[this.currentFileIdx];
+    if (fileIndex !== this.currentFileIdx) {
+      throw new Error(`Received data for file #${fileIndex} while receiving file #${this.currentFileIdx}`);
+    }
+    if (chunkIndex !== this.expectedChunkIdx) {
+      throw new Error(`Received chunk ${chunkIndex} of ${currentFile.name}, expected chunk ${this.expectedChunkIdx}`);
+    }
+    if (HEADER_SIZE + payloadLength > buffer.byteLength) {
+      throw new Error('Received a malformed data chunk');
+    }
+    if (this.receivedBytesForFile + payloadLength > currentFile.size) {
+      throw new Error(`Received more data than declared for ${currentFile.name}`);
+    }
 
     const payload = new Uint8Array(buffer, HEADER_SIZE, payloadLength);
 
@@ -274,11 +294,11 @@ export class TransferEngine {
     this.receiverChecksum.update(payload);
     await this.currentWriter.writeChunk(payload);
 
+    this.expectedChunkIdx++;
     this.receivedBytesForFile += payloadLength;
     this.totalBytesTransferred += payloadLength;
     this.recordSpeed(payloadLength);
 
-    const currentFile = this.manifest.files[fileIndex];
     const percent = (this.receivedBytesForFile / currentFile.size) * 100;
 
     this.callbacks.onFileProgress?.(fileIndex, percent, this.receivedBytesForFile);
