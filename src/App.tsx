@@ -11,7 +11,7 @@ import { useReceiverSession } from './hooks/useReceiverSession';
 
 type Mode = 'send' | 'receive';
 
-/** Room code from a ?room=DW-XXXXXX share link, if the page was opened through one. */
+/** Room code from a ?room=XX-XXXXXX share link, if the page was opened through one. */
 function getSharedRoomCode(): string {
   return new URLSearchParams(window.location.search).get('room')?.toUpperCase() ?? '';
 }

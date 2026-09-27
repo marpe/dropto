@@ -2,19 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand palettes as RGB triples (see tailwind.config.js `brand`). DropWave green is the default. */
+:root {
+  --brand-50: 237 252 244;
+  --brand-100: 213 247 230;
+  --brand-200: 174 240 209;
+  --brand-300: 118 228 180;
+  --brand-400: 82 214 155;
+  --brand-500: 62 207 142;
+  --brand-600: 36 180 126;
+  --brand-700: 28 143 101;
+  --brand-800: 26 113 82;
+  --brand-900: 23 92 68;
+  --brand-950: 7 51 36;
+}
+
+/* dropto.space orange (stamped on <html> by the boot script in index.html) */
+:root[data-brand='dropto'] {
+  --brand-50: 255 247 237;
+  --brand-100: 255 237 213;
+  --brand-200: 254 215 170;
+  --brand-300: 253 186 116;
+  --brand-400: 251 146 60;
+  --brand-500: 249 115 22;
+  --brand-600: 234 88 12;
+  --brand-700: 194 65 12;
+  --brand-800: 154 52 18;
+  --brand-900: 124 45 18;
+  --brand-950: 67 20 7;
+}
+
 :root {
   color-scheme: light dark;
   --scrollbar-thumb: #d4d4d8;
   --scrollbar-track: #f4f4f5;
-  --accent-color: #3ECF8E;
-  accent-color: #3ECF8E;
+  accent-color: rgb(var(--brand-500));
 }
 
 .dark {
   --scrollbar-thumb: #27272a;
   --scrollbar-track: #121212;
-  --accent-color: #3ECF8E;
-  accent-color: #3ECF8E;
 }
 
 /* Modern standard scrollbar-color */
@@ -51,18 +78,18 @@
 }
 
 .supabase-card:hover {
-  border-color: rgba(62, 207, 142, 0.4);
+  border-color: rgb(var(--brand-500) / 0.4);
 }
 
 /* Animated glowing border */
 @keyframes border-glow {
   0%, 100% {
-    border-color: rgba(62, 207, 142, 0.2);
-    box-shadow: 0 0 15px rgba(62, 207, 142, 0.05);
+    border-color: rgb(var(--brand-500) / 0.2);
+    box-shadow: 0 0 15px rgb(var(--brand-500) / 0.05);
   }
   50% {
-    border-color: rgba(62, 207, 142, 0.6);
-    box-shadow: 0 0 25px rgba(62, 207, 142, 0.15);
+    border-color: rgb(var(--brand-500) / 0.6);
+    box-shadow: 0 0 25px rgb(var(--brand-500) / 0.15);
   }
 }
 
@@ -72,9 +99,9 @@
 
 /* Ambient radial glow in background */
 .supabase-glow {
-  background: radial-gradient(circle 500px at 50% 10%, rgba(62, 207, 142, 0.08), transparent 70%);
+  background: radial-gradient(circle 500px at 50% 10%, rgb(var(--brand-500) / 0.08), transparent 70%);
 }
 
 .dark .supabase-glow {
-  background: radial-gradient(circle 600px at 50% 10%, rgba(62, 207, 142, 0.07), transparent 70%);
+  background: radial-gradient(circle 600px at 50% 10%, rgb(var(--brand-500) / 0.07), transparent 70%);
 }

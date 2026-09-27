@@ -5,6 +5,7 @@ import { chooseWriterFactory, createStorageWriter } from './storage';
 import type { StorageWriter, WriterFactory } from './storage';
 import type { ProtocolMessage, TransferFile, TransferManifest, TransferMetrics } from '../types/transfer';
 import { wakeLockService } from './wakeLock';
+import { getActiveBrand } from '../branding';
 
 export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KB
 const HIGH_WATERMARK = 1024 * 1024; // 1 MB
@@ -650,7 +651,7 @@ export class TransferEngine {
     // Update document title with progress
     if (typeof document !== 'undefined') {
       this.originalTitle ??= document.title;
-      document.title = `(${Math.round(overallPercent)}%) DropWave — Transferring`;
+      document.title = `(${Math.round(overallPercent)}%) ${getActiveBrand().name} — Transferring`;
     }
 
     this.callbacks.onMetrics?.(metrics);

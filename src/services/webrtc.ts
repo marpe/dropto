@@ -1,6 +1,7 @@
 import Peer from 'peerjs';
 import type { DataConnection, PeerOptions } from 'peerjs';
 import type { AppSettings } from '../types/transfer';
+import { getActiveBrand } from '../branding';
 
 export type ConnectionEventHandler = {
   onIncomingConnection?: (conn: DataConnection) => void;
@@ -33,7 +34,7 @@ export class WebRtcService {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     const bytes = crypto.getRandomValues(new Uint8Array(6));
     const code = Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
-    return `DW-${code}`;
+    return `${getActiveBrand().roomPrefix}-${code}`;
   }
 
   public initSender(settings?: Partial<AppSettings>, attempt = 1): Promise<string> {

@@ -37,6 +37,21 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(page.locator('text=Transfer & Network Settings')).not.toBeVisible();
   });
 
+  test('shows dropto.space branding and orange palette for the dropto brand', async ({ page }) => {
+    // ?brand= is the dev-only stand-in for visiting https://dropto.space
+    await page.goto('/?brand=dropto');
+
+    await expect(page).toHaveTitle('dropto.space — 10GB P2P WebRTC Transfer');
+    await expect(page.locator('header').getByText('dropto.space', { exact: true })).toBeVisible();
+    await expect(page.locator('text=DropWave')).toHaveCount(0);
+    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon-dropto.svg');
+    const brand500 = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--brand-500').trim()
+    );
+    expect(brand500).toBe('249 115 22');
+    await expect(page.locator('.font-mono.text-2xl.font-black')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
+  });
+
   test('switches to Receive tab when opening share link with ?room= parameter', async ({ page }) => {
     await page.goto('/?room=DW-998877');
 

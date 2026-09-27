@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, AlertTriangle, HardDriveDownload } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
+import { getActiveBrand } from '../branding';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
@@ -199,7 +200,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
               </label>
               <input
                 type="text"
-                placeholder="DW-XXXXXX"
+                placeholder={`${getActiveBrand().roomPrefix}-XXXXXX`}
                 value={roomCode}
                 onChange={(e) => onRoomCodeChange(e.target.value.toUpperCase())}
                 className="w-full text-center font-mono text-xl sm:text-2xl font-bold tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 focus:outline-none transition-all"

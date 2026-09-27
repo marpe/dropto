@@ -2,6 +2,7 @@ import React from 'react';
 import { Sun, Moon, Settings, Radio } from 'lucide-react';
 import { GitHubIcon } from './ui/GitHubIcon';
 import { REPOSITORY_URL } from '../constants';
+import { getActiveBrand } from '../branding';
 
 interface HeaderProps {
   darkMode: boolean;
@@ -16,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   connected,
 }) => {
+  const brand = getActiveBrand();
   return (
     <header className="w-full max-w-5xl mx-auto px-4 py-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80">
       <div className="flex items-center gap-3">
@@ -28,10 +30,10 @@ export const Header: React.FC<HeaderProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-600 dark:from-white dark:via-zinc-200 dark:to-zinc-400 bg-clip-text text-transparent">
-              DropWave
+              {brand.name}
             </span>
             <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
-              10GB P2P
+              {brand.badge}
             </span>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 hidden sm:block">

@@ -9,6 +9,36 @@
     <meta name="theme-color" content="#3ECF8E" />
     <title>DropWave — 10GB P2P WebRTC Transfer</title>
     <script>
+      // Brand detection runs before first paint so dropto.space never flashes DropWave's name or colours.
+      // Keep these values in sync with src/branding.ts (branding.test.ts checks them).
+      (function () {
+        var brand = /(^|\.)dropto\.space$/i.test(location.hostname) ? 'dropto' : 'dropwave';
+        if ('%MODE%' === 'development') {
+          var override = new URLSearchParams(location.search).get('brand');
+          if (override === 'dropto' || override === 'dropwave') {
+            brand = override;
+          }
+        }
+        document.documentElement.dataset.brand = brand;
+        if (brand !== 'dropto') {
+          return;
+        }
+        document.title = 'dropto.space — 10GB P2P WebRTC Transfer';
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F97316');
+        document.querySelector('link[rel="icon"]').setAttribute('href', '/favicon-dropto.svg');
+        // The PWA plugin injects the manifest link after this script, so swap it once parsing is done
+        var swapManifest = function () {
+          var link = document.querySelector('link[rel="manifest"]');
+          if (link) {
+            link.setAttribute('href', '/manifest-dropto.webmanifest');
+          }
+        };
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', swapManifest);
+        } else {
+          swapManifest();
+        }
+      })();
       (function() {
         try {
           const stored = localStorage.getItem('theme');

@@ -60,6 +60,21 @@ The output will be generated in `dist/`. Since DropWave is 100% static, you can 
 
 ---
 
+## 🎨 Per-Domain Branding
+
+One build serves two brands, picked from the hostname:
+
+| Domain | Name | Accent | Room codes |
+| :--- | :--- | :--- | :--- |
+| `dropto.space`, `www.dropto.space` | dropto.space | Orange `#F97316` | `DT-XXXXXX` |
+| any other host | DropWave | Green `#3ECF8E` | `DW-XXXXXX` |
+
+The boot script in `index.html` detects the brand before first paint and stamps `data-brand` on `<html>`; colours come from CSS variables in `src/index.css`, and names/assets from `src/branding.ts`. Room codes work across both domains. In development, append `?brand=dropto` to preview the other brand locally.
+
+If you edit the inline boot script, regenerate its hash in the `vercel.json` CSP (`src/test/csp.test.ts` fails until you do).
+
+---
+
 ## 🌐 Browser Compatibility
 
 | Browser | Direct-to-Disk (Zero RAM) | Max Tested File Size |

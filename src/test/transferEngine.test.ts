@@ -524,6 +524,17 @@ describe('TransferEngine progress reporting', () => {
     expect(receiverMetrics[receiverMetrics.length - 1].currentFilePercent).toBe(100);
   });
 
+  it('names the active brand in the progress tab title', async () => {
+    document.documentElement.dataset.brand = 'dropto';
+    try {
+      await startReceiverWithFakeSender([6]);
+
+      expect(document.title).toBe('(0%) dropto.space — Transferring');
+    } finally {
+      delete document.documentElement.dataset.brand;
+    }
+  });
+
   it('restores the page title once the transfer completes', async () => {
     // A single engine: two engines in one test would share and overwrite document.title
     document.title = 'DropWave';

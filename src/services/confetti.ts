@@ -1,4 +1,5 @@
 import confetti from 'canvas-confetti';
+import { getActiveBrand } from '../branding';
 
 export function fireCelebration() {
   if (typeof window === 'undefined') {
@@ -8,7 +9,7 @@ export function fireCelebration() {
   const count = 150;
   const defaults = {
     origin: { y: 0.65 },
-    colors: ['#3ECF8E', '#24b47e', '#52d69b', '#ffffff', '#ffd700'],
+    colors: getActiveBrand().confettiColors,
   };
 
   function fire(particleRatio: number, opts: confetti.Options) {
