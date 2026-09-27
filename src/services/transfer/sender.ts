@@ -124,6 +124,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     }
     this.pinAttemptsLeft--;
     if (this.pinAttemptsLeft <= 0) {
+      this.events.onPinLockout?.();
       throw new Error('Too many incorrect PIN attempts');
     }
     this.send({ type: 'AUTH_REQUEST', payload: { attemptsLeft: this.pinAttemptsLeft, isIncorrect: true } });

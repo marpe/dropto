@@ -675,10 +675,11 @@ describe('multi-file receive into a chosen folder', () => {
 });
 
 describe('session PIN', () => {
-  function startPinSession(pin: string) {
+  function startPinSession(pin: string, senderEvents: SenderEvents = {}) {
     const prompts: PinPrompt[] = [];
     let manifest: TransferManifest | null = null;
     const pair = createTransferPair({
+      senderEvents,
       isAutoReceiving: false,
       receiverEvents: {
         onPinRequired: (prompt) => {
@@ -737,6 +738,22 @@ describe('session PIN', () => {
     ).toBe(true);
     expect(session.getManifest()).toBeNull();
     expect(session.prompts).toHaveLength(3);
+  });
+
+  it('tells the sender when a receiver is locked out, so the room can be closed to guessing', async () => {
+    let lockouts = 0;
+    const session = startPinSession('1234', {
+      onPinLockout: () => {
+        lockouts++;
+      },
+    });
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await waitFor(() => session.prompts.length === attempt);
+      session.receiver.submitPin('0000');
+    }
+
+    expect(await waitFor(() => lockouts === 1)).toBe(true);
   });
 
   it('refuses to stream files to a receiver that skipped the PIN', async () => {

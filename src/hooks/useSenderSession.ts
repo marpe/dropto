@@ -24,10 +24,14 @@ export interface SenderSessionState {
   isPaused: boolean;
   error: string | null;
   corruptedFiles: string[];
+  /** Receivers locked out by wrong PINs in the current room */
+  pinLockouts: number;
+  /** Why the room code changed, shown with the new code */
+  roomNotice: string | null;
 }
 
 type SenderAction =
-  | { type: 'ROOM_REQUESTED' }
+  | { type: 'ROOM_REQUESTED'; notice: string | null }
   | { type: 'ROOM_READY'; roomCode: string; shareKey: string }
   | { type: 'ROOM_FAILED'; error: string }
   | { type: 'ROOM_CLOSED' }
@@ -41,6 +45,7 @@ type SenderAction =
   | { type: 'PEER_DISCONNECTED'; peerId?: string }
   | { type: 'TRANSFER_STARTED'; peerId: string }
   | { type: 'RECEIVER_STARTED' }
+  | { type: 'PIN_LOCKOUT' }
   | { type: 'METRICS'; metrics: TransferMetrics }
   | { type: 'PAUSED'; isPaused: boolean }
   | { type: 'COMPLETED'; result: TransferResult }
@@ -61,7 +66,14 @@ export const initialSenderState: SenderSessionState = {
   isPaused: false,
   error: null,
   corruptedFiles: [],
+  pinLockouts: 0,
+  roomNotice: null,
 };
+
+// Three attempts per connection, three connections: then the code is replaced
+const MAX_PIN_LOCKOUTS_PER_ROOM = 3;
+const PIN_LOCKOUT_NOTICE =
+  'Someone entered a wrong PIN too many times, so this is a new room. Share the new code or link.';
 
 // Per-transfer progress, cleared whenever a transfer starts or ends
 const noProgress = { metrics: null, isPaused: false } as const;
@@ -69,7 +81,15 @@ const noProgress = { metrics: null, isPaused: false } as const;
 export function senderReducer(state: SenderSessionState, action: SenderAction): SenderSessionState {
   switch (action.type) {
     case 'ROOM_REQUESTED':
-      return { ...state, status: 'waiting', roomCode: '', shareKey: '', error: null };
+      return {
+        ...state,
+        status: 'waiting',
+        roomCode: '',
+        shareKey: '',
+        error: null,
+        pinLockouts: 0,
+        roomNotice: action.notice,
+      };
     case 'ROOM_READY':
       return { ...state, roomCode: action.roomCode, shareKey: action.shareKey };
     case 'ROOM_FAILED':
@@ -122,6 +142,8 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
         error: null,
         corruptedFiles: [],
       };
+    case 'PIN_LOCKOUT':
+      return { ...state, pinLockouts: state.pinLockouts + 1 };
     case 'RECEIVER_STARTED':
       return state.status === 'awaiting_receiver' ? { ...state, status: 'transferring' } : state;
     case 'METRICS':
@@ -154,6 +176,12 @@ function toTransferFile(file: File): TransferFile {
 /** Same path, size and modification time: the same file picked or dropped twice. */
 function fileIdentity(file: TransferFile): string {
   return `${displayPath(file)}|${file.size}|${file.lastModified}`;
+}
+
+interface OpenRoomOptions {
+  /** Never reuse the remembered room, so its code and link stop working */
+  isFresh?: boolean;
+  notice?: string | null;
 }
 
 interface UseSenderSessionOptions {
@@ -198,6 +226,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       let hasReceiverStarted = false;
 
       const engine = services.createSender(conn, {
+        onPinLockout: ifCurrent(() => dispatch({ type: 'PIN_LOCKOUT' })),
         onReceiverStarted: ifCurrent(() => {
           hasReceiverStarted = true;
           dispatch({ type: 'RECEIVER_STARTED' });
@@ -229,12 +258,12 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     [services]
   );
 
-  const openRoom = useCallback(async () => {
+  const openRoom = useCallback(async ({ isFresh = false, notice = null }: OpenRoomOptions = {}) => {
     connectionRef.current?.destroy();
     engineRef.current = null;
     pendingConnRef.current = null;
     shareKeyRef.current = null;
-    dispatch({ type: 'ROOM_REQUESTED' });
+    dispatch({ type: 'ROOM_REQUESTED', notice });
 
     const connection = services.createConnection({
       onIncomingConnection: (conn, greeting) => {
@@ -267,7 +296,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     connectionRef.current = connection;
 
     try {
-      const remembered = recallRoom();
+      const remembered = isFresh ? null : recallRoom();
       const roomCode = await connection.initSender(settingsRef.current, { preferredRoomId: remembered?.roomCode });
       if (connectionRef.current === connection) {
         // Links already handed out stay valid only while both the room and its key survive
@@ -301,6 +330,12 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       dispatch({ type: 'ROOM_CLOSED' });
     };
   }, [active, openRoom, services]);
+
+  useEffect(() => {
+    if (state.pinLockouts >= MAX_PIN_LOCKOUTS_PER_ROOM) {
+      openRoom({ isFresh: true, notice: PIN_LOCKOUT_NOTICE });
+    }
+  }, [state.pinLockouts, openRoom]);
 
   const approvePeer = () => {
     const conn = pendingConnRef.current;
@@ -388,7 +423,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       togglePause: () => engineRef.current?.togglePause(),
       cancel,
       dismissError: () => dispatch({ type: 'ERROR_DISMISSED' }),
-      retryRoom: openRoom,
+      retryRoom: () => openRoom(),
     },
   };
 }

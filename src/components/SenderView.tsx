@@ -37,6 +37,7 @@ interface SenderViewProps {
   errorMessage: string | null;
   onDismissError: () => void;
   onRetryRoom: () => void;
+  roomNotice?: string | null;
   /** Offered on the landing page, for when the sender can only read out a room code */
   onSwitchToReceive?: () => void;
 }
@@ -63,6 +64,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
   errorMessage,
   onDismissError,
   onRetryRoom,
+  roomNotice = null,
   onSwitchToReceive,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -164,6 +166,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
           onPinChange={onPinChange}
           errorMessage={errorMessage}
           onRetryRoom={onRetryRoom}
+          notice={roomNotice}
         />
       )}
     </div>
