@@ -1,5 +1,7 @@
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {
+    return '0 B';
+  }
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
@@ -12,7 +14,9 @@ export function formatSpeed(bytesPerSec: number): string {
 }
 
 export function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0 || !isFinite(seconds)) return '--';
+  if (!seconds || seconds <= 0 || !isFinite(seconds)) {
+    return '--';
+  }
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
