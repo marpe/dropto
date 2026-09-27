@@ -1,4 +1,7 @@
 import type { ManifestFile } from '../types/transfer';
+import { isAbortError } from '../utils/errors';
+import { fileSystemAccess, supportsDirectoryPicker, supportsSaveFilePicker } from '../utils/fileSystemAccess';
+import type { SaveFilePickerOptions } from '../utils/fileSystemAccess';
 
 export interface StorageWriter {
   prepare(filename: string, size: number): Promise<boolean>;
@@ -9,10 +12,6 @@ export interface StorageWriter {
 }
 
 export type WriterFactory = (file: ManifestFile) => StorageWriter;
-
-type DirectoryPickerWindow = Window & {
-  showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>;
-};
 
 /** Streams chunks straight to disk through a File System Access writable. */
 abstract class NativeFileWriter implements StorageWriter {
@@ -49,12 +48,12 @@ abstract class NativeFileWriter implements StorageWriter {
 
 export class FileSystemAccessWriter extends NativeFileWriter {
   public async prepare(filename: string, _size: number): Promise<boolean> {
-    if (typeof window === 'undefined' || !('showSaveFilePicker' in window)) {
+    if (!supportsSaveFilePicker()) {
       return false;
     }
 
     try {
-      const pickerOptions: any = {
+      const pickerOptions: SaveFilePickerOptions = {
         suggestedName: filename,
       };
 
@@ -71,12 +70,11 @@ export class FileSystemAccessWriter extends NativeFileWriter {
         ];
       }
 
-      const handle = await (window as any).showSaveFilePicker(pickerOptions);
+      const handle = await fileSystemAccess().showSaveFilePicker(pickerOptions);
       this.writableStream = await handle.createWritable();
       return true;
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('User cancelled save file dialog');
+    } catch (err) {
+      if (isAbortError(err)) {
         return false;
       }
       console.warn('Error opening FileSystemWritableFileStream, rethrowing for fallback:', err);
@@ -167,7 +165,7 @@ export class AutoStorageWriter implements StorageWriter {
   public isNativeFSA = true;
 
   constructor() {
-    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    if (supportsSaveFilePicker()) {
       this.activeWriter = new FileSystemAccessWriter();
       this.isNativeFSA = true;
     } else {
@@ -181,8 +179,8 @@ export class AutoStorageWriter implements StorageWriter {
       try {
         const ok = await this.activeWriter.prepare(filename, size);
         return ok;
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
+      } catch (err) {
+        if (isAbortError(err)) {
           return false;
         }
         console.warn('File System Access API failed, falling back to memory download:', err);
@@ -222,15 +220,15 @@ export async function chooseWriterFactory(files: ManifestFile[]): Promise<Writer
     return () => createStorageWriter();
   }
 
-  if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
+  if (!supportsDirectoryPicker()) {
     return () => new MemoryFallbackWriter();
   }
 
   try {
-    const root = await (window as DirectoryPickerWindow).showDirectoryPicker({ mode: 'readwrite' });
+    const root = await fileSystemAccess().showDirectoryPicker({ mode: 'readwrite' });
     return (file) => new DirectoryWriter(root, file.relativePath);
-  } catch (err: any) {
-    if (err?.name === 'AbortError') {
+  } catch (err) {
+    if (isAbortError(err)) {
       return null;
     }
     console.warn('Folder picker failed, falling back to in-memory downloads:', err);

@@ -17,7 +17,7 @@ export type ConnectionEventHandler = {
   onIncomingConnection?: (conn: DataConnection, greeting: ReceiverGreeting) => void;
   /** peerId identifies which incoming connection closed; absent when the whole session ended */
   onDisconnected?: (peerId?: string) => void;
-  onError?: (err: any) => void;
+  onError?: (err: unknown) => void;
 };
 
 const MAX_ROOM_ID_ATTEMPTS = 4;

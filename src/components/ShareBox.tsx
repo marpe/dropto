@@ -6,6 +6,7 @@ import { TextInput } from './ui/TextInput';
 import { QrModal } from './QrModal';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { getActiveBrand } from '../branding';
+import { isAbortError } from '../utils/errors';
 
 interface ShareBoxProps {
   roomCode: string;
@@ -23,7 +24,7 @@ async function shareLink(url: string) {
     await navigator.share({ title: getActiveBrand().name, text: 'Files for you', url });
   } catch (err) {
     // Closing the share sheet rejects with AbortError; that is the user's choice, not a failure
-    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+    if (!isAbortError(err)) {
       console.warn('Web Share failed:', err);
     }
   }

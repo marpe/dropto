@@ -15,6 +15,7 @@ import { useProgressTitle } from './hooks/useProgressTitle';
 import { usePageFileDrop } from './hooks/usePageFileDrop';
 import type { ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
+import { supportsSaveFilePicker } from './utils/fileSystemAccess';
 import type { ShareLink } from './utils/shareLink';
 
 type Mode = 'send' | 'receive';
@@ -33,7 +34,7 @@ function readShareLink(): ShareLink {
   return link;
 }
 
-const isNativeFSA = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+const isNativeFSA = supportsSaveFilePicker();
 
 export const App: React.FC = () => {
   const theme = useTheme();
