@@ -18,6 +18,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await page.getByTitle('Settings').click();
     await expect(page.locator('text=Settings')).toBeVisible();
+    // The page behind an open dialog cannot scroll (or be clicked: showModal makes it inert)
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflowY)).toBe('hidden');
     await page.getByRole('button', { name: 'Dark' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Light' }).click();
@@ -27,6 +29,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await page.locator('button:has-text("Cancel")').click();
     await expect(page.locator('text=Settings')).not.toBeVisible();
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).overflowY)).not.toBe('hidden');
   });
 
   test('files dropped anywhere on the page are queued, even from the receive form', async ({ page }) => {
