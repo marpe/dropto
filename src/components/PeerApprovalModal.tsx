@@ -23,8 +23,8 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-[#181818] p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-center">
-        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] flex items-center justify-center">
+      <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-supabase-surface p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-center">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-brand-500 flex items-center justify-center">
           <ShieldCheck className="w-6 h-6" />
         </div>
 
@@ -60,7 +60,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
           </button>
           <button
             onClick={onApprove}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-sm font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
+            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-105"
           >
             <UserCheck className="w-4 h-4" />
             <span>Accept</span>

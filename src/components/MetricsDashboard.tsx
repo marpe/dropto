@@ -22,21 +22,21 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   const percentRounded = Math.min(Math.round(metrics.overallPercent), 100);
 
   return (
-    <div className="w-full rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl relative overflow-hidden transition-all">
+    <div className="w-full rounded-2xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl relative overflow-hidden transition-all">
       {/* Background ambient Supabase green radial glow */}
-      <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-[#3ECF8E]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top row: Status & Actions */}
       <div className="flex items-center justify-between pb-5 border-b border-zinc-100 dark:border-zinc-800/80">
         <div className="flex items-center gap-3">
           <div className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3ECF8E] opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#3ECF8E]" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-500 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-500" />
           </div>
           <div>
             <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
               <span>{isSender ? 'Streaming to Receiver' : 'Receiving Direct to Disk'}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#3ECF8E]/10 text-[#3ECF8E] border border-[#3ECF8E]/30">
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
                 Active P2P
               </span>
             </h3>
@@ -51,7 +51,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
             onClick={onTogglePause}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
           >
-            {isPaused ? <Play className="w-3.5 h-3.5 text-[#3ECF8E]" /> : <Pause className="w-3.5 h-3.5 text-amber-500" />}
+            {isPaused ? <Play className="w-3.5 h-3.5 text-brand-500" /> : <Pause className="w-3.5 h-3.5 text-amber-500" />}
             <span>{isPaused ? 'Resume' : 'Pause'}</span>
           </button>
           <button
@@ -71,9 +71,9 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
 
       {/* Main Metric Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-6">
-        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-[#3ECF8E]/40 transition-colors">
+        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-brand-500/40 transition-colors">
           <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs mb-1">
-            <Gauge className="w-3.5 h-3.5 text-[#3ECF8E]" />
+            <Gauge className="w-3.5 h-3.5 text-brand-500" />
             <span>Current Speed</span>
           </div>
           <div className="text-lg sm:text-xl font-bold font-mono text-zinc-900 dark:text-white">
@@ -91,9 +91,9 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
           </div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-[#3ECF8E]/40 transition-colors">
+        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-brand-500/40 transition-colors">
           <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs mb-1">
-            <HardDrive className="w-3.5 h-3.5 text-[#3ECF8E]" />
+            <HardDrive className="w-3.5 h-3.5 text-brand-500" />
             <span>Transferred</span>
           </div>
           <div className="text-lg sm:text-xl font-bold font-mono text-zinc-900 dark:text-white">
@@ -101,9 +101,9 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
           </div>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-[#3ECF8E]/40 transition-colors">
+        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 hover:border-brand-500/40 transition-colors">
           <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs mb-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#3ECF8E]" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-brand-500" />
             <span>Total Target</span>
           </div>
           <div className="text-lg sm:text-xl font-bold font-mono text-zinc-900 dark:text-white">
@@ -118,11 +118,11 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         <div>
           <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
             <span className="text-zinc-700 dark:text-zinc-300">Total Transfer Progress</span>
-            <span className="font-mono text-[#3ECF8E] font-bold">{percentRounded}%</span>
+            <span className="font-mono text-brand-500 font-bold">{percentRounded}%</span>
           </div>
           <div className="w-full h-3 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden p-0.5 border border-zinc-200 dark:border-zinc-800">
             <div
-              className="h-full bg-gradient-to-r from-[#24b47e] via-[#3ECF8E] to-[#52d69b] rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(62,207,142,0.4)]"
+              className="h-full bg-gradient-to-r from-brand-600 via-brand-500 to-brand-400 rounded-full transition-all duration-300 ease-out shadow-[0_0_12px_rgba(62,207,142,0.4)]"
               style={{ width: `${percentRounded}%` }}
             />
           </div>
@@ -136,7 +136,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
           </div>
           <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#3ECF8E]/60 rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-brand-500/60 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${Math.round(metrics.currentFilePercent)}%` }}
             />
           </div>

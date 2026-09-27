@@ -72,8 +72,8 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             onCancel={onCancelTransfer}
           />
         ) : (
-          <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl">
-            <div className="w-10 h-10 mx-auto mb-4 border-3 border-[#3ECF8E] border-t-transparent rounded-full animate-spin" />
+          <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl">
+            <div className="w-10 h-10 mx-auto mb-4 border-3 border-brand-500 border-t-transparent rounded-full animate-spin" />
             <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">
               Preparing Stream to Disk...
             </h3>
@@ -94,9 +94,9 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
       ) : manifest ? (
         /* Manifest Received - Ready to Choose Save Location */
-        <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
+        <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-[#3ECF8E] flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center">
               <DownloadCloud className="w-6 h-6 animate-float" />
             </div>
             <div>
@@ -112,7 +112,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           {/* Files List Preview */}
           <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 max-h-56 overflow-y-auto space-y-2">
             {manifest.files.map((file, idx) => (
-              <div key={file.id || idx} className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-[#3ECF8E]/30 transition-colors">
+              <div key={file.id || idx} className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-brand-500/30 transition-colors">
                 <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate mr-3">
                   {file.relativePath || file.name}
                 </span>
@@ -151,11 +151,11 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           <button
             onClick={handleStartSaveClick}
             disabled={isPreparingSave}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-base font-bold bg-[#3ECF8E] hover:bg-[#24b47e] disabled:opacity-75 text-[#121212] shadow-xl shadow-[#3ECF8E]/25 transition-all hover:scale-[1.02]"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-base font-bold bg-brand-500 hover:bg-brand-600 disabled:opacity-75 text-supabase-bg shadow-xl shadow-brand-500/25 transition-all hover:scale-[1.02]"
           >
             {isPreparingSave ? (
               <>
-                <div className="w-5 h-5 border-2 border-[#121212] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-supabase-bg border-t-transparent rounded-full animate-spin" />
                 <span>{manifest.files.length > 1 ? 'Opening Folder Dialog...' : 'Opening File Dialog...'}</span>
               </>
             ) : (
@@ -170,8 +170,8 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         </div>
       ) : (
         /* Room Code Entry Card */
-        <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-[#3ECF8E] flex items-center justify-center shadow-inner">
+        <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center shadow-inner">
             <DownloadCloud className="w-8 h-8 animate-float" />
           </div>
 
@@ -199,23 +199,23 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
                 placeholder="DW-XXXXXX"
                 value={roomCode}
                 onChange={(e) => onRoomCodeChange(e.target.value.toUpperCase())}
-                className="w-full text-center font-mono text-xl sm:text-2xl font-bold tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#3ECF8E]/50 focus:border-[#3ECF8E] focus:outline-none transition-all"
+                className="w-full text-center font-mono text-xl sm:text-2xl font-bold tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 focus:outline-none transition-all"
               />
             </div>
 
             <button
               onClick={onConnect}
               disabled={!roomCode.trim() || connectionState === 'connecting' || connectionState === 'waiting_approval'}
-              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold bg-[#3ECF8E] hover:bg-[#24b47e] disabled:opacity-50 text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-[1.02]"
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-[1.02]"
             >
               {connectionState === 'connecting' ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#121212] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-supabase-bg border-t-transparent rounded-full animate-spin" />
                   <span>Connecting to Peer...</span>
                 </>
               ) : connectionState === 'waiting_approval' ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-[#121212] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-supabase-bg border-t-transparent rounded-full animate-spin" />
                   <span>Waiting for Sender Approval...</span>
                 </>
               ) : (

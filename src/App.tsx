@@ -33,7 +33,7 @@ export const App: React.FC = () => {
     !!sender.state.connectedPeerId || ['waiting_approval', 'connected', 'transferring'].includes(receiver.state.status);
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 text-zinc-900 dark:bg-[#121212] dark:text-zinc-100 supabase-glow transition-colors">
+    <div className="min-h-screen flex flex-col bg-zinc-50 text-zinc-900 dark:bg-supabase-bg dark:text-zinc-100 supabase-glow transition-colors">
       <Header
         darkMode={darkMode}
         onToggleTheme={toggleDarkMode}
@@ -49,14 +49,14 @@ export const App: React.FC = () => {
         {/* Switching modes tears down the other session, so it is hidden mid-transfer */}
         {!isTransferring && (
           <div className="flex justify-center mb-8">
-            <div className="inline-flex p-1 rounded-2xl bg-zinc-200/80 dark:bg-[#181818] border border-zinc-300/60 dark:border-zinc-800">
+            <div className="inline-flex p-1 rounded-2xl bg-zinc-200/80 dark:bg-supabase-surface border border-zinc-300/60 dark:border-zinc-800">
               {(['send', 'receive'] as const).map((option) => (
                 <button
                   key={option}
                   onClick={() => setMode(option)}
                   className={`py-2 px-6 rounded-xl text-sm font-bold transition-all ${
                     mode === option
-                      ? 'bg-[#3ECF8E] text-[#121212] shadow-md shadow-[#3ECF8E]/20'
+                      ? 'bg-brand-500 text-supabase-bg shadow-md shadow-brand-500/20'
                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                   }`}
                 >
