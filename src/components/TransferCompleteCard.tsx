@@ -8,7 +8,6 @@ import { fireCelebration } from '../services/confetti';
 import type { ManifestFile, TransferMetrics } from '../types/transfer';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
 import { getFileProgress } from '../utils/transferProgress';
-import { cn } from '../utils/cn';
 
 interface TransferCompleteCardProps {
   title: string;
@@ -33,13 +32,13 @@ const TransferStats: React.FC<TransferStatsProps> = ({ files, metrics }) => {
   const hasTiming = metrics !== null && metrics.elapsedSeconds >= 1;
 
   return (
-    <div className={cn('grid grid-cols-2 gap-3 mb-6', hasTiming && 'sm:grid-cols-4')}>
+    <div className="grid grid-cols-2 gap-3 mb-6">
       <StatTile data-testid="stat-files" icon={Files} label="Files" value={String(files.length)} />
       <StatTile data-testid="stat-size" icon={HardDrive} label="Size" value={formatBytes(totalBytes)} />
       {hasTiming && (
         <>
-          <StatTile data-testid="stat-time" icon={Clock} label="Time Taken" value={formatDuration(metrics.elapsedSeconds)} />
-          <StatTile data-testid="stat-speed" icon={Gauge} label="Average Speed" value={formatSpeed(metrics.averageSpeed)} />
+          <StatTile data-testid="stat-time" icon={Clock} label="Time taken" value={formatDuration(metrics.elapsedSeconds)} />
+          <StatTile data-testid="stat-speed" icon={Gauge} label="Average speed" value={formatSpeed(metrics.averageSpeed)} />
         </>
       )}
     </div>
@@ -71,7 +70,7 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   if (isVerified) {
     return (
       <StatusCard
-        badge={<IconBadge icon={CheckCircle2} className="motion-safe:animate-bounce" />}
+        badge={<IconBadge icon={CheckCircle2} className="motion-safe:animate-pop-in" />}
         title={title}
       >
         {stats}
@@ -85,7 +84,7 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   return (
     <StatusCard
       badge={<IconBadge icon={AlertTriangle} tone="warning" />}
-      title="Transfer Finished With Errors"
+      title="Finished with errors"
       description={`${count === 1 ? '1 file' : `${count} files`} failed the integrity check and may be corrupted. Send ${count === 1 ? 'it' : 'them'} again.`}
     >
       {stats}

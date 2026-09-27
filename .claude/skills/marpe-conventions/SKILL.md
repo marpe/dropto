@@ -43,6 +43,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 code
 - `components/ui/TextInput` — `size` `sm` (settings fields) or `lg` (centred mono codes/PINs).
 - `components/ui/ProgressBar` — `primary` | `subtle`; animates `transform`, not `width`.
 - `components/ui/ToggleRow` — labelled on/off option; children (e.g. an input) show inside the row while it is on.
+- `components/ui/ProgressRing` — circular overall progress with content in the middle (live transfer).
 - `components/ui/StatTile` — one labelled number in transfer stats (live dashboard and completion card).
 - `components/ui/NumberStepper` — a small whole number picked with − / + (e.g. downloads at the same time).
 - `components/ui/Screen` — one screen of a flow; give it a `key` naming the screen so the enter animation plays on step changes only.
@@ -76,7 +77,7 @@ Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/
 | Borders | `border-border-1` dividers · `border-2` panels · `border-3` inputs | A bare `border` already uses `border-2` |
 | Text | `text-text-1` headings → `text-text-5` faint captions; `text-text-on-accent` on `bg-brand-500` | |
 | Status | `text-text-danger-1`, `bg-surface-danger-1`, `border-border-danger-1`, `text-text-warning-1` | Tinted fills like `bg-red-500/10` read the same in both themes and are fine |
-| Brand accent | `brand-50` … `brand-950` | green for DropWave, orange on dropto.space (`:root[data-brand='dropto']`) |
+| Brand accent | `brand-50` … `brand-950` | indigo for DropWave, orange on dropto.space (`:root[data-brand='dropto']`) |
 | File-type accents | `ctp-*` (Catppuccin) | Latte, Mocha under `.dark`; use `components/ui/FileTypeIcon` |
 | Micro-labels | `text-2xs` | the only size below `text-xs` |
 
@@ -86,7 +87,9 @@ Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/
 - **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'var(--color-brand-500)' }}`.
 - **Never hardcode the brand.** The name, room-code prefix and brand colours come from `getActiveBrand()` / `brand-*`, because the same build is DropWave and dropto.space.
 - **Nothing smaller than `text-xs`** except `text-2xs`. No `text-[Npx]`.
-- **Text on accent backgrounds:** buttons on `bg-brand-500` use `text-text-on-accent` (dark text reads on both green and orange). Don't use `text-white` there.
+- **Filled controls:** use `bg-accent hover:bg-accent-hover text-text-on-accent`, not `bg-brand-500`. The text colour comes from `contrast-color()` (white on indigo, black on orange). Don't use `text-white` there.
+- **Copy:** sentence case for headings and buttons ("Receive files", "Copy link"); no protocol jargon (P2P, peer, stream) in the UI.
+- **Motion:** new list rows and tiles enter with `starting:opacity-0 starting:translate-y-1`; buttons press (`active:scale`) rather than grow on hover.
 - **Motion:** use `motion-safe:` for scale, bounce or float. List transition properties (`transition-[transform,background-color]`, `transition-colors`), not `transition-all`.
 - **Prevent layout jitter:** keep `font-weight` and border width constant across states. Idle states get `border border-transparent`; only the colour changes.
 - **Never `select-none` on containers** (it blocks copying error text). It's fine on buttons and drag handles.

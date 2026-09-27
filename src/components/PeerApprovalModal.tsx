@@ -38,7 +38,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
 
   return (
     <Modal
-      title="Receiver Connection Request"
+      title="Someone wants to connect"
       icon={ShieldCheck}
       footer={
         <div className="grid grid-cols-2 gap-3 w-full">
@@ -46,7 +46,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
             <X className="w-4 h-4" />
             <span>Decline</span>
           </Button>
-          <Button onClick={onApprove} disabled={!hasFiles}>
+          <Button data-testid="approve-peer" onClick={onApprove} disabled={!hasFiles}>
             <UserCheck className="w-4 h-4" />
             <span>Accept</span>
           </Button>
@@ -58,21 +58,22 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
       </p>
 
       <div className="p-3 bg-surface-2 rounded-xl border border-border-2 text-left text-xs space-y-1.5">
-        <DetailRow label="Peer ID:">
-          <span className="font-mono font-normal">{peerId}</span>
-        </DetailRow>
-        <DetailRow label="Queued Files:">
+        <DetailRow label="Files">
           {fileCount} {fileCount === 1 ? 'file' : 'files'}
         </DetailRow>
-        <DetailRow label="Total Size:">{formatBytes(totalBytes)}</DetailRow>
+        <DetailRow label="Size">{formatBytes(totalBytes)}</DetailRow>
+        {/* Tells two requests apart; the full id means nothing to people */}
+        <DetailRow label="Device">
+          <span className="font-mono font-normal">{peerId.slice(0, 8)}</span>
+        </DetailRow>
       </div>
 
       {!hasFiles && (
         <div className="mt-5 space-y-3">
           <p className="text-xs text-text-warning-1">Nothing is queued yet — add files before accepting.</p>
-          <Button variant="secondary" onClick={onSelectFiles} className="w-full">
+          <Button data-testid="add-files" variant="secondary" onClick={onSelectFiles} className="w-full">
             <FileUp className="w-4 h-4" />
-            <span>Select Files</span>
+            <span>Add files</span>
           </Button>
         </div>
       )}

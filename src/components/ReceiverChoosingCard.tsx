@@ -13,7 +13,7 @@ export const ReceiverChoosingCard: React.FC<ReceiverChoosingCardProps> = ({ onCa
   <Card padding="md" className="flex flex-col sm:flex-row items-center gap-4 border-brand-500/30 animate-fade-in">
     <IconBadge icon={FolderOpen} size="md" isPulsing />
     <div className="flex-1 min-w-0 text-center sm:text-left">
-      <h3 className="font-bold text-text-1">Receiver connected</h3>
+      <h3 className="font-bold text-text-1">Someone connected</h3>
       <p className="text-xs text-text-4">
         They are choosing where to save the files. You can still add or remove files until the download starts.
       </p>

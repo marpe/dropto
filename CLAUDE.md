@@ -49,11 +49,11 @@ Invariants that tests rely on:
 
 ### Per-domain branding
 
-One build serves two brands. `dropto.space` / `www.dropto.space` gets dropto (orange, `DT-` room codes); any other host gets DropWave (green, `DW-`).
+One build serves two brands. `dropto.space` / `www.dropto.space` gets dropto (orange, `DT-` room codes); any other host gets DropWave (indigo, `DW-`).
 - The inline boot script in `index.html` is the only brand detector. It runs before first paint, sets `data-brand` on `<html>`, and swaps the title, theme-color, favicon and manifest. `getActiveBrand()` in `src/branding.ts` reads `data-brand`.
 - Brand strings and asset paths are duplicated between `index.html` and `src/branding.ts`. `src/test/branding.test.ts` executes the real boot script to keep them in sync.
 - In dev only, `?brand=dropto` overrides detection (it uses Vite's `%MODE%` HTML replacement).
-- Tailwind 4 (via `@tailwindcss/vite`; no config file). Stylesheets: `src/index.css` only imports `src/styles/` — `tokens.css` (colour tokens and themes), `base.css` (element defaults: cursors, focus ring, selection, scrollbars) and `scroll-fade.css` (the `scroll-fade` class: edge fades on scroll areas via scroll-state container queries). All colours are CSS-variable tokens in `tokens.css`: `@theme` holds the light theme and green brand, `.dark` overrides the theme, `:root[data-brand='dropto']` overrides the brand with orange. Use token classes (`bg-surface-1`, `text-text-4`, `brand-500`, …) rather than raw colours or `dark:` variants.
+- Tailwind 4 (via `@tailwindcss/vite`; no config file). Stylesheets: `src/index.css` only imports `src/styles/` — `tokens.css` (colour tokens and themes), `base.css` (element defaults: cursors, focus ring, selection, scrollbars) and `scroll-fade.css` (the `scroll-fade` class: edge fades on scroll areas via scroll-state container queries). All colours are CSS-variable tokens in `tokens.css`: `@theme` holds the light theme and indigo brand, `.dark` overrides the theme (and lightens DropWave's indigo one step), `:root[data-brand='dropto']` overrides the brand with orange. Filled controls use `bg-accent` / `hover:bg-accent-hover` with `text-text-on-accent`, which `contrast-color()` picks (white on indigo, black on orange; per-brand fallback without support). Use token classes (`bg-surface-1`, `text-text-4`, `brand-500`, …) rather than raw colours or `dark:` variants.
 - **If you edit the inline script in `index.html`, update its `sha256-` hash in the `vercel.json` CSP** (it's currently Report-Only). `src/test/csp.test.ts` fails until you do.
 
 ## Conventions

@@ -4,7 +4,7 @@ import type { Brand, BrandId } from './types/branding';
  * Per-domain branding. The brand is detected once by the boot script in index.html (which
  * stamps `data-brand` on <html> before first paint); keep the titles, colours and asset paths
  * there in sync with this table — branding.test.ts fails if they drift.
- * Brand colour scales live in index.css as CSS variables keyed on `data-brand`.
+ * Brand colour scales live in styles/tokens.css as CSS variables keyed on `data-brand`.
  */
 export const BRANDS: Record<BrandId, Brand> = {
   dropwave: {
@@ -13,10 +13,10 @@ export const BRANDS: Record<BrandId, Brand> = {
     title: 'DropWave — 10GB P2P WebRTC Transfer',
     badge: '10GB P2P',
     roomPrefix: 'DW',
-    themeColor: '#3ECF8E',
+    themeColor: '#4F46E5',
     favicon: '/favicon.svg',
     manifest: '/manifest.webmanifest',
-    confettiColors: ['#3ECF8E', '#24b47e', '#52d69b', '#ffffff', '#ffd700'],
+    confettiColors: ['#4F46E5', '#6366f1', '#818cf8', '#ffffff', '#fbbf24'],
   },
   dropto: {
     id: 'dropto',

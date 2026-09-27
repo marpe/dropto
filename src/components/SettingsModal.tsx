@@ -174,7 +174,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           />
         </SettingsSection>
 
-        <SettingsSection icon={Server} title="Signaling Server">
+        <SettingsSection icon={Server} title="Signaling server">
           <ToggleRow
             label="Use Custom PeerServer"
             description="Default is free public 0.peerjs.com"
@@ -223,7 +223,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
         </SettingsSection>
 
-        <SettingsSection icon={Radio} title="Relay Servers (TURN/STUN)">
+        <SettingsSection icon={Radio} title="Relay servers (TURN/STUN)">
           <p className="text-xs text-text-5">
             Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers are
             always included.

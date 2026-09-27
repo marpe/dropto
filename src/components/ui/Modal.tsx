@@ -85,8 +85,8 @@ export const Modal: React.FC<ModalProps> = ({
         'transition-[opacity,translate] duration-200 ease-out starting:opacity-0',
         // Phone: full-screen drawer from the bottom
         'h-full max-h-full rounded-none starting:translate-y-full',
-        // sm and up: centred panel
-        'sm:h-auto sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
+        // sm and up: centred panel; a modal dialog is fixed to inset 0, so auto height would stretch it
+        'sm:h-fit sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
         sizeClasses[size]
       )}
     >

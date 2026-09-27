@@ -31,7 +31,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           className={cn(
             'flex flex-1 items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-[color,background-color]',
             optionValue === value
-              ? 'bg-brand-500 text-text-on-accent'
+              ? 'bg-accent text-text-on-accent'
               : 'text-text-4 hover:text-text-1'
           )}
         >

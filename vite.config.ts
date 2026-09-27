@@ -34,7 +34,7 @@ export default defineConfig({
         name: 'DropWave - 10GB P2P WebRTC Transfer',
         short_name: 'DropWave',
         description: 'Direct browser-to-browser WebRTC file transfer supporting up to 10GB+ with zero memory bloat.',
-        theme_color: '#3ECF8E',
+        theme_color: '#4F46E5',
         background_color: '#121212',
         display: 'standalone',
         icons: [
