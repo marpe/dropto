@@ -11,12 +11,17 @@ const HIGH_WATERMARK = 1024 * 1024; // 1 MB
 const LOW_WATERMARK = 256 * 1024; // 256 KB
 const HEADER_SIZE = 16; // 4 + 8 + 4 bytes
 
+export type TransferResult = {
+  /** Paths of files whose end-to-end checksum did not match */
+  corruptedFiles: string[];
+};
+
 export type EngineEventCallback = {
   onMetrics?: (metrics: TransferMetrics) => void;
   onFileStart?: (file: TransferFile, fileIndex: number) => void;
   onFileProgress?: (fileIndex: number, percent: number, bytesTransferred: number) => void;
   onFileComplete?: (fileIndex: number, verified: boolean) => void;
-  onAllCompleted?: () => void;
+  onAllCompleted?: (result: TransferResult) => void;
   onError?: (err: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
@@ -29,6 +34,7 @@ export class TransferEngine {
   // True from manifest until completion/cancel; a disconnect in this window is a failure
   private isActive: boolean = false;
   private incomingQueue: Promise<void> = Promise.resolve();
+  private corruptedFiles: string[] = [];
 
   // Sender state
   private files: TransferFile[] = [];
@@ -91,6 +97,7 @@ export class TransferEngine {
     this.totalBytesTransferred = 0;
     this.startTime = Date.now();
     this.speedWindow = [];
+    this.corruptedFiles = [];
     this.isActive = true;
 
     wakeLockService.acquire();
@@ -329,6 +336,7 @@ export class TransferEngine {
         this.totalBytes = this.manifest.totalBytes;
         this.totalBytesTransferred = 0;
         this.startTime = Date.now();
+        this.corruptedFiles = [];
         this.isActive = true;
         wakeLockService.acquire();
         soundService.playStart();
@@ -370,6 +378,7 @@ export class TransferEngine {
             verified,
           },
         });
+        this.recordVerification(this.manifest?.files[fileIndex], verified);
         this.callbacks.onFileComplete?.(fileIndex, verified);
 
         // Check if there are more files in manifest
@@ -377,10 +386,7 @@ export class TransferEngine {
           // Prepare next file
           await this.prepareAndStartReceiverFile(fileIndex + 1);
         } else {
-          this.isActive = false;
-          wakeLockService.release();
-          soundService.playComplete();
-          this.callbacks.onAllCompleted?.();
+          this.completeTransfer();
         }
         break;
       }
@@ -388,13 +394,11 @@ export class TransferEngine {
       case 'FILE_ACK': {
         // Sender receives confirmation that the receiver finalized and verified a file
         const { fileIndex, verified } = msg.payload;
+        this.recordVerification(this.files[fileIndex], verified);
         this.callbacks.onFileComplete?.(fileIndex, verified);
 
         if (fileIndex + 1 >= this.files.length) {
-          this.isActive = false;
-          wakeLockService.release();
-          soundService.playComplete();
-          this.callbacks.onAllCompleted?.();
+          this.completeTransfer();
         }
         break;
       }
@@ -449,6 +453,19 @@ export class TransferEngine {
     this.sendControlMessage({
       type: 'TRANSFER_CANCEL',
     });
+  }
+
+  private recordVerification(file: { name: string; relativePath?: string } | undefined, verified: boolean) {
+    if (!verified && file) {
+      this.corruptedFiles.push(file.relativePath || file.name);
+    }
+  }
+
+  private completeTransfer() {
+    this.isActive = false;
+    wakeLockService.release();
+    soundService.playComplete();
+    this.callbacks.onAllCompleted?.({ corruptedFiles: [...this.corruptedFiles] });
   }
 
   /** Local fatal error: tell the peer, stop, and surface it to the UI. */

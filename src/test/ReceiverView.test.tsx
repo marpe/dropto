@@ -38,6 +38,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         isPaused={false}
         errorMessage={null}
         isNativeFSA={true}
+        corruptedFiles={[]}
       />
     );
 
@@ -71,6 +72,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         isPaused={false}
         errorMessage={null}
         isNativeFSA={true}
+        corruptedFiles={[]}
       />
     );
 
@@ -121,6 +123,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         isPaused={false}
         errorMessage={null}
         isNativeFSA={true}
+        corruptedFiles={[]}
       />
     );
 
