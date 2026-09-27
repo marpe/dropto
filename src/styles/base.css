@@ -21,6 +21,16 @@
     min-height: 100dvh;
   }
 
+  /* showModal() already makes the page behind a dialog inert; this also stops it scrolling. The stable
+     gutter keeps the layout from shifting when the scrollbar goes away */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+
   /* Tailwind 4's preflight leaves buttons with the default arrow cursor */
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']),
