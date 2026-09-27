@@ -8,6 +8,7 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import type { SegmentOption } from './ui/SegmentedControl';
 import { AboutInfo } from './AboutInfo';
 import type { ThemePreference } from '../hooks/useTheme';
+import { notificationService } from '../services/notifications';
 import type { AppSettings, IceServerConfig } from '../types/transfer';
 import { IceServerRow } from './IceServerRow';
 
@@ -18,6 +19,8 @@ interface SettingsModalProps {
   themePreference: ThemePreference;
   /** Applied immediately (not part of the saved draft) so the choice can be previewed */
   onThemeChange: (preference: ThemePreference) => void;
+  /** Resolves true when the browser allows notifications; injectable for tests */
+  requestNotificationPermission?: () => Promise<boolean>;
 }
 
 const THEME_OPTIONS: SegmentOption<ThemePreference>[] = [
@@ -104,11 +107,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
   themePreference,
   onThemeChange,
+  requestNotificationPermission = () => notificationService.requestPermission(),
 }) => {
   const [form, setForm] = useState<AppSettings>(settings);
   const [showRelayErrors, setShowRelayErrors] = useState(false);
+  const [isNotificationBlocked, setIsNotificationBlocked] = useState(false);
 
   const update = (changes: Partial<AppSettings>) => setForm({ ...form, ...changes });
+
+  const toggleNotifications = async (isEnabling: boolean) => {
+    if (!isEnabling) {
+      update({ enableNotifications: false });
+      return;
+    }
+    const isAllowed = await requestNotificationPermission();
+    setIsNotificationBlocked(!isAllowed);
+    setForm((current) => ({ ...current, enableNotifications: isAllowed }));
+  };
 
   const updateRelay = (index: number, server: IceServerConfig) => {
     update({ customStunTurn: form.customStunTurn.map((s, i) => (i === index ? server : s)) });
@@ -151,6 +166,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             description="Prevents device sleep during 10GB transfers"
             isChecked={form.enableWakeLock}
             onChange={(enableWakeLock) => update({ enableWakeLock })}
+          />
+          <SettingToggle
+            label="Notify When Done"
+            description={
+              isNotificationBlocked
+                ? 'Notifications are blocked for this site; allow them in your browser settings.'
+                : 'A system notification if this tab is in the background'
+            }
+            isChecked={form.enableNotifications}
+            onChange={toggleNotifications}
           />
         </SettingsSection>
 

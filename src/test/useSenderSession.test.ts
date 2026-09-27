@@ -17,6 +17,7 @@ const settings: AppSettings = {
   customStunTurn: [],
   enableAudioAlerts: false,
   enableWakeLock: false,
+  enableNotifications: false,
 };
 
 async function renderSenderSession() {
