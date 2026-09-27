@@ -121,6 +121,9 @@ export abstract class TransferPeer<Events extends TransferEvents> {
 
   private async dispatch(message: ControlMessage) {
     switch (message.type) {
+      case 'HELLO':
+        // Introductions are read during connection setup, before a transfer exists
+        return;
       case 'TRANSFER_PAUSE':
       case 'TRANSFER_RESUME':
         this.isPaused = message.type === 'TRANSFER_PAUSE';

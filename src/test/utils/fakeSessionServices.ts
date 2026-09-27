@@ -1,8 +1,11 @@
 import { vi } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import type { ReceiverEvents, TransferEvents } from '../../types/transfer';
+import type { ReceiverEvents, SenderEvents } from '../../types/transfer';
 import type { ConnectionEventHandler } from '../../services/webrtc';
+import type { ReceiverOptions } from '../../services/transfer/receiver';
 import type { SessionServices } from '../../hooks/sessionServices';
+
+type AnyTransferEvents = SenderEvents & ReceiverEvents;
 
 export class FakeConnection {
   public handlers: ConnectionEventHandler;
@@ -17,18 +20,21 @@ export class FakeConnection {
 }
 
 /** Stands in for TransferSender / TransferReceiver; tests fire `events` to simulate the protocol. */
-export class FakeTransfer<Events extends TransferEvents = ReceiverEvents> {
+export class FakeTransfer {
   public conn: DataConnection;
-  public events: Events;
+  public events: AnyTransferEvents;
+  public options: ReceiverOptions;
   public start = vi.fn();
+  public updateFiles = vi.fn().mockReturnValue(true);
   public startReceiving = vi.fn().mockResolvedValue(true);
   public submitPin = vi.fn();
   public togglePause = vi.fn().mockReturnValue(true);
   public cancel = vi.fn();
 
-  constructor(conn: DataConnection, events: Events) {
+  constructor(conn: DataConnection, events: SenderEvents | ReceiverEvents, options: ReceiverOptions = {}) {
     this.conn = conn;
-    this.events = events;
+    this.events = events as AnyTransferEvents;
+    this.options = options;
   }
 }
 
@@ -48,12 +54,12 @@ export function createFakeServices() {
       return connection;
     },
     createSender: (conn, events) => {
-      const engine = new FakeTransfer<ReceiverEvents>(conn, events);
+      const engine = new FakeTransfer(conn, events);
       engines.push(engine);
       return engine;
     },
-    createReceiver: (conn, events) => {
-      const engine = new FakeTransfer<ReceiverEvents>(conn, events);
+    createReceiver: (conn, events, options) => {
+      const engine = new FakeTransfer(conn, events, options);
       engines.push(engine);
       return engine;
     },

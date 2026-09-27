@@ -1,5 +1,5 @@
 import type { DataConnection } from 'peerjs';
-import type { ControlMessage, TransferEvents, TransferFile, TransferManifest } from '../../types/transfer';
+import type { ControlMessage, SenderEvents, TransferFile, TransferManifest } from '../../types/transfer';
 import { FastStreamingChecksum } from '../checksum';
 import { TransferPeer } from './peer';
 import { CHUNK_SIZE, encodeChunk } from './protocol';
@@ -38,14 +38,16 @@ function toManifest(files: TransferFile[]): TransferManifest {
 }
 
 /** Streams queued files to one receiver, gated by an optional PIN. */
-export class TransferSender extends TransferPeer<TransferEvents> {
+export class TransferSender extends TransferPeer<SenderEvents> {
   private files: TransferFile[] = [];
   private pin = '';
   private pinAttemptsLeft = 0;
   // File requests are refused until the manifest (and so any PIN check) has been passed
   private hasSentManifest = false;
+  // Once the receiver requests the first file, the file list can no longer change
+  private hasReceiverStarted = false;
 
-  constructor(conn: DataConnection, events: TransferEvents) {
+  constructor(conn: DataConnection, events: SenderEvents) {
     super(conn, events);
     if (conn.dataChannel) {
       conn.dataChannel.bufferedAmountLowThreshold = LOW_WATERMARK_BYTES;
@@ -67,6 +69,19 @@ export class TransferSender extends TransferPeer<TransferEvents> {
     }
   }
 
+  /** Replaces the offered files while the receiver is still choosing; returns false once downloading began. */
+  public updateFiles(files: TransferFile[]): boolean {
+    if (this.hasReceiverStarted) {
+      return false;
+    }
+    this.files = files;
+    this.beginTransfer(toManifest(files).totalBytes, files.length);
+    if (this.hasSentManifest) {
+      this.sendManifest();
+    }
+    return true;
+  }
+
   protected handleMessage(message: ControlMessage) {
     switch (message.type) {
       case 'AUTH_RESPONSE':
@@ -75,6 +90,10 @@ export class TransferSender extends TransferPeer<TransferEvents> {
       case 'FILE_START':
         if (!this.hasSentManifest) {
           throw new Error('Receiver requested files before authenticating');
+        }
+        if (!this.hasReceiverStarted) {
+          this.hasReceiverStarted = true;
+          this.events.onReceiverStarted?.();
         }
         // Not awaited: streaming a file must not block pause/cancel messages in the queue
         this.streamFile(message.payload.fileIndex).catch((err) => this.failTransfer(err));

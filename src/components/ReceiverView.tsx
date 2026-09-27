@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, AlertTriangle, HardDriveDownload } from 'lucide-react';
+import React from 'react';
+import { DownloadCloud, ArrowRight, AlertCircle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { getActiveBrand } from '../branding';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
-import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
 import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
+import type { WaitingStage } from './WaitingForSenderCard';
+import { IncomingFilesCard } from './IncomingFilesCard';
 import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
@@ -22,7 +23,7 @@ interface ReceiverViewProps {
   onSubmitPin: () => void;
   manifest: TransferManifest | null;
   transferMetrics: TransferMetrics | null;
-  onStartSaving: () => void;
+  onStartSaving: () => void | Promise<void>;
   onTogglePause: () => void;
   onCancelTransfer: () => void;
   isPaused: boolean;
@@ -30,6 +31,25 @@ interface ReceiverViewProps {
   isNativeFSA: boolean;
   corruptedFiles: string[];
   onReset: () => void;
+  /** Connected through the sender's link, so there is no approval to wait for */
+  isInvited?: boolean;
+}
+
+function getWaitingStage(
+  status: ReceiverStatus,
+  isInvited: boolean,
+  manifest: TransferManifest | null
+): WaitingStage | null {
+  if (status === 'verifying_pin') {
+    return 'pin';
+  }
+  if (status === 'waiting_approval') {
+    return isInvited ? 'files' : 'approval';
+  }
+  if (status === 'connected' && manifest?.files.length === 0) {
+    return 'files';
+  }
+  return null;
 }
 
 export const ReceiverView: React.FC<ReceiverViewProps> = ({
@@ -51,20 +71,12 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   isNativeFSA,
   corruptedFiles,
   onReset,
+  isInvited = false,
 }) => {
-  const [isPreparingSave, setIsPreparingSave] = useState(false);
-
-  const handleStartSaveClick = async () => {
-    setIsPreparingSave(true);
-    try {
-      await onStartSaving();
-    } finally {
-      setIsPreparingSave(false);
-    }
-  };
+  const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="w-full space-y-6 animate-fade-in">
       {/* Active Transfer State */}
       {connectionState === 'transferring' ? (
         transferMetrics ? (
@@ -94,91 +106,12 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           onAction={onReset}
           corruptedFiles={corruptedFiles}
         />
-      ) : connectionState === 'waiting_approval' || connectionState === 'verifying_pin' ? (
-        <WaitingForSenderCard
-          stage={connectionState === 'verifying_pin' ? 'pin' : 'approval'}
-          roomCode={roomCode}
-          onCancel={onCancelTransfer}
-        />
+      ) : waitingStage ? (
+        <WaitingForSenderCard stage={waitingStage} roomCode={roomCode} onCancel={onCancelTransfer} />
       ) : connectionState === 'pin_required' && pinPrompt ? (
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
       ) : manifest ? (
-        /* Manifest Received - Ready to Choose Save Location */
-        <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center">
-              <DownloadCloud className="w-6 h-6 animate-float" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                Incoming Files Ready ({manifest.files.length} {manifest.files.length === 1 ? 'file' : 'files'})
-              </h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Total transfer size: <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatBytes(manifest.totalBytes)}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Files List Preview */}
-          <div className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 max-h-56 overflow-y-auto space-y-2">
-            {manifest.files.map((file, idx) => (
-              <div key={file.id || idx} className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-brand-500/30 transition-colors">
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate mr-3">
-                  {file.relativePath || file.name}
-                </span>
-                <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">
-                  {formatBytes(file.size)}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Storage notice: only Chromium can stream to disk; elsewhere files are buffered in RAM */}
-          {isNativeFSA ? (
-            <div className="p-3.5 mb-6 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-start gap-3">
-              <ShieldCheck className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
-              <div className="text-xs text-zinc-700 dark:text-zinc-300">
-                <span className="font-semibold block text-zinc-900 dark:text-white">
-                  Zero-RAM Native Disk Streaming Supported
-                </span>
-                Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream
-                direct to disk to prevent memory overflows.
-              </div>
-            </div>
-          ) : (
-            <div className="p-3.5 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-              <div className="text-xs text-zinc-700 dark:text-zinc-300">
-                <span className="font-semibold block text-zinc-900 dark:text-white">
-                  This Browser Can’t Stream to Disk
-                </span>
-                Each file is held in memory until its download finishes. Files larger than about 1&nbsp;GB may
-                crash this tab — use Chrome or Edge for large transfers.
-              </div>
-            </div>
-          )}
-
-          <Button
-            size="lg"
-            onClick={handleStartSaveClick}
-            disabled={isPreparingSave}
-            className="w-full rounded-2xl shadow-xl disabled:opacity-75 motion-safe:hover:scale-[1.02]"
-          >
-            {isPreparingSave ? (
-              <>
-                <Spinner className="w-5 h-5" />
-                <span>{manifest.files.length > 1 ? 'Opening Folder Dialog…' : 'Opening File Dialog…'}</span>
-              </>
-            ) : (
-              <>
-                <HardDriveDownload className="w-5 h-5" />
-                <span>
-                  {manifest.files.length > 1 ? 'Select Download Folder' : 'Select Save Location'} & Start Download
-                </span>
-              </>
-            )}
-          </Button>
-        </div>
+        <IncomingFilesCard manifest={manifest} isNativeFSA={isNativeFSA} onStartSaving={onStartSaving} />
       ) : (
         /* Room Code Entry Card */
         <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">

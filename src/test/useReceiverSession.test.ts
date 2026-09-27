@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useReceiverSession } from '../hooks/useReceiverSession';
 import type { AppSettings, TransferManifest } from '../types/transfer';
 import { createFakeServices } from './utils/fakeSessionServices';
@@ -20,10 +20,11 @@ const manifest: TransferManifest = {
   files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain' }],
 };
 
-function renderReceiverSession(initialRoomCode = '') {
+function renderReceiverSession(roomCode = '', shareKey: string | null = null) {
   const fakes = createFakeServices();
+  const shareLink = { roomCode, shareKey };
   const hook = renderHook(
-    ({ active }) => useReceiverSession({ active, settings, initialRoomCode, services: fakes.services }),
+    ({ active }) => useReceiverSession({ active, settings, shareLink, services: fakes.services }),
     { initialProps: { active: true } }
   );
   return { ...fakes, ...hook };
@@ -354,5 +355,36 @@ describe('useReceiverSession', () => {
     expect(engine.togglePause).toHaveBeenCalled();
     expect(session.result.current.state.isPaused).toBe(true);
   });
-});
 
+  it('waits for the user to connect when the link carries no key', () => {
+    const session = renderReceiverSession('DW-ROOM22');
+
+    expect(session.connections).toHaveLength(0);
+    expect(session.result.current.state.status).toBe('idle');
+  });
+
+  it('connects straight away when opened through a share link, presenting its key', async () => {
+    const session = renderReceiverSession('DW-ROOM22', 'link-key');
+
+    await waitFor(() => expect(session.result.current.state.status).toBe('waiting_approval'));
+
+    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DW-ROOM22', settings);
+    expect(session.engines[0].options.shareKey).toBe('link-key');
+    expect(session.result.current.state.isInvited).toBe(true);
+  });
+
+  it('never presents the link key to a different room', async () => {
+    const session = renderReceiverSession('DW-ROOM22', 'link-key');
+    await waitFor(() => expect(session.engines).toHaveLength(1));
+
+    act(() => {
+      session.result.current.actions.setRoomCode('DW-OTHER2');
+    });
+    await act(async () => {
+      await session.result.current.actions.connect();
+    });
+
+    expect(session.engines[1].options.shareKey).toBeNull();
+    expect(session.result.current.state.isInvited).toBe(false);
+  });
+});

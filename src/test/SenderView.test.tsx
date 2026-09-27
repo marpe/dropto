@@ -2,7 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { SenderView } from '../components/SenderView';
-import type { TransferMetrics } from '../types/transfer';
+import type { TransferFile, TransferMetrics } from '../types/transfer';
+
+const queuedFile: TransferFile = {
+  id: 'f1',
+  name: 'report.pdf',
+  size: 2048,
+  type: 'application/pdf',
+  rawFile: new File(['x'], 'report.pdf'),
+};
 
 const metrics: TransferMetrics = {
   currentSpeed: 1048576,
@@ -17,17 +25,18 @@ const metrics: TransferMetrics = {
   currentFilePercent: 50,
 };
 
-function renderSenderView(overrides: Partial<ComponentProps<typeof SenderView>> = {}) {
-  const props: ComponentProps<typeof SenderView> = {
+function renderSenderViewProps(overrides: Partial<ComponentProps<typeof SenderView>> = {}): ComponentProps<typeof SenderView> {
+  return {
     roomCode: 'DW-ABC234',
+    shareKey: 'link-key',
     files: [],
     onAddFiles: () => {},
     onRemoveFile: () => {},
     onClearFiles: () => {},
-    connectedPeerId: null,
     transferMetrics: null,
     transferState: 'waiting',
     pendingPeerId: null,
+    isPendingPeerTrusted: false,
     onApprovePeer: () => {},
     onRejectPeer: () => {},
     onTogglePause: () => {},
@@ -41,7 +50,10 @@ function renderSenderView(overrides: Partial<ComponentProps<typeof SenderView>> 
     onRetryRoom: () => {},
     ...overrides,
   };
-  return render(<SenderView {...props} />);
+}
+
+function renderSenderView(overrides: Partial<ComponentProps<typeof SenderView>> = {}) {
+  return render(<SenderView {...renderSenderViewProps(overrides)} />);
 }
 
 describe('SenderView', () => {
@@ -77,5 +89,41 @@ describe('SenderView', () => {
     expect(screen.queryByText(/generating/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     expect(onRetryRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the share box hidden until there is something to send', () => {
+    const { rerender } = renderSenderView();
+    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
+
+    rerender(<SenderView {...renderSenderViewProps({ files: [queuedFile] })} />);
+    expect(screen.getByRole('button', { name: /copy link/i })).toBeDefined();
+  });
+
+  it('copies a link that carries the room key', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderSenderView({ files: [queuedFile] });
+
+    fireEvent.click(screen.getByRole('button', { name: /copy link/i }));
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DW-ABC234#key=link-key$/));
+  });
+
+  it('shows that the receiver is choosing where to save, while files can still change', () => {
+    const onCancelTransfer = vi.fn();
+    renderSenderView({ transferState: 'awaiting_receiver', files: [queuedFile], onCancelTransfer });
+
+    expect(screen.getByText(/choosing where to save/i)).toBeDefined();
+    expect(screen.getByText('report.pdf')).toBeDefined();
+    expect(screen.getByRole('button', { name: /select files/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(onCancelTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for files, not approval, when a receiver opened the link early', () => {
+    renderSenderView({ pendingPeerId: 'receiver-1', isPendingPeerTrusted: true });
+
+    expect(screen.getByText(/opened your link/i)).toBeDefined();
+    expect(screen.queryByRole('button', { name: /accept/i })).toBeNull();
   });
 });

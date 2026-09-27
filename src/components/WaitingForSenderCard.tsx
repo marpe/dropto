@@ -1,8 +1,8 @@
 import React from 'react';
-import { Hourglass, KeyRound } from 'lucide-react';
+import { FilePlus2, Hourglass, KeyRound } from 'lucide-react';
 import { Button } from './ui/Button';
 
-type WaitingStage = 'approval' | 'pin';
+export type WaitingStage = 'approval' | 'pin' | 'files';
 
 interface WaitingForSenderCardProps {
   stage: WaitingStage;
@@ -15,6 +15,11 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; Ico
     title: 'Waiting for the Sender to Accept',
     description: 'The sender has been asked to approve this device. Files appear here as soon as they do.',
     Icon: Hourglass,
+  },
+  files: {
+    title: 'Waiting for the Sender’s Files',
+    description: 'You are connected. The files appear here as soon as the sender adds them.',
+    Icon: FilePlus2,
   },
   pin: {
     title: 'Checking PIN…',

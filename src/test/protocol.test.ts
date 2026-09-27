@@ -8,6 +8,8 @@ const manifest = {
 
 describe('parseControlMessage', () => {
   it.each([
+    [{ type: 'HELLO', payload: { shareKey: 'abc_DEF-123' } }],
+    [{ type: 'HELLO', payload: { shareKey: null } }],
     [{ type: 'AUTH_REQUEST', payload: { attemptsLeft: 3, isIncorrect: false } }],
     [{ type: 'AUTH_RESPONSE', payload: { pin: '1234' } }],
     [{ type: 'MANIFEST', payload: manifest }],
@@ -40,6 +42,7 @@ describe('parseControlMessage', () => {
       JSON.stringify({ type: 'MANIFEST', payload: { ...manifest, totalBytes: 999 } }),
     ],
     ['an error without a message', JSON.stringify({ type: 'ERROR', payload: {} })],
+    ['a greeting with a non-string key', JSON.stringify({ type: 'HELLO', payload: { shareKey: 42 } })],
   ])('rejects %s', (_label, raw) => {
     expect(parseControlMessage(raw)).toBeNull();
   });

@@ -9,7 +9,7 @@ import type { StorageWriter } from '../services/storage';
 import type {
   PinPrompt,
   ReceiverEvents,
-  TransferEvents,
+  SenderEvents,
   TransferFile,
   TransferManifest,
   TransferMetrics,
@@ -123,7 +123,7 @@ function fakeStorage(write?: (chunk: Uint8Array) => Promise<void>) {
 }
 
 interface PairOptions {
-  senderEvents?: TransferEvents;
+  senderEvents?: SenderEvents;
   receiverEvents?: ReceiverEvents;
   receiverOptions?: ReceiverOptions;
   /** Start receiving as soon as the manifest arrives, like a user clicking the save button */
@@ -275,6 +275,113 @@ describe('full transfer', () => {
 
     expect(await waitFor(pair.isComplete)).toBe(true);
     expect(pair.record.receiverResult).toEqual({ corruptedFiles: [] });
+  });
+});
+
+describe('introduction and live file list', () => {
+  function helloPayloads(conn: MockDataConnection) {
+    return conn.sent
+      .filter((data): data is string => typeof data === 'string')
+      .map((data) => JSON.parse(data))
+      .filter((message) => message.type === 'HELLO')
+      .map((message) => message.payload);
+  }
+
+  it('greets the sender first, presenting the share key from the link', () => {
+    const receiverConn = new MockDataConnection();
+
+    new TransferReceiver(asConnection(receiverConn), {}, { shareKey: 'secret-key' });
+
+    expect(receiverConn.sentMessageTypes()[0]).toBe('HELLO');
+    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'secret-key' }]);
+  });
+
+  it('greets without a key when the room code was typed in', () => {
+    const receiverConn = new MockDataConnection();
+
+    new TransferReceiver(asConnection(receiverConn), {});
+
+    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: null }]);
+  });
+
+  it('shows the receiver an updated file list until the download starts', async () => {
+    const manifests: TransferManifest[] = [];
+    const pair = createTransferPair({
+      isAutoReceiving: false,
+      receiverEvents: {
+        onManifest: (manifest) => {
+          manifests.push(manifest);
+        },
+      },
+    });
+    const first = createTestFile(1024, 'a.bin');
+    pair.sender.start([first]);
+    await waitFor(() => manifests.length === 1);
+
+    pair.sender.updateFiles([first, createTestFile(2048, 'b.bin')]);
+    await waitFor(() => manifests.length === 2);
+    await pair.receiver.startReceiving();
+
+    expect(manifests[1].files.map((file) => file.name)).toEqual(['a.bin', 'b.bin']);
+    expect(await waitFor(pair.isComplete)).toBe(true);
+  });
+
+  it('tells the sender once the receiver starts downloading, and freezes the file list', async () => {
+    let receiverStartedCount = 0;
+    const manifests: TransferManifest[] = [];
+    const pair = createTransferPair({
+      senderEvents: {
+        onReceiverStarted: () => {
+          receiverStartedCount++;
+        },
+      },
+      receiverEvents: {
+        onManifest: (manifest) => {
+          manifests.push(manifest);
+        },
+      },
+    });
+    const files = [createTestFile(1024, 'a.bin'), createTestFile(1024, 'b.bin')];
+
+    pair.sender.start(files);
+    await waitFor(() => receiverStartedCount > 0);
+    pair.sender.updateFiles([...files, createTestFile(1024, 'late.bin')]);
+
+    expect(await waitFor(pair.isComplete)).toBe(true);
+    expect(receiverStartedCount).toBe(1);
+    expect(manifests).toHaveLength(1);
+  });
+
+  // A destination picked for one file (a save dialog) cannot hold a list that has since grown
+  it('asks again when the file list changes while the save location is being chosen', async () => {
+    const receiverConn = new MockDataConnection();
+    let finishChoosing: () => void = () => {};
+    const receiver = new TransferReceiver(
+      asConnection(receiverConn),
+      {},
+      {
+        chooseStorage: async () => {
+          await new Promise<void>((resolve) => {
+            finishChoosing = resolve;
+          });
+          return fakeStorage().chooseStorage([]);
+        },
+      }
+    );
+    const manifestOf = (...names: string[]): TransferManifest => ({
+      totalBytes: names.length,
+      files: names.map((name, i) => ({ id: `f${i}`, name, size: 1, type: 'application/octet-stream' })),
+    });
+    receiverConn.emit('data', JSON.stringify({ type: 'MANIFEST', payload: manifestOf('a.bin') }));
+    await sleep(10);
+
+    const starting = receiver.startReceiving();
+    receiverConn.emit('data', JSON.stringify({ type: 'MANIFEST', payload: manifestOf('a.bin', 'b.bin') }));
+    await sleep(10);
+    finishChoosing();
+
+    expect(await starting).toBe(false);
+    expect(receiverConn.sentMessageTypes()).not.toContain('FILE_START');
   });
 });
 
@@ -658,7 +765,9 @@ describe('cancellation', () => {
     pair.receiver.cancel();
     await sleep(30);
 
-    expect(pair.receiverConn.sentMessageTypes()).toEqual(['TRANSFER_CANCEL']);
-    expect(pair.senderConn.sentMessageTypes()).toEqual([]);
+    const cancelsSentBy = (conn: MockDataConnection) =>
+      conn.sentMessageTypes().filter((type) => type === 'TRANSFER_CANCEL').length;
+    expect(cancelsSentBy(pair.receiverConn)).toBe(1);
+    expect(cancelsSentBy(pair.senderConn)).toBe(0);
   });
 });

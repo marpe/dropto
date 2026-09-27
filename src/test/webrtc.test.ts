@@ -10,6 +10,9 @@ const { FakeConnection, FakePeer, peers, peerBehavior } = vi.hoisted(() => {
     public on(event: string, handler: Handler) {
       (this.handlers[event] ??= []).push(handler);
     }
+    public off(event: string, handler: Handler) {
+      this.handlers[event] = (this.handlers[event] ?? []).filter((registered) => registered !== handler);
+    }
     public emit(event: string, ...args: any[]) {
       for (const handler of this.handlers[event] ?? []) {
         handler(...args);
@@ -31,8 +34,11 @@ const { FakeConnection, FakePeer, peers, peerBehavior } = vi.hoisted(() => {
   }
 
   const peers: FakePeer[] = [];
-  // When set, new peers fail to open with this PeerJS error instead of opening
-  const peerBehavior: { openError: { type: string } | null } = { openError: null };
+  // openError: every new peer fails with it; takenIds: those room IDs are already in use
+  const peerBehavior: { openError: { type: string } | null; takenIds: Set<string> } = {
+    openError: null,
+    takenIds: new Set(),
+  };
 
   class FakePeer extends FakeEmitter {
     public id: string;
@@ -41,7 +47,7 @@ const { FakeConnection, FakePeer, peers, peerBehavior } = vi.hoisted(() => {
       super();
       this.id = id ?? 'ephemeral';
       peers.push(this);
-      const openError = peerBehavior.openError;
+      const openError = peerBehavior.takenIds.has(this.id) ? { type: 'unavailable-id' } : peerBehavior.openError;
       queueMicrotask(() => (openError ? this.emit('error', openError) : this.emit('open', this.id)));
     }
   }
@@ -83,17 +89,68 @@ describe('WebRtcService.generateRoomId', () => {
   });
 });
 
+/** A receiver connecting to the room and sending its first protocol message. */
+function connectReceiver(peer: InstanceType<typeof FakePeer>, peerId: string, shareKey: string | null = null) {
+  const conn = new FakeConnection(peerId);
+  peer.emit('connection', conn);
+  conn.emit('data', JSON.stringify({ type: 'HELLO', payload: { shareKey } }));
+  return conn;
+}
+
 describe('WebRtcService incoming connections', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   async function startSender() {
     const incoming: string[] = [];
+    const greetings: (string | null)[] = [];
     const service = new WebRtcService({
-      onIncomingConnection: (conn) => {
+      onIncomingConnection: (conn, greeting) => {
         incoming.push(conn.peer);
+        greetings.push(greeting.shareKey);
       },
     });
     await service.initSender();
-    return { service, incoming, peer: peers[peers.length - 1] };
+    return { service, incoming, greetings, peer: peers[peers.length - 1] };
   }
+
+  it('announces a receiver together with the share key from its greeting', async () => {
+    const { incoming, greetings, peer } = await startSender();
+
+    connectReceiver(peer, 'receiver-1', 'link-key');
+
+    expect(incoming).toEqual(['receiver-1']);
+    expect(greetings).toEqual(['link-key']);
+  });
+
+  it('waits for the greeting before announcing a receiver', async () => {
+    const { incoming, peer } = await startSender();
+
+    peer.emit('connection', new FakeConnection('receiver-1'));
+
+    expect(incoming).toEqual([]);
+  });
+
+  it('treats a receiver that never greets as having no key', async () => {
+    vi.useFakeTimers();
+    const { incoming, greetings, peer } = await startSender();
+
+    peer.emit('connection', new FakeConnection('old-client'));
+    vi.advanceTimersByTime(5_000);
+
+    expect(incoming).toEqual(['old-client']);
+    expect(greetings).toEqual([null]);
+  });
+
+  it('announces each receiver only once', async () => {
+    const { incoming, peer } = await startSender();
+    const conn = connectReceiver(peer, 'receiver-1', 'link-key');
+
+    conn.emit('data', JSON.stringify({ type: 'HELLO', payload: { shareKey: 'again' } }));
+
+    expect(incoming).toEqual(['receiver-1']);
+  });
 
   it('reports which receiver disconnected', async () => {
     const disconnected: (string | undefined)[] = [];
@@ -113,11 +170,10 @@ describe('WebRtcService incoming connections', () => {
 
   it('frees the room for the next receiver after disconnecting the current peer', async () => {
     const { service, incoming, peer } = await startSender();
-    const first = new FakeConnection('receiver-1');
-    peer.emit('connection', first);
+    const first = connectReceiver(peer, 'receiver-1');
 
     service.disconnectPeer();
-    peer.emit('connection', new FakeConnection('receiver-2'));
+    connectReceiver(peer, 'receiver-2');
 
     // flush: messages sent just before (e.g. TRANSFER_CANCEL) must still reach the peer
     expect(first.close).toHaveBeenCalledWith({ flush: true });
@@ -126,11 +182,8 @@ describe('WebRtcService incoming connections', () => {
 
   it('turns away a second receiver while the first is still connected', async () => {
     const { incoming, peer } = await startSender();
-    const first = new FakeConnection('receiver-1');
-    const second = new FakeConnection('receiver-2');
-
-    peer.emit('connection', first);
-    peer.emit('connection', second);
+    const first = connectReceiver(peer, 'receiver-1');
+    const second = connectReceiver(peer, 'receiver-2');
 
     expect(incoming).toEqual(['receiver-1']);
     expect(second.close).toHaveBeenCalled();
@@ -139,11 +192,10 @@ describe('WebRtcService incoming connections', () => {
 
   it('accepts a new receiver once the previous one disconnected', async () => {
     const { incoming, peer } = await startSender();
-    const first = new FakeConnection('receiver-1');
-    peer.emit('connection', first);
+    const first = connectReceiver(peer, 'receiver-1');
 
     first.close();
-    peer.emit('connection', new FakeConnection('receiver-2'));
+    connectReceiver(peer, 'receiver-2');
 
     expect(incoming).toEqual(['receiver-1', 'receiver-2']);
   });
@@ -152,6 +204,22 @@ describe('WebRtcService incoming connections', () => {
 describe('WebRtcService room creation', () => {
   afterEach(() => {
     peerBehavior.openError = null;
+    peerBehavior.takenIds.clear();
+  });
+
+  it('reopens the preferred room code, so links survive a sender reload', async () => {
+    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DW-KEEP22' });
+
+    expect(roomCode).toBe('DW-KEEP22');
+  });
+
+  it('falls back to a fresh room code when the preferred one is taken', async () => {
+    peerBehavior.takenIds.add('DW-KEEP22');
+
+    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DW-KEEP22' });
+
+    expect(roomCode).not.toBe('DW-KEEP22');
+    expect(roomCode).toMatch(/^DW-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   });
 
   it('gives up after a few room-code collisions instead of retrying forever', async () => {

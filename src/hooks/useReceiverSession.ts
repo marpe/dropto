@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
+import type { ShareLink } from '../utils/shareLink';
 import type {
   AppSettings,
   PinPrompt,
@@ -15,6 +16,8 @@ import type { SessionConnection, SessionReceiver, SessionServices } from './sess
 export interface ReceiverSessionState {
   status: ReceiverStatus;
   roomCode: string;
+  /** Connected with the sender's link key, so no approval is needed (only files may still be missing) */
+  isInvited: boolean;
   pin: string;
   pinPrompt: PinPrompt | null;
   manifest: TransferManifest | null;
@@ -28,7 +31,7 @@ type ReceiverAction =
   | { type: 'ROOM_CODE_CHANGED'; roomCode: string }
   | { type: 'PIN_CHANGED'; pin: string }
   | { type: 'CONNECT_REQUESTED' }
-  | { type: 'CONNECTED' }
+  | { type: 'CONNECTED'; isInvited: boolean }
   | { type: 'CONNECT_FAILED'; error: string }
   | { type: 'PIN_REQUIRED'; prompt: PinPrompt }
   | { type: 'PIN_SUBMITTED' }
@@ -55,9 +58,17 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
     case 'PIN_CHANGED':
       return { ...state, pin: action.pin };
     case 'CONNECT_REQUESTED':
-      return { ...state, ...noProgress, status: 'connecting', error: null, manifest: null, corruptedFiles: [] };
+      return {
+        ...state,
+        ...noProgress,
+        status: 'connecting',
+        isInvited: false,
+        error: null,
+        manifest: null,
+        corruptedFiles: [],
+      };
     case 'CONNECTED':
-      return { ...state, status: 'waiting_approval' };
+      return { ...state, status: 'waiting_approval', isInvited: action.isInvited };
     case 'CONNECT_FAILED':
       return { ...state, status: 'error', error: action.error };
     case 'PIN_REQUIRED':
@@ -104,6 +115,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
 export const initialReceiverState: ReceiverSessionState = {
   status: 'idle',
   roomCode: '',
+  isInvited: false,
   pin: '',
   pinPrompt: null,
   manifest: null,
@@ -113,22 +125,24 @@ export const initialReceiverState: ReceiverSessionState = {
   corruptedFiles: [],
 };
 
+const noShareLink: ShareLink = { roomCode: '', shareKey: null };
+
 interface UseReceiverSessionOptions {
   /** Leaving receive mode tears down any connection */
   active: boolean;
   settings: AppSettings;
-  /** Prefilled from a ?room= share link */
-  initialRoomCode?: string;
+  /** From the address the page was opened with: pre-fills the room, and a key connects straight away */
+  shareLink?: ShareLink;
   services?: SessionServices;
 }
 
 export function useReceiverSession({
   active,
   settings,
-  initialRoomCode = '',
+  shareLink = noShareLink,
   services = defaultSessionServices,
 }: UseReceiverSessionOptions) {
-  const [state, dispatch] = useReducer(receiverReducer, { ...initialReceiverState, roomCode: initialRoomCode });
+  const [state, dispatch] = useReducer(receiverReducer, { ...initialReceiverState, roomCode: shareLink.roomCode });
   const connectionRef = useRef<SessionConnection | null>(null);
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
@@ -168,80 +182,96 @@ export function useReceiverSession({
   }, [active, teardown]);
 
   /** Stops listening to the engine and closes the peer connection once queued messages are sent. */
-  const leave = () => {
+  const leave = useCallback(() => {
     engineRef.current = null;
     connectionRef.current?.disconnectPeer();
-  };
+  }, []);
 
-  const connect = async () => {
-    const roomCode = state.roomCode.trim().toUpperCase();
-    if (!roomCode) {
-      return;
-    }
-    teardown();
-    dispatch({ type: 'CONNECT_REQUESTED' });
-
-    const connection = services.createConnection({
-      onDisconnected: () => {
-        if (connectionRef.current === connection) {
-          dispatch({ type: 'PEER_DISCONNECTED' });
-        }
-      },
-      onError: (err) => {
-        console.error('WebRTC error:', err);
-      },
-    });
-    connectionRef.current = connection;
-
-    try {
-      const conn = await connection.initReceiver(roomCode, settingsRef.current);
-      if (connectionRef.current !== connection) {
+  const connectTo = useCallback(
+    async (requestedRoomCode: string) => {
+      const roomCode = requestedRoomCode.trim().toUpperCase();
+      if (!roomCode) {
         return;
       }
+      // The key belongs to the room it was shared for; never hand it to another sender
+      const shareKey = roomCode === shareLink.roomCode ? shareLink.shareKey : null;
+      teardown();
+      dispatch({ type: 'CONNECT_REQUESTED' });
 
-      // Events from a receiver that has since been replaced or torn down are ignored
-      const ifCurrent =
-        <A extends unknown[]>(handler: (...args: A) => void) =>
-        (...args: A) => {
-          if (engineRef.current === engine) {
-            handler(...args);
+      const connection = services.createConnection({
+        onDisconnected: () => {
+          if (connectionRef.current === connection) {
+            dispatch({ type: 'PEER_DISCONNECTED' });
           }
-        };
-
-      const engine = services.createReceiver(conn, {
-        onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
-        onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
-        onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
-        onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
-        onAllCompleted: ifCurrent((result) => {
-          endRun(true);
-          leave();
-          dispatch({ type: 'COMPLETED', result });
-        }),
-        onError: ifCurrent((error) => {
-          endRun(false);
-          leave();
-          dispatch({ type: 'FAILED', error });
-        }),
-        onCancelled: ifCurrent(() => {
-          endRun(false);
-          leave();
-          dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
-        }),
+        },
+        onError: (err) => {
+          console.error('WebRTC error:', err);
+        },
       });
-      engineRef.current = engine;
-      soundService.playConnect();
-      dispatch({ type: 'CONNECTED' });
-    } catch (err) {
-      if (connectionRef.current === connection) {
-        teardown();
-        dispatch({
-          type: 'CONNECT_FAILED',
-          error: describePeerError(err),
-        });
+      connectionRef.current = connection;
+
+      try {
+        const conn = await connection.initReceiver(roomCode, settingsRef.current);
+        if (connectionRef.current !== connection) {
+          return;
+        }
+
+        // Events from a receiver that has since been replaced or torn down are ignored
+        const ifCurrent =
+          <A extends unknown[]>(handler: (...args: A) => void) =>
+          (...args: A) => {
+            if (engineRef.current === engine) {
+              handler(...args);
+            }
+          };
+
+        const engine = services.createReceiver(
+          conn,
+          {
+            onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
+            onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
+            onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
+            onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
+            onAllCompleted: ifCurrent((result) => {
+              endRun(true);
+              leave();
+              dispatch({ type: 'COMPLETED', result });
+            }),
+            onError: ifCurrent((error) => {
+              endRun(false);
+              leave();
+              dispatch({ type: 'FAILED', error });
+            }),
+            onCancelled: ifCurrent(() => {
+              endRun(false);
+              leave();
+              dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
+            }),
+          },
+          { shareKey }
+        );
+        engineRef.current = engine;
+        soundService.playConnect();
+        dispatch({ type: 'CONNECTED', isInvited: shareKey !== null });
+      } catch (err) {
+        if (connectionRef.current === connection) {
+          teardown();
+          dispatch({
+            type: 'CONNECT_FAILED',
+            error: describePeerError(err),
+          });
+        }
       }
+    },
+    [services, teardown, endRun, leave, shareLink]
+  );
+
+  // Opening the sender's link connects straight away: its key admits us without the sender having to accept
+  useEffect(() => {
+    if (active && shareLink.shareKey) {
+      connectTo(shareLink.roomCode);
     }
-  };
+  }, [active, connectTo, shareLink]);
 
   const startSaving = async () => {
     const engine = engineRef.current;
@@ -275,7 +305,7 @@ export function useReceiverSession({
     actions: {
       setRoomCode: (roomCode: string) => dispatch({ type: 'ROOM_CODE_CHANGED', roomCode }),
       setPin: (pin: string) => dispatch({ type: 'PIN_CHANGED', pin }),
-      connect,
+      connect: () => connectTo(state.roomCode),
       submitPin: () => {
         engineRef.current?.submitPin(state.pin);
         dispatch({ type: 'PIN_SUBMITTED' });

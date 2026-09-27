@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReceiverView } from '../components/ReceiverView';
-import type { TransferManifest, TransferMetrics } from '../types/transfer';
+import type { ComponentProps } from 'react';
+import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 
 describe('ReceiverView Component UI & Interaction', () => {
   const dummyManifest: TransferManifest = {
@@ -95,7 +96,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     });
   });
 
-  function renderWaiting(connectionState: 'waiting_approval' | 'verifying_pin') {
+  function renderWaiting(connectionState: ReceiverStatus, extra: Partial<ComponentProps<typeof ReceiverView>> = {}) {
     const onCancelTransfer = vi.fn();
     render(
       <ReceiverView
@@ -117,6 +118,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         isNativeFSA={true}
         corruptedFiles={[]}
         onReset={() => {}}
+        {...extra}
       />
     );
     return { onCancelTransfer };
@@ -263,5 +265,19 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(screen.getByText(/Receiving Direct to Disk/i)).toBeDefined();
     expect(screen.getByText(/Current Speed/i)).toBeDefined();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('waits for the files, not for approval, after opening the sender link', () => {
+    renderWaiting('waiting_approval', { isInvited: true });
+
+    expect(screen.getByRole('heading', { name: /waiting for the sender.s files/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /waiting for the sender to accept/i })).toBeNull();
+  });
+
+  it('keeps waiting while the sender has not queued any files yet', () => {
+    renderWaiting('connected', { isInvited: true, manifest: { totalBytes: 0, files: [] } });
+
+    expect(screen.getByRole('heading', { name: /waiting for the sender.s files/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /start download/i })).toBeNull();
   });
 });

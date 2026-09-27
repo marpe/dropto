@@ -115,6 +115,10 @@ export function parseControlMessage(raw: string): ControlMessage | null {
   const payload = isRecord(message.payload) ? message.payload : {};
 
   switch (message.type) {
+    case 'HELLO':
+      return typeof payload.shareKey === 'string' || payload.shareKey === null
+        ? { type: 'HELLO', payload: { shareKey: payload.shareKey } }
+        : null;
     case 'AUTH_REQUEST':
       return isIndex(payload.attemptsLeft) && typeof payload.isIncorrect === 'boolean'
         ? { type: 'AUTH_REQUEST', payload: { attemptsLeft: payload.attemptsLeft, isIncorrect: payload.isIncorrect } }

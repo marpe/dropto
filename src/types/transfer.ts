@@ -17,7 +17,7 @@ export interface TransferManifest {
   files: ManifestFile[];
 }
 
-export type SenderStatus = 'idle' | 'waiting' | 'transferring' | 'completed' | 'failed';
+export type SenderStatus = 'idle' | 'waiting' | 'awaiting_receiver' | 'transferring' | 'completed' | 'failed';
 
 export type ReceiverStatus =
   | 'idle'
@@ -43,6 +43,7 @@ export interface TransferResult {
 
 /** JSON control messages; file data travels separately as binary chunks. */
 export type ControlMessage =
+  | { type: 'HELLO'; payload: { shareKey: string | null } }
   | { type: 'AUTH_REQUEST'; payload: PinPrompt }
   | { type: 'AUTH_RESPONSE'; payload: { pin: string } }
   | { type: 'MANIFEST'; payload: TransferManifest }
@@ -78,6 +79,11 @@ export interface TransferEvents {
   onError?: (message: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
+}
+
+export interface SenderEvents extends TransferEvents {
+  /** The receiver chose a destination and requested the first file; the file list is now fixed */
+  onReceiverStarted?: () => void;
 }
 
 export interface ReceiverEvents extends TransferEvents {
