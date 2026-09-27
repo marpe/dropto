@@ -30,15 +30,23 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 - **A long or repeated class list means a component.** If you're copying a styled node, extract it with typed variant props instead.
 - **Encapsulate conceptual units.** Existing examples: `TransferCompleteCard` (success/corrupted states plus confetti), `PinEntryCard`, `MetricsDashboard`, `PeerApprovalModal`, `IceServerRow`, `Footer`. New concepts get the same treatment (e.g. a mode switcher, share box, file-queue row).
 - **Per-item state belongs in the row component.** Rows with their own edit, draft, copied or visibility state own it. Parents pass data and domain callbacks, never ID-keyed `Record<string, …>` state maps.
-- **Modals:** `PeerApprovalModal`, `QrModal` and `SettingsModal` duplicate the overlay/panel shell. The next modal you touch or add should extract a shared `Modal` first, not add a fourth copy. Never use `alert()` / `confirm()` / `prompt()`.
+- **Modals** use `components/ui/Modal` (overlay, panel, size `sm`/`md`). Pass `onClose` for a close button plus Escape; omit it when the user must choose (e.g. `PeerApprovalModal`). Parents mount modals conditionally — no `isOpen` props. Never use `alert()` / `confirm()` / `prompt()`.
 - **Transient "done" flags** (copied, saved) use `useCopyToClipboard` or the same pattern: timer cleared on re-trigger and unmount, and the flag set only when the action actually succeeded.
 
 ### Shared UI primitives — reach for these before hand-styling
-- `components/ui/Button` — `variant`: `primary` | `secondary`; `size`: `sm` | `md` | `lg`. Per-site tweaks go via `className` (merged by `cn`). Add a variant rather than restyling a raw `<button>`.
+- `components/ui/Button` — `variant`: `primary` | `secondary` | `danger` (secondary that turns red on hover: Decline, Cancel transfer) | `ghost` (dialog Cancel, inline actions); `size`: `sm` | `md` | `lg`. Per-site tweaks go via `className` (merged by `cn`). Add a variant rather than restyling a raw `<button>`.
+- `components/ui/IconButton` — icon-only button with a required `title`; `iconButtonClassName()` (`ui/iconButtonStyles.ts`) styles icon links the same way.
+- `components/ui/Card` — the raised section surface (`padding`: `sm` | `md` | `lg`). Never re-type `rounded-3xl bg-white dark:bg-supabase-surface border …`.
+- `components/ui/StatusCard` — centred state screen: `badge`, `title`, `description`, actions as children (waiting, failed, complete, PIN).
+- `components/ui/IconBadge` — tinted icon tile (`tone`: `brand` | `danger` | `warning`, `size`: `md` | `lg`, `isPulsing` for "waiting on the other device").
+- `components/ui/Notice` — inline callout (`tone`: `brand` | `warning` | `danger`, optional `title`).
+- `components/ui/TextInput` — `size` `sm` (settings fields) or `lg` (centred mono codes/PINs).
+- `components/ui/ProgressBar` — `primary` | `subtle`; animates `transform`, not `width`.
+- `components/ui/Pill` — small uppercase brand tag. `components/ui/AppLogo` — the header mark.
 - `components/ui/Spinner` — colour comes from `text-*` (it draws in `currentColor`), size from `w-/h-`.
 - `components/ui/GitHubIcon`.
 - `components/ui/FileTypeIcon` — lucide glyph + Catppuccin colour for a file name/MIME type (`utils/fileKind.ts`).
-- Icons: `lucide-react` first. A custom SVG becomes a component in `components/ui/` accepting `className`. No inline `<svg>` blocks in views (the header logo is a known leftover).
+- Icons: `lucide-react` first. A custom SVG becomes a component in `components/ui/` accepting `className` (see `AppLogo`, `GitHubIcon`). No inline `<svg>` blocks in views.
 
 ---
 

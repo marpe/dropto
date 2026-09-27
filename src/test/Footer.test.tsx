@@ -7,7 +7,7 @@ describe('Footer build info', () => {
   it('links the commit hash to the repository and shows when the build was made', () => {
     render(<Footer buildInfo={{ commit: 'abc1234', builtAtIso: '2026-09-27T20:10:00.000Z' }} />);
 
-    const commitLink = screen.getByRole('link', { name: 'abc1234' });
+    const commitLink = screen.getByRole('link', { name: '#abc1234' });
     expect(commitLink.getAttribute('href')).toBe(`${REPOSITORY_URL}/commit/abc1234`);
     const builtAt = document.querySelector('time');
     expect(builtAt?.getAttribute('dateTime')).toBe('2026-09-27T20:10:00.000Z');

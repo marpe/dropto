@@ -7,7 +7,6 @@ function renderModal(fileCount: number) {
   const onSelectFiles = vi.fn();
   render(
     <PeerApprovalModal
-      isOpen={true}
       peerId="receiver-1"
       fileCount={fileCount}
       totalBytes={fileCount * 1024}

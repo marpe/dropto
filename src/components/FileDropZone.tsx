@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { UploadCloud, FolderUp, FileUp } from 'lucide-react';
 import { Button } from './ui/Button';
+import { IconBadge } from './ui/IconBadge';
 import { cn } from '../utils/cn';
 
 interface FileDropZoneProps {
@@ -53,9 +54,11 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
     >
       {!isCompact && (
         <>
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center shadow-inner motion-safe:group-hover:scale-110 transition-transform">
-            <UploadCloud className="w-8 h-8 motion-safe:animate-float" />
-          </div>
+          <IconBadge
+            icon={UploadCloud}
+            className="mx-auto mb-4 motion-safe:group-hover:scale-110 transition-transform"
+            iconClassName="motion-safe:animate-float"
+          />
           <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drag & Drop files or directories here</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
             Up to 10GB+ per file. Direct WebRTC streaming with zero cloud storage.

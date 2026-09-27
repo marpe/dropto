@@ -1,6 +1,8 @@
 import React from 'react';
 import { X } from 'lucide-react';
+import { Card } from './ui/Card';
 import { FileTypeIcon } from './ui/FileTypeIcon';
+import { IconButton } from './ui/IconButton';
 import type { TransferFile } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 
@@ -24,14 +26,14 @@ const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
       </span>
       <span className="text-zinc-400 font-mono">{formatBytes(file.size)}</span>
     </div>
-    <button
-      type="button"
-      onClick={onRemove}
+    <IconButton
       title={`Remove ${file.name}`}
-      className="p-1 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+      size="sm"
+      onClick={onRemove}
+      className="p-1 hover:text-red-500 dark:hover:text-red-400"
     >
       <X className="w-3.5 h-3.5" />
-    </button>
+    </IconButton>
   </li>
 );
 
@@ -39,7 +41,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
+    <Card padding="sm">
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800 mb-3">
         <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
           Ready to Send ({files.length} {files.length === 1 ? 'file' : 'files'} • {formatBytes(totalBytes)})
@@ -53,11 +55,11 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
         </button>
       </div>
 
-      <ul className="max-h-56 overflow-y-auto space-y-2 pr-1">
+      <ul className="max-h-56 overflow-y-auto overscroll-contain space-y-2 pr-1">
         {files.map((file) => (
           <FileQueueRow key={file.id} file={file} onRemove={() => onRemoveFile(file.id)} />
         ))}
       </ul>
-    </div>
+    </Card>
   );
 };
