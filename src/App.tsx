@@ -71,8 +71,9 @@ export const App: React.FC = () => {
 
   // Transfer shared state
   const [transferState, setTransferState] = useState<
-    'idle' | 'waiting' | 'transferring' | 'completed' | 'paused' | 'failed'
+    'idle' | 'waiting' | 'transferring' | 'completed' | 'failed'
   >('idle');
+  const [senderError, setSenderError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<TransferMetrics | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [corruptedFiles, setCorruptedFiles] = useState<string[]>([]);
@@ -113,6 +114,7 @@ export const App: React.FC = () => {
   const initSenderSession = useCallback(async () => {
     try {
       setTransferState('waiting');
+      setSenderError(null);
       const code = await webrtcService.initSender(settings);
       setSenderRoomCode(code);
 
@@ -125,6 +127,7 @@ export const App: React.FC = () => {
             approve: () => {
               setPendingPeer(null);
               setConnectedPeerId(conn.peer);
+              setIsPaused(false);
               setTransferState('transferring');
 
               transferEngine.init(conn, true, {
@@ -137,7 +140,7 @@ export const App: React.FC = () => {
                   wakeLockService.release();
                 },
                 onError: (err) => {
-                  console.error('Engine error:', err);
+                  setSenderError(err);
                   setTransferState('failed');
                   wakeLockService.release();
                 },
@@ -167,6 +170,7 @@ export const App: React.FC = () => {
       });
     } catch (err: any) {
       console.error('Failed to init sender:', err);
+      setSenderError(err?.message || 'Could not reach the signaling server');
     }
   }, [settings]);
 
@@ -206,6 +210,12 @@ export const App: React.FC = () => {
     setSenderFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
+  const handleDismissSenderError = () => {
+    setSenderError(null);
+    setTransferState('waiting');
+    setMetrics(null);
+  };
+
   const handleClearFiles = () => {
     setSenderFiles([]);
     setTransferState('waiting');
@@ -223,6 +233,7 @@ export const App: React.FC = () => {
     try {
       const conn = await webrtcService.initReceiver(receiverRoomCode.trim(), settings);
       setReceiverState('connected');
+      setIsPaused(false);
       soundService.playConnect();
 
       transferEngine.init(conn, false, {
@@ -349,6 +360,10 @@ export const App: React.FC = () => {
               pin={senderPin}
               onPinChange={setSenderPin}
               corruptedFiles={corruptedFiles}
+              isPaused={isPaused}
+              errorMessage={senderError}
+              onDismissError={handleDismissSenderError}
+              onRetryRoom={initSenderSession}
             />
           ) : (
             <ReceiverView
