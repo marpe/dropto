@@ -37,7 +37,10 @@ class WakeLockService {
   public release() {
     this.isRequested = false;
     if (this.wakeLock) {
-      this.wakeLock.release().catch(() => {});
+      this.wakeLock.release().catch((err) => {
+        // The browser releases the lock itself when the tab is hidden; releasing again is harmless
+        console.warn('Wake Lock release failed:', err);
+      });
       this.wakeLock = null;
     }
   }
