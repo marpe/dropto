@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, Link2, Radio } from 'lucide-react';
+import { AlertCircle, ArrowRight, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconBadge } from './ui/IconBadge';
@@ -215,12 +215,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
           }}
           onClearFiles={requestClearFiles}
           footer={
-            isShared ? (
-              <p className="flex items-center justify-center gap-1.5 text-xs text-text-5">
-                <Radio className="w-3.5 h-3.5 text-brand-500" />
-                The link is live: anyone still choosing sees changes to this list.
-              </p>
-            ) : (
+            !isShared && (
               <Button data-testid="share-files" onClick={actions.createLink} className="w-full">
                 <Link2 className="w-4 h-4" />
                 <span>Share</span>
