@@ -150,6 +150,11 @@ function toTransferFile(file: File): TransferFile {
   };
 }
 
+/** Same path, size and modification time: the same file picked or dropped twice. */
+function fileIdentity(file: TransferFile): string {
+  return `${file.relativePath || file.name}|${file.size}|${file.lastModified}`;
+}
+
 interface UseSenderSessionOptions {
   /** A room is open only while active (i.e. the app is in send mode) */
   active: boolean;
@@ -320,7 +325,18 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   };
 
   const addFiles = (rawFiles: File[]) => {
-    const added = rawFiles.map(toTransferFile);
+    const known = new Set(state.files.map(fileIdentity));
+    const added = rawFiles.map(toTransferFile).filter((file) => {
+      const identity = fileIdentity(file);
+      if (known.has(identity)) {
+        return false;
+      }
+      known.add(identity);
+      return true;
+    });
+    if (added.length === 0) {
+      return;
+    }
     dispatch({ type: 'FILES_ADDED', files: added });
     offerFiles([...state.files, ...added]);
   };

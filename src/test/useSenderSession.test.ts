@@ -403,6 +403,20 @@ describe('useSenderSession', () => {
     expect(result.current.state.error).toBe('Too many incorrect PIN attempts');
   });
 
+  it('queues each file only once, even when it is added again', async () => {
+    const { result } = await renderSenderSession();
+    const report = new File(['v1'], 'report.pdf', { lastModified: 1000 });
+
+    act(() => {
+      result.current.actions.addFiles([report]);
+    });
+    act(() => {
+      result.current.actions.addFiles([new File(['v1'], 'report.pdf', { lastModified: 1000 }), new File(['x'], 'new.txt')]);
+    });
+
+    expect(result.current.state.files.map((file) => file.name)).toEqual(['report.pdf', 'new.txt']);
+  });
+
   it('uses a fresh link key for every new room', async () => {
     const first = await renderSenderSession();
     sessionStorage.clear();

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import type { RefObject } from 'react';
 import { UploadCloud, FolderUp, FileUp } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -23,33 +23,13 @@ function addFromInput(event: React.ChangeEvent<HTMLInputElement>, onAddFiles: (f
 
 export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInputRef, isCompact = false }) => {
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files.length > 0) {
-      onAddFiles(Array.from(e.dataTransfer.files));
-    }
-  };
-
+  // Dropping is handled page-wide (usePageFileDrop); this is the visible invitation plus the pickers
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-      }}
-      onDrop={handleDrop}
       className={cn(
-        'group border-2 border-dashed rounded-3xl text-center transition-[transform,border-color,background-color,box-shadow]',
-        isCompact ? 'p-5' : 'p-8',
-        isDragging
-          ? 'border-brand-500 bg-brand-500/10 motion-safe:scale-[1.01] shadow-xl shadow-brand-500/10'
-          : 'border-zinc-200 dark:border-zinc-800 hover:border-brand-500/60 bg-white dark:bg-supabase-surface'
+        'group border-2 border-dashed rounded-3xl text-center transition-colors border-zinc-200 dark:border-zinc-800 hover:border-brand-500/60 bg-white dark:bg-supabase-surface',
+        isCompact ? 'p-5' : 'p-8'
       )}
     >
       {!isCompact && (
@@ -59,7 +39,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
             className="mx-auto mb-4 motion-safe:group-hover:scale-110 transition-transform"
             iconClassName="motion-safe:animate-float"
           />
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drag & Drop files or directories here</h3>
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drag & Drop files or folders anywhere</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
             Files or whole folders, any size.
           </p>
@@ -92,7 +72,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
           <FolderUp className="w-4 h-4" />
           <span>Select Folder</span>
         </Button>
-        {isCompact && <span className="text-xs text-zinc-500 dark:text-zinc-400">or drop more here</span>}
+        {isCompact && <span className="text-xs text-zinc-500 dark:text-zinc-400">or drop more anywhere</span>}
       </div>
     </div>
   );
