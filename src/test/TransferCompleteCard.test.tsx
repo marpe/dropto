@@ -34,8 +34,7 @@ function renderCard(overrides: Partial<ComponentProps<typeof TransferCompleteCar
   render(
     <TransferCompleteCard
       title="Transfer Complete!"
-      actionLabel="Send More Files"
-      onAction={onAction}
+      actions={<button onClick={onAction}>Send More Files</button>}
       files={files}
       metrics={finalMetrics}
       corruptedFiles={[]}

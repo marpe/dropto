@@ -8,6 +8,7 @@ import { DropOverlay } from './components/DropOverlay';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { useSenderSession } from './hooks/useSenderSession';
+import { countActiveReceivers } from './hooks/senderState';
 import { useReceiverSession } from './hooks/useReceiverSession';
 import { useLeaveGuard } from './hooks/useLeaveGuard';
 import { useProgressTitle } from './hooks/useProgressTitle';
@@ -19,8 +20,8 @@ import type { ShareLink } from './utils/shareLink';
 
 type Mode = 'send' | 'receive';
 
-// Files can join the queue until the receiver starts downloading
-const CAN_ADD_FILES: SenderStatus[] = ['idle', 'waiting', 'awaiting_receiver'];
+// With one person, files can join the queue until they start downloading; with several, the list is always open
+const CAN_ADD_FILES: SenderStatus[] = ['waiting', 'awaiting_receiver'];
 // From the room-code form, dropping files means "actually, I want to send"
 const CAN_SWITCH_TO_SENDING: ReceiverStatus[] = ['idle', 'error'];
 
@@ -45,12 +46,15 @@ export const App: React.FC = () => {
   const sender = useSenderSession({ active: mode === 'send', settings });
   const receiver = useReceiverSession({ active: mode === 'receive', settings, shareLink });
 
-  const isTransferring = sender.state.status === 'transferring' || receiver.state.status === 'transferring';
+  const isSenderBusy = countActiveReceivers(sender.state.receivers) > 0;
+  const isTransferring =
+    sender.state.receivers.some((r) => r.stage === 'transferring') || receiver.state.status === 'transferring';
   // Switching modes tears down the other session, including a receiver still choosing where to save
-  const isSessionBusy = isTransferring || sender.state.status === 'awaiting_receiver';
+  const isSessionBusy = isTransferring || isSenderBusy;
   useLeaveGuard(isTransferring);
+  // The tab title follows one transfer; with several people downloading there is no single number to show
   const activeMetrics =
-    sender.state.status === 'transferring' ? sender.state.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
+    sender.status === 'transferring' ? sender.focus?.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
   useProgressTitle(activeMetrics ? activeMetrics.overallPercent : null);
 
   const addDroppedFiles = (files: File[]) => {
@@ -58,7 +62,7 @@ export const App: React.FC = () => {
     sender.actions.addFiles(files);
   };
   const canTakeFiles =
-    mode === 'send' ? CAN_ADD_FILES.includes(sender.state.status) : CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
+    mode === 'send' ? CAN_ADD_FILES.includes(sender.status) : CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
   const { isDraggingFiles } = usePageFileDrop(canTakeFiles ? addDroppedFiles : null);
 
   return (
@@ -85,37 +89,7 @@ export const App: React.FC = () => {
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-12 pb-10 sm:pt-20 space-y-8">
         {mode === 'send' ? (
-          <SenderView
-            roomCode={sender.state.roomCode}
-            shareKey={sender.state.shareKey}
-            files={sender.state.files}
-            onAddFiles={sender.actions.addFiles}
-            onRemoveFile={sender.actions.removeFile}
-            onClearFiles={sender.actions.clearFiles}
-            transferMetrics={sender.state.metrics}
-            transferState={sender.state.status}
-            pendingPeerId={sender.state.pendingPeerId}
-            isPendingPeerTrusted={sender.state.isPendingPeerTrusted}
-            onApprovePeer={sender.actions.approvePeer}
-            onRejectPeer={sender.actions.rejectPeer}
-            onTogglePause={sender.actions.togglePause}
-            onCancelTransfer={sender.actions.cancel}
-            pin={sender.state.pin}
-            onPinChange={sender.actions.setPin}
-            requireApproval={sender.state.requireApproval}
-            onRequireApprovalChange={sender.actions.setRequireApproval}
-            isShared={sender.state.isShared}
-            onCreateLink={sender.actions.createLink}
-            onUpdateSharing={sender.actions.updateSharing}
-            corruptedFiles={sender.state.corruptedFiles}
-            isPaused={sender.state.isPaused}
-            errorMessage={sender.state.error}
-            onDismissError={sender.actions.dismissError}
-            onRetryRoom={sender.actions.retryRoom}
-            roomNotice={sender.state.roomNotice}
-            receiverFileIndices={sender.state.receiverFileIndices}
-            onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')}
-          />
+          <SenderView session={sender} onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')} />
         ) : (
           <ReceiverView
             roomCode={receiver.state.roomCode}
@@ -139,6 +113,7 @@ export const App: React.FC = () => {
             isInvited={receiver.state.isInvited}
             onSwitchToSend={() => setMode('send')}
             selectedFileIndices={receiver.state.selectedFileIndices}
+            queuePosition={receiver.state.queuePosition}
           />
         )}
       </main>

@@ -1,19 +1,31 @@
 import React from 'react';
-import { FilePlus2, Hourglass, KeyRound, RefreshCw } from 'lucide-react';
+import { FilePlus2, Hourglass, KeyRound, Plug, RefreshCw, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { IconBadge } from './ui/IconBadge';
 import { StatusCard } from './ui/StatusCard';
 
-export type WaitingStage = 'approval' | 'pin' | 'files' | 'reconnecting';
+export type WaitingStage = 'connecting' | 'approval' | 'queued' | 'pin' | 'files' | 'reconnecting';
 
 interface WaitingForSenderCardProps {
   stage: WaitingStage;
   roomCode: string;
+  /** While queued: 1 means next */
+  queuePosition?: number | null;
   onCancel: () => void;
 }
 
 const STAGE_COPY: Record<WaitingStage, { title: string; description: string; icon: LucideIcon }> = {
+  connecting: {
+    title: 'Connecting to the Sender…',
+    description: 'Finding a direct route to their device. This usually takes a few seconds.',
+    icon: Plug,
+  },
+  queued: {
+    title: 'You’re in Line',
+    description: 'The sender is busy with others. The files appear here as soon as it’s your turn.',
+    icon: Users,
+  },
   approval: {
     title: 'Waiting for the Sender to Accept',
     description: 'The sender has been asked to approve this device. Files appear here as soon as they do.',
@@ -36,8 +48,18 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; ico
   },
 };
 
-export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stage, roomCode, onCancel }) => {
-  const { title, description, icon } = STAGE_COPY[stage];
+function describeQueuePosition(position: number): string {
+  const ahead = position - 1;
+  if (ahead === 0) {
+    return 'You’re next. The files appear here as soon as someone else’s download finishes.';
+  }
+  return `${ahead === 1 ? '1 person' : `${ahead} people`} ahead of you. The files appear here as soon as it’s your turn.`;
+}
+
+export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stage, roomCode, queuePosition = null, onCancel }) => {
+  const { title, icon } = STAGE_COPY[stage];
+  const description =
+    stage === 'queued' && queuePosition ? describeQueuePosition(queuePosition) : STAGE_COPY[stage].description;
 
   return (
     <StatusCard badge={<IconBadge icon={icon} isPulsing />} title={title} description={description}>

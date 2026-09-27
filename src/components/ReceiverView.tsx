@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { Button } from './ui/Button';
 import { LinkButton } from './ui/LinkButton';
 import { Spinner } from './ui/Spinner';
 import { StatusCard } from './ui/StatusCard';
@@ -38,6 +39,8 @@ interface ReceiverViewProps {
   onSwitchToSend?: () => void;
   /** Manifest indices being downloaded; null means all of them */
   selectedFileIndices?: number[] | null;
+  /** Place in the sender's line while it is busy with others */
+  queuePosition?: number | null;
 }
 
 function getWaitingStage(
@@ -45,6 +48,12 @@ function getWaitingStage(
   isInvited: boolean,
   manifest: TransferManifest | null
 ): WaitingStage | null {
+  if (status === 'connecting') {
+    return 'connecting';
+  }
+  if (status === 'queued') {
+    return 'queued';
+  }
   if (status === 'verifying_pin') {
     return 'pin';
   }
@@ -82,6 +91,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   isInvited = false,
   onSwitchToSend,
   selectedFileIndices = null,
+  queuePosition = null,
 }) => {
   const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
   const transferFiles = pickFiles(manifest?.files ?? [], selectedFileIndices);
@@ -109,14 +119,23 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
       ) : connectionState === 'completed' ? (
         <TransferCompleteCard
           title="Download Complete & Verified!"
-          actionLabel="Receive More Files"
-          onAction={onReset}
+          actions={
+            <Button onClick={onReset} className="px-6">
+              Receive More Files
+            </Button>
+          }
           files={transferFiles}
           metrics={transferMetrics}
           corruptedFiles={corruptedFiles}
         />
       ) : waitingStage ? (
-        <WaitingForSenderCard stage={waitingStage} roomCode={roomCode} onCancel={onCancelTransfer} />
+        <WaitingForSenderCard
+          stage={waitingStage}
+          roomCode={roomCode}
+          queuePosition={queuePosition}
+          // Still connecting there is no engine to cancel; starting over abandons the attempt
+          onCancel={waitingStage === 'connecting' ? onReset : onCancelTransfer}
+        />
       ) : connectionState === 'pin_required' && pinPrompt ? (
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
       ) : manifest ? (
@@ -127,7 +146,6 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             roomCode={roomCode}
             onRoomCodeChange={onRoomCodeChange}
             onConnect={onConnect}
-            isConnecting={connectionState === 'connecting'}
             errorMessage={errorMessage}
           />
           {onSwitchToSend && (

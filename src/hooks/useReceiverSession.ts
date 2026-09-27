@@ -25,6 +25,8 @@ export interface ReceiverSessionState {
   selectedFileIndices: number[] | null;
   pin: string;
   pinPrompt: PinPrompt | null;
+  /** Place in the sender's line while it is busy with others; 1 means next */
+  queuePosition: number | null;
   manifest: TransferManifest | null;
   metrics: TransferMetrics | null;
   isPaused: boolean;
@@ -39,6 +41,7 @@ type ReceiverAction =
   | { type: 'CONNECT_REQUESTED' }
   | { type: 'CONNECTED'; isInvited: boolean }
   | { type: 'CONNECT_FAILED'; error: string }
+  | { type: 'QUEUED'; position: number }
   | { type: 'PIN_REQUIRED'; prompt: PinPrompt }
   | { type: 'PIN_SUBMITTED' }
   | { type: 'MANIFEST_RECEIVED'; manifest: TransferManifest }
@@ -60,6 +63,7 @@ const AWAITING_SENDER: ReceiverStatus[] = [
   'connecting',
   'reconnecting',
   'waiting_approval',
+  'queued',
   'pin_required',
   'verifying_pin',
   'connected',
@@ -83,6 +87,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         ...noProgress,
         status: 'connecting',
         isInvited: false,
+        queuePosition: null,
         error: null,
         manifest: null,
         corruptedFiles: [],
@@ -91,18 +96,21 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
       return { ...state, status: 'waiting_approval', isInvited: action.isInvited };
     case 'CONNECT_FAILED':
       return { ...state, status: 'error', error: action.error };
+    case 'QUEUED':
+      return { ...state, status: 'queued', queuePosition: action.position };
     case 'PIN_REQUIRED':
       // After a wrong attempt, clear the field so the next try starts fresh
       return {
         ...state,
         status: 'pin_required',
+        queuePosition: null,
         pinPrompt: action.prompt,
         pin: action.prompt.isIncorrect ? '' : state.pin,
       };
     case 'PIN_SUBMITTED':
       return { ...state, status: 'verifying_pin' };
     case 'MANIFEST_RECEIVED':
-      return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null };
+      return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null, queuePosition: null };
     case 'SENDER_LOST':
       if (state.status === 'transferring') {
         return { ...state, ...noProgress, status: 'error', error: 'The connection to the sender was lost.' };
@@ -117,7 +125,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         error: 'The sender declined the connection or went offline.',
       };
     case 'RECONNECTING':
-      return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null };
+      return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null, queuePosition: null };
     case 'SAVING_STARTED':
       return { ...state, ...noProgress, status: 'transferring', selectedFileIndices: action.fileIndices };
     case 'SAVING_ABORTED':
@@ -145,6 +153,7 @@ export const initialReceiverState: ReceiverSessionState = {
   selectedFileIndices: null,
   pin: '',
   pinPrompt: null,
+  queuePosition: null,
   manifest: null,
   metrics: null,
   isPaused: false,
@@ -173,6 +182,8 @@ export function useReceiverSession({
 }: UseReceiverSessionOptions) {
   const [state, dispatch] = useReducer(receiverReducer, {
     ...initialReceiverState,
+    // A link with its key connects straight away; start there so the code form never flashes first
+    status: shareLink.shareKey ? 'connecting' : 'idle',
     roomCode: shareLink.roomCode,
     link: shareLink,
   });
@@ -182,6 +193,8 @@ export function useReceiverSession({
   const isRunningRef = useRef(false);
   // Once the save location is chosen, a dropped connection is a failed transfer, not a reason to reconnect
   const hasStartedSavingRef = useRef(false);
+  // After leaving (done, failed, cancelled), the connection closing is expected, not a reason to reconnect
+  const hasLeftRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const settingsRef = useRef(settings);
 
@@ -220,6 +233,7 @@ export function useReceiverSession({
 
   /** Stops listening to the engine and closes the peer connection once queued messages are sent. */
   const leave = useCallback(() => {
+    hasLeftRef.current = true;
     engineRef.current = null;
     connectionRef.current?.disconnectPeer();
   }, []);
@@ -234,6 +248,7 @@ export function useReceiverSession({
       const shareKey = roomCode === link.roomCode ? link.shareKey : null;
       teardown();
       hasStartedSavingRef.current = false;
+      hasLeftRef.current = false;
       if (reconnectAttempt === 0) {
         dispatch({ type: 'CONNECT_REQUESTED' });
       }
@@ -245,7 +260,7 @@ export function useReceiverSession({
       };
       // Reached from both the signalling connection closing and the engine losing its data channel
       const handleSenderGone = () => {
-        if (connectionRef.current !== connection) {
+        if (connectionRef.current !== connection || hasLeftRef.current) {
           return;
         }
         if (shareKey !== null && !hasStartedSavingRef.current) {
@@ -284,6 +299,7 @@ export function useReceiverSession({
           conn,
           {
             onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
+            onQueued: ifCurrent((position) => dispatch({ type: 'QUEUED', position })),
             onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
             onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
             onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),

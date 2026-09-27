@@ -3,7 +3,8 @@ import { cn } from '../../utils/cn';
 export type IconButtonSize = 'sm' | 'md';
 
 const sizeClasses: Record<IconButtonSize, string> = {
-  sm: 'p-1.5 rounded-lg',
+  // Fingers need a bigger target than a mouse pointer; the icon stays the same size
+  sm: 'p-1.5 rounded-lg pointer-coarse:p-2.5',
   md: 'p-2 rounded-xl',
 };
 

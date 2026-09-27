@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Button } from './ui/Button';
 import { IconBadge } from './ui/IconBadge';
 import { StatusCard } from './ui/StatusCard';
 import { TransferFileList } from './TransferFileList';
@@ -11,8 +10,8 @@ import { getFileProgress } from '../utils/transferProgress';
 
 interface TransferCompleteCardProps {
   title: string;
-  actionLabel: string;
-  onAction: () => void;
+  /** What to do next; buttons laid out in a row that wraps */
+  actions: React.ReactNode;
   files: ManifestFile[];
   /** The final snapshot, for timing; null when the transfer finished before one was taken */
   metrics: TransferMetrics | null;
@@ -31,8 +30,7 @@ function summarise(files: ManifestFile[], metrics: TransferMetrics | null): stri
 
 export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   title,
-  actionLabel,
-  onAction,
+  actions,
   files,
   metrics,
   corruptedFiles,
@@ -49,11 +47,7 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   const fileList = files.length > 1 || !isVerified ? (
     <TransferFileList files={files} progress={getFileProgress(files, metrics, corruptedFiles, true)} className="mb-6" />
   ) : null;
-  const action = (
-    <Button onClick={onAction} className="px-6">
-      {actionLabel}
-    </Button>
-  );
+  const action = <div className="flex flex-wrap justify-center gap-3">{actions}</div>;
 
   if (isVerified) {
     return (

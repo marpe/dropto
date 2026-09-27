@@ -192,26 +192,26 @@ describe('WebRtcService incoming connections', () => {
     expect(disconnected).toEqual(['receiver-1']);
   });
 
-  it('frees the room for the next receiver after disconnecting the current peer', async () => {
-    const { service, incoming, peer } = await startSender();
+  it('disconnects one receiver and leaves the others connected', async () => {
+    const { service, peer } = await startSender();
     const first = connectReceiver(peer, 'receiver-1');
+    const second = connectReceiver(peer, 'receiver-2');
 
-    service.disconnectPeer();
-    connectReceiver(peer, 'receiver-2');
+    service.disconnectPeer('receiver-1');
 
     // flush: messages sent just before (e.g. TRANSFER_CANCEL) must still reach the peer
     expect(first.close).toHaveBeenCalledWith({ flush: true });
-    expect(incoming).toEqual(['receiver-1', 'receiver-2']);
+    expect(second.close).not.toHaveBeenCalled();
   });
 
-  it('turns away a second receiver while the first is still connected', async () => {
+  it('announces several receivers at once; whether they may stay is up to the session', async () => {
     const { incoming, peer } = await startSender();
     const first = connectReceiver(peer, 'receiver-1');
     const second = connectReceiver(peer, 'receiver-2');
 
-    expect(incoming).toEqual(['receiver-1']);
-    expect(second.close).toHaveBeenCalled();
+    expect(incoming).toEqual(['receiver-1', 'receiver-2']);
     expect(first.close).not.toHaveBeenCalled();
+    expect(second.close).not.toHaveBeenCalled();
   });
 
   it('accepts a new receiver once the previous one disconnected', async () => {

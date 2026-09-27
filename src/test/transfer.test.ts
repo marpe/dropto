@@ -296,6 +296,18 @@ describe('introduction and live file list', () => {
     expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'secret-key' }]);
   });
 
+  it('tells the user their place in line while the sender is busy with others', async () => {
+    const places: number[] = [];
+    const receiverConn = new MockDataConnection();
+    new TransferReceiver(asConnection(receiverConn), { onQueued: (position) => places.push(position) });
+
+    receiverConn.emit('data', JSON.stringify({ type: 'QUEUED', payload: { position: 2 } }));
+    receiverConn.emit('data', JSON.stringify({ type: 'QUEUED', payload: { position: 1 } }));
+
+    expect(await waitFor(() => places.length === 2)).toBe(true);
+    expect(places).toEqual([2, 1]);
+  });
+
   it('greets without a key when the room code was typed in', () => {
     const receiverConn = new MockDataConnection();
 

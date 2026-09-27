@@ -32,6 +32,7 @@ describe('parseControlMessage', () => {
     [{ type: 'TRANSFER_RESUME' }],
     [{ type: 'TRANSFER_CANCEL' }],
     [{ type: 'ERROR', payload: { message: 'Disk full' } }],
+    [{ type: 'QUEUED', payload: { position: 2 } }],
   ])('accepts a well-formed %o', (message) => {
     expect(parseControlMessage(JSON.stringify(message))).toEqual(message);
   });
@@ -54,6 +55,7 @@ describe('parseControlMessage', () => {
       JSON.stringify({ type: 'MANIFEST', payload: { ...manifest, totalBytes: 999 } }),
     ],
     ['an error without a message', JSON.stringify({ type: 'ERROR', payload: {} })],
+    ['a place in line below 1', JSON.stringify({ type: 'QUEUED', payload: { position: 0 } })],
     ['a greeting with a non-string key', JSON.stringify({ type: 'HELLO', payload: { shareKey: 42 } })],
   ])('rejects %s', (_label, raw) => {
     expect(parseControlMessage(raw)).toBeNull();

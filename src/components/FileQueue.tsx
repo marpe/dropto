@@ -33,9 +33,9 @@ const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
       title={`Remove ${file.name}`}
       size="sm"
       onClick={onRemove}
-      className="p-1 hover:text-text-danger-1"
+      className="hover:text-text-danger-1 pointer-coarse:-my-1.5"
     >
-      <X className="w-3.5 h-3.5" />
+      <X className="w-4 h-4" />
     </IconButton>
   </li>
 );

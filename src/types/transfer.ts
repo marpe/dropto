@@ -20,13 +20,15 @@ export interface TransferManifest {
   files: ManifestFile[];
 }
 
-export type SenderStatus = 'idle' | 'waiting' | 'awaiting_receiver' | 'transferring' | 'completed' | 'failed';
+/** What a one-person share shows full screen; 'waiting' covers everything before someone is let in. */
+export type SenderStatus = 'waiting' | 'awaiting_receiver' | 'transferring' | 'completed' | 'failed';
 
 export type ReceiverStatus =
   | 'idle'
   | 'connecting'
   | 'reconnecting'
   | 'waiting_approval'
+  | 'queued'
   | 'pin_required'
   | 'verifying_pin'
   | 'connected'
@@ -58,7 +60,9 @@ export type ControlMessage =
   | { type: 'TRANSFER_PAUSE' }
   | { type: 'TRANSFER_RESUME' }
   | { type: 'TRANSFER_CANCEL' }
-  | { type: 'ERROR'; payload: { message: string } };
+  | { type: 'ERROR'; payload: { message: string } }
+  /** Sender to a receiver waiting for a free download slot; 1 means next */
+  | { type: 'QUEUED'; payload: { position: number } };
 
 export type ControlMessageType = ControlMessage['type'];
 
@@ -100,6 +104,8 @@ export interface SenderEvents extends TransferEvents {
 export interface ReceiverEvents extends TransferEvents {
   onManifest?: (manifest: TransferManifest) => void;
   onPinRequired?: (prompt: PinPrompt) => void;
+  /** The sender is busy with others; `position` 1 means this receiver is next */
+  onQueued?: (position: number) => void;
 }
 
 export interface IceServerConfig {

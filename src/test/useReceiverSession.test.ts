@@ -79,6 +79,23 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.manifest).toEqual(manifest);
   });
 
+  it('waits in line while the sender is busy with others, then shows the files', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connect(session);
+
+    act(() => {
+      engine.events.onQueued?.(2);
+    });
+    expect(session.result.current.state.status).toBe('queued');
+    expect(session.result.current.state.queuePosition).toBe(2);
+
+    act(() => {
+      engine.events.onManifest?.(manifest);
+    });
+    expect(session.result.current.state.status).toBe('connected');
+    expect(session.result.current.state.queuePosition).toBeNull();
+  });
+
   it('asks for the PIN when the sender requires one', async () => {
     const session = renderReceiverSession();
     const { engine } = await connect(session);
@@ -375,6 +392,25 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.status).toBe('idle');
   });
 
+  it('starts out connecting when opened through a share link, so the code form never flashes', () => {
+    const fakes = createFakeServices();
+    const shareLink = { roomCode: 'DW-ROOM22', shareKey: 'link-key' };
+    const firstStatuses: string[] = [];
+    renderHook(() => {
+      const session = useReceiverSession({
+        active: true,
+        settings,
+        shareLink,
+        services: fakes.services,
+      });
+      firstStatuses.push(session.state.status);
+      return session;
+    });
+
+    // The first render is what paints before the connecting effect runs
+    expect(firstStatuses[0]).toBe('connecting');
+  });
+
   it('connects straight away when opened through a share link, presenting its key', async () => {
     const session = renderReceiverSession('DW-ROOM22', 'link-key');
 
@@ -480,6 +516,34 @@ describe('useReceiverSession', () => {
       await waitFor(() => expect(session.result.current.state.status).toBe('error'));
       expect(session.connections.length).toBeGreaterThan(2);
       expect(session.result.current.state.error).toBeTruthy();
+    });
+
+    it('keeps the reason when the sender turns the link away, instead of reconnecting', async () => {
+      const session = await openLink();
+
+      act(() => {
+        session.engines[0].events.onError?.('This link has already been used.');
+      });
+      act(() => {
+        session.connections[0].handlers.onDisconnected?.();
+      });
+
+      expect(session.result.current.state.status).toBe('error');
+      expect(session.result.current.state.error).toBe('This link has already been used.');
+      expect(session.connections).toHaveLength(1);
+    });
+
+    it('reconnects while waiting in line, like before the files were offered', async () => {
+      const session = await openLink();
+      act(() => {
+        session.engines[0].events.onQueued?.(1);
+      });
+
+      act(() => {
+        session.engines[0].events.onConnectionLost?.();
+      });
+
+      await waitFor(() => expect(session.engines).toHaveLength(2));
     });
 
     it('does not reconnect once saving has started', async () => {

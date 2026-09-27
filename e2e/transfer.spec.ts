@@ -67,7 +67,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     expect(brand500).toBe('#f97316');
     await addFile(page, 'brand.txt', 'orange');
     await shareFiles(page);
-    await expect(page.locator('.font-mono.text-2xl.font-black')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
+    await expect(page.getByTestId('room-code')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
   });
 
   test('switches to Receive tab when opening share link with ?room= parameter', async ({ page }) => {
@@ -181,6 +181,50 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
+
+    // A one-person link serves a single download; someone else arriving later is told why
+    const latecomer = await openReceiver(browser);
+    await latecomer.page.goto(link);
+    await expect(latecomer.page.getByText(/only worked once/i)).toBeVisible({ timeout: 15000 });
+    await latecomer.close();
+
+    // The same files can go to someone else on a new link
+    await senderPage.getByTestId('send-again').click();
+    await senderPage.getByTestId('create-link').click();
+    const newCode = await readRoomCode(senderPage);
+    expect(newCode).not.toBe(readRoomCodeFromLink(link));
+    await close();
+  });
+
+  test('several people: one downloads while the next waits in line, then gets their turn', async ({ browser }) => {
+    const { senderPage, receiverPage: first, close } = await openPeers(browser);
+    const second = await openReceiver(browser);
+
+    await senderPage.goto('/');
+    await addFile(senderPage, 'for-everyone.txt', 'shared with several people');
+    await shareFiles(senderPage, { simultaneous: 1 });
+    await readRoomCode(senderPage);
+    const link = await senderPage.getByLabel('Share link').inputValue();
+
+    await first.goto(link);
+    await expect(first.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
+    await second.page.goto(link);
+    await expect(second.page.getByRole('heading', { name: /in line/i })).toBeVisible({ timeout: 15000 });
+    await expect(second.page.getByText(/you.re next/i)).toBeVisible();
+    await expect(senderPage.getByTestId('receiver-row')).toHaveCount(2);
+
+    await first.getByTestId('start-download').click();
+    await expect(first.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+
+    // A slot freed up: the next person gets the files without doing anything
+    await expect(second.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
+    await second.page.getByTestId('start-download').click();
+    await expect(second.page.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+
+    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(2);
+    // The link stays on screen for more people
+    await expect(senderPage.getByRole('button', { name: 'Copy Link' })).toBeVisible();
+    await second.close();
     await close();
   });
 
@@ -238,13 +282,11 @@ test.describe('DropWave Application End-to-End Tests', () => {
   });
 });
 
-/** Two isolated browser contexts; the receiver's file pickers are stubbed to write nowhere. */
-async function openPeers(browser: Browser) {
-  const senderContext = await newLocalContext(browser, { permissions: ['clipboard-read', 'clipboard-write'] });
-  const receiverContext = await newLocalContext(browser);
-  const senderPage = await senderContext.newPage();
-  const receiverPage = await receiverContext.newPage();
-  await receiverPage.addInitScript(() => {
+/** A receiver in its own browser context, with file pickers stubbed to write nowhere. */
+async function openReceiver(browser: Browser) {
+  const context = await newLocalContext(browser);
+  const page = await context.newPage();
+  await page.addInitScript(() => {
     const createWritable = async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} });
     const fileHandle = { createWritable };
     const directoryHandle = {
@@ -254,9 +296,18 @@ async function openPeers(browser: Browser) {
     (window as any).showSaveFilePicker = async () => fileHandle;
     (window as any).showDirectoryPicker = async () => directoryHandle;
   });
+  return { page, close: () => context.close() };
+}
+
+/** Two isolated browser contexts: a sender and one receiver. */
+async function openPeers(browser: Browser) {
+  const senderContext = await newLocalContext(browser, { permissions: ['clipboard-read', 'clipboard-write'] });
+  const senderPage = await senderContext.newPage();
+  const receiver = await openReceiver(browser);
+  const receiverPage = receiver.page;
   const close = async () => {
     await senderContext.close();
-    await receiverContext.close();
+    await receiver.close();
   };
   return { senderPage, receiverPage, close };
 }
@@ -268,19 +319,37 @@ async function addFile(page: Page, name: string, content: string, mimeType = 'te
   await expect(page.locator(`text=${name}`)).toBeVisible();
 }
 
-/** The room code is shown once the link has been created. */
-/** Moves from the file list to the share step and creates the link, optionally behind a PIN. */
-async function shareFiles(page: Page, { pin }: { pin?: string } = {}) {
+interface ShareOptions {
+  pin?: string;
+  /** Let several people download, this many at the same time */
+  simultaneous?: number;
+}
+
+/** Moves from the file list to the share step and creates the link, optionally behind a PIN or for several people. */
+async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) {
   await page.getByTestId('share-files').click();
   if (pin) {
     await page.getByRole('checkbox', { name: /require a pin/i }).check();
-    await page.getByPlaceholder('e.g. 1234').fill(pin);
+    await page.getByTestId('pin-input').fill(pin);
+  }
+  if (simultaneous) {
+    await page.getByRole('checkbox', { name: /let several people download/i }).check();
+    const limit = page.getByRole('status', { name: /at the same time/i });
+    while (Number(await limit.textContent()) > simultaneous) {
+      await page.getByTitle('Fewer').click();
+    }
   }
   await page.getByTestId('create-link').click();
 }
 
+/** The room code is shown once the link has been created. */
+
+function readRoomCodeFromLink(link: string): string {
+  return new URL(link).searchParams.get('room') ?? '';
+}
+
 async function readRoomCode(page: Page): Promise<string> {
-  const roomCodeElement = page.locator('.font-mono.text-2xl.font-black');
+  const roomCodeElement = page.getByTestId('room-code');
   await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
   return (await roomCodeElement.textContent())?.trim() ?? '';
 }
