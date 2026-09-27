@@ -22,4 +22,8 @@ describe('describePeerError', () => {
     expect(describePeerError(new Error('Boom'))).toBe('Boom');
     expect(describePeerError('odd')).toMatch(/something went wrong/i);
   });
+
+  it('explains a connection that timed out as a network route problem', () => {
+    expect(describePeerError({ type: 'connection-timeout' })).toMatch(/firewall/i);
+  });
 });

@@ -7,6 +7,8 @@ const PEER_ERROR_MESSAGES: Record<string, string> = {
   'socket-error': SIGNALLING_UNREACHABLE,
   'socket-closed': SIGNALLING_UNREACHABLE,
   'browser-incompatible': 'This browser doesn’t support direct peer-to-peer transfers. Try a recent Chrome, Edge or Firefox.',
+  'connection-timeout':
+    'Couldn’t reach the sender directly, often because of a strict firewall on either side. Adding a TURN relay in Settings can help.',
   webrtc:
     'A direct connection couldn’t be established, often because of a strict firewall. Adding a TURN relay in Settings can help.',
 };
