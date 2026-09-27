@@ -27,7 +27,7 @@ export const AnimatedWave: React.FC<AnimatedWaveProps> = ({ active, className = 
         </defs>
       </svg>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className="text-[10px] font-mono tracking-widest uppercase font-bold text-zinc-600 dark:text-zinc-400">
+        <span className="text-2xs font-mono tracking-widest uppercase font-bold text-zinc-600 dark:text-zinc-400">
           {active ? 'P2P Stream Active' : 'P2P Stream Idle'}
         </span>
       </div>

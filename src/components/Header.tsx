@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-600 dark:from-white dark:via-zinc-200 dark:to-zinc-400 bg-clip-text text-transparent">
               {brand.name}
             </span>
-            <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
+            <span className="text-2xs font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
               {brand.badge}
             </span>
           </div>

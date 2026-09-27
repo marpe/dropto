@@ -263,7 +263,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
             {/* Room Code Display */}
             <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/80 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-4">
               <div className="flex-1 min-w-0 text-center sm:text-left">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block">Room Code</span>
+                <span className="text-2xs uppercase font-bold tracking-wider text-zinc-400 block">Room Code</span>
                 {!roomCode && errorMessage ? (
                   <div className="flex items-center justify-center sm:justify-start gap-3">
                     <span className="text-sm text-red-500 break-words min-w-0">{errorMessage}</span>
