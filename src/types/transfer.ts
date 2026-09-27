@@ -69,7 +69,6 @@ export interface AppSettings {
   signalingPath: string;
   signalingSecure: boolean;
   customStunTurn: IceServerConfig[];
-  chunkSize: number; // default 64KB (65536)
   enableAudioAlerts: boolean;
   enableWakeLock: boolean;
 }

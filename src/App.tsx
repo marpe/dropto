@@ -4,7 +4,7 @@ import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
 import { webrtcService } from './services/webrtc';
-import { transferEngine } from './services/transferEngine';
+import { DEFAULT_CHUNK_SIZE, transferEngine } from './services/transferEngine';
 import { soundService } from './services/sound';
 import { wakeLockService } from './services/wakeLock';
 import type { AppSettings, TransferFile, TransferManifest, TransferMetrics } from './types/transfer';
@@ -16,7 +16,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   signalingPath: '/',
   signalingSecure: true,
   customStunTurn: [],
-  chunkSize: 64 * 1024,
   enableAudioAlerts: true,
   enableWakeLock: true,
 };
@@ -37,7 +36,9 @@ export const App: React.FC = () => {
     try {
       const stored = localStorage.getItem('dropwave_settings');
       if (stored) return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-    } catch (e) {}
+    } catch {
+      // Unreadable stored settings: fall back to defaults
+    }
     return DEFAULT_SETTINGS;
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -198,8 +199,8 @@ export const App: React.FC = () => {
       relativePath: (file as any).webkitRelativePath || undefined,
       lastModified: file.lastModified,
       rawFile: file,
-      chunkSize: settings.chunkSize,
-      totalChunks: Math.ceil(file.size / settings.chunkSize),
+      chunkSize: DEFAULT_CHUNK_SIZE,
+      totalChunks: Math.ceil(file.size / DEFAULT_CHUNK_SIZE),
       status: 'pending',
       bytesTransferred: 0,
     }));
