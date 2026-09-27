@@ -144,7 +144,9 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // 4. Receiver clicks "Connect & Download"
     const receiverConnectBtn = receiverPage.locator('button:has-text("Connect & Download")');
     await receiverConnectBtn.click();
-    await expect(receiverPage.locator('text=Waiting for Sender Approval')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
+      timeout: 15000,
+    });
 
     // 5. Sender receives incoming connection request modal
     await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
@@ -168,6 +170,33 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // 9. Both sides reach a verified completion
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+
+    await senderContext.close();
+    await receiverContext.close();
+  });
+
+  test('receiver can stop waiting for approval, which withdraws the request on the sender', async ({ browser }) => {
+    const senderContext = await browser.newContext();
+    const receiverContext = await browser.newContext();
+    const senderPage = await senderContext.newPage();
+    const receiverPage = await receiverContext.newPage();
+
+    await senderPage.goto('/');
+    const roomCodeElement = senderPage.locator('.font-mono.text-2xl.font-black');
+    await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
+    const roomCode = (await roomCodeElement.textContent())?.trim();
+
+    await receiverPage.goto(`/?room=${roomCode}`);
+    await receiverPage.locator('button:has-text("Connect & Download")').click();
+    await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
+
+    await receiverPage.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(receiverPage.locator('input[placeholder="DW-XXXXXX"]')).toBeVisible();
+    await expect(senderPage.locator('text=Receiver Connection Request')).toHaveCount(0, { timeout: 15000 });
 
     await senderContext.close();
     await receiverContext.close();

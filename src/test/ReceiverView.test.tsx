@@ -98,6 +98,51 @@ describe('ReceiverView Component UI & Interaction', () => {
     });
   });
 
+  function renderWaiting(connectionState: 'waiting_approval' | 'verifying_pin') {
+    const onCancelTransfer = vi.fn();
+    render(
+      <ReceiverView
+        roomCode="DW-123456"
+        onRoomCodeChange={() => {}}
+        pin=""
+        onPinChange={() => {}}
+        onConnect={() => {}}
+        connectionState={connectionState}
+        pinPrompt={null}
+        onSubmitPin={() => {}}
+        manifest={null}
+        transferMetrics={null}
+        onStartSaving={() => {}}
+        onTogglePause={() => {}}
+        onCancelTransfer={onCancelTransfer}
+        isPaused={false}
+        errorMessage={null}
+        isNativeFSA={true}
+        corruptedFiles={[]}
+        onReset={() => {}}
+      />
+    );
+    return { onCancelTransfer };
+  }
+
+  it('shows that the sender is being asked to accept, with a way to cancel', () => {
+    const { onCancelTransfer } = renderWaiting('waiting_approval');
+
+    expect(screen.getByRole('heading', { name: /waiting for the sender to accept/i })).toBeDefined();
+    expect(screen.getByText('DW-123456')).toBeDefined();
+    expect(screen.queryByPlaceholderText(/XXXXXX/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancelTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows that a submitted PIN is being checked', () => {
+    renderWaiting('verifying_pin');
+
+    expect(screen.getByRole('heading', { name: /checking pin/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /waiting for the sender to accept/i })).toBeNull();
+  });
+
   function renderReadyToSave(isNativeFSA: boolean) {
     render(
       <ReceiverView

@@ -91,7 +91,7 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 3, incorrect: false });
   });
 
-  it('submits the entered PIN and waits for the sender', async () => {
+  it('submits the entered PIN and shows it is being checked', async () => {
     const session = renderReceiverSession();
     const { engine } = await connect(session);
     act(() => {
@@ -106,7 +106,43 @@ describe('useReceiverSession', () => {
     });
 
     expect(engine.submitPin).toHaveBeenCalledWith('1234');
+    expect(session.result.current.state.status).toBe('verifying_pin');
+  });
+
+  it('reports a sender that goes away while the PIN is being checked', async () => {
+    const session = renderReceiverSession();
+    const { engine, connection } = await connect(session);
+    act(() => {
+      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+    });
+    act(() => {
+      session.result.current.actions.submitPin();
+    });
+
+    act(() => {
+      connection.handlers.onDisconnected?.();
+    });
+
+    expect(session.result.current.state.status).toBe('error');
+  });
+
+  it('can stop waiting for approval, leaving the room and returning to the form', async () => {
+    const session = renderReceiverSession();
+    const { connection } = await connect(session);
     expect(session.result.current.state.status).toBe('waiting_approval');
+
+    act(() => {
+      session.result.current.actions.cancel();
+    });
+    // The graceful close that follows must not be reported as the sender declining
+    act(() => {
+      connection.handlers.onDisconnected?.();
+    });
+
+    expect(connection.disconnectPeer).toHaveBeenCalled();
+    expect(session.result.current.state.status).toBe('idle');
+    expect(session.result.current.state.error).toBeNull();
+    expect(session.result.current.state.roomCode).toBe('DW-ROOM22');
   });
 
   it('clears the PIN field and shows remaining attempts after a wrong PIN', async () => {

@@ -28,6 +28,7 @@ export type ReceiverStatus =
   | 'connecting'
   | 'waiting_approval'
   | 'pin_required'
+  | 'verifying_pin'
   | 'connected'
   | 'transferring'
   | 'completed'

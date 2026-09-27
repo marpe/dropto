@@ -30,7 +30,7 @@ export const App: React.FC = () => {
 
   const isTransferring = sender.state.status === 'transferring' || receiver.state.status === 'transferring';
   const isConnected =
-    !!sender.state.connectedPeerId || ['waiting_approval', 'connected', 'transferring'].includes(receiver.state.status);
+    !!sender.state.connectedPeerId || ['waiting_approval', 'pin_required', 'verifying_pin', 'connected', 'transferring'].includes(receiver.state.status);
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 text-zinc-900 dark:bg-supabase-bg dark:text-zinc-100 supabase-glow transition-colors">

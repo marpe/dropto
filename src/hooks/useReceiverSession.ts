@@ -39,7 +39,7 @@ type ReceiverAction =
 const noProgress = { metrics: null, isPaused: false } as const;
 
 // Before a transfer starts, losing the sender means it declined or went away
-const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'pin_required', 'connected'];
+const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'pin_required', 'verifying_pin', 'connected'];
 
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
   switch (action.type) {
@@ -62,7 +62,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         pin: action.prompt.incorrect ? '' : state.pin,
       };
     case 'PIN_SUBMITTED':
-      return { ...state, status: 'waiting_approval' };
+      return { ...state, status: 'verifying_pin' };
     case 'MANIFEST_RECEIVED':
       return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null };
     case 'PEER_DISCONNECTED':
