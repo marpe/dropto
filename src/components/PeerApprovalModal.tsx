@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, UserCheck, X } from 'lucide-react';
+import { Button } from './ui/Button';
 import { formatBytes } from '../utils/format';
 
 interface PeerApprovalModalProps {
@@ -51,20 +52,18 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <button
+          <Button
+            variant="secondary"
             onClick={onReject}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-zinc-700 dark:text-zinc-300 hover:text-red-500 dark:hover:text-red-400 transition-all hover:scale-105"
+            className="px-4 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400"
           >
             <X className="w-4 h-4" />
             <span>Decline</span>
-          </button>
-          <button
-            onClick={onApprove}
-            className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-105"
-          >
+          </Button>
+          <Button onClick={onApprove} className="px-4">
             <UserCheck className="w-4 h-4" />
             <span>Accept</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

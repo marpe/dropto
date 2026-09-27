@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Check, Server, Volume2, Plus, Radio } from 'lucide-react';
+import { Button } from './ui/Button';
 import type { AppSettings, IceServerConfig } from '../types/transfer';
 import { IceServerRow } from './IceServerRow';
 
@@ -216,13 +217,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings,
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-5 py-2 text-sm font-bold rounded-xl bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-105"
-            >
+            <Button type="submit">
               {saved ? <Check className="w-4 h-4" /> : null}
               <span>{saved ? 'Saved!' : 'Save Settings'}</span>
-            </button>
+            </Button>
           </div>
         </form>
       </div>

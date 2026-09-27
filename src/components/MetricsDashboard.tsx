@@ -1,5 +1,6 @@
 import React from 'react';
 import { Gauge, HardDrive, Clock, CheckCircle2, Pause, Play, XCircle } from 'lucide-react';
+import { Button } from './ui/Button';
 import type { TransferMetrics } from '../types/transfer';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
 import { AnimatedWave } from './AnimatedWave';
@@ -47,20 +48,19 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={onTogglePause}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
-          >
+          <Button variant="secondary" size="sm" onClick={onTogglePause}>
             {isPaused ? <Play className="w-3.5 h-3.5 text-brand-500" /> : <Pause className="w-3.5 h-3.5 text-amber-500" />}
             <span>{isPaused ? 'Resume' : 'Pause'}</span>
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onCancel}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-red-50 dark:hover:bg-red-950/40 text-zinc-600 dark:text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-all hover:scale-105"
+            className="text-zinc-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 dark:hover:text-red-400"
           >
             <XCircle className="w-3.5 h-3.5" />
             <span>Cancel</span>
-          </button>
+          </Button>
         </div>
       </div>
 

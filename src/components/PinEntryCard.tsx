@@ -1,5 +1,6 @@
 import React from 'react';
 import { Lock } from 'lucide-react';
+import { Button } from './ui/Button';
 import type { PinPrompt } from '../services/transferEngine';
 
 interface PinEntryCardProps {
@@ -45,13 +46,9 @@ export const PinEntryCard: React.FC<PinEntryCardProps> = ({ pin, prompt, onPinCh
           onChange={(e) => onPinChange(e.target.value)}
           className="w-full text-center font-mono text-xl tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 focus:outline-none"
         />
-        <button
-          type="submit"
-          disabled={!pin}
-          className="w-full py-3 px-6 rounded-xl font-bold bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-supabase-bg shadow-lg shadow-brand-500/25 transition-[transform,background-color] motion-safe:hover:scale-[1.02]"
-        >
+        <Button type="submit" size="lg" disabled={!pin} className="w-full motion-safe:hover:scale-[1.02]">
           Unlock Files
-        </button>
+        </Button>
       </div>
     </form>
   );

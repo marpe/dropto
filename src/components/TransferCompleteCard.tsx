@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Button } from './ui/Button';
 import { fireCelebration } from '../services/confetti';
 
 interface TransferCompleteCardProps {
@@ -61,12 +62,9 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
           </ul>
         </>
       )}
-      <button
-        onClick={onAction}
-        className="px-6 py-2.5 rounded-xl font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-[transform,background-color] motion-safe:hover:scale-105"
-      >
+      <Button onClick={onAction} className="px-6">
         {actionLabel}
-      </button>
+      </Button>
     </div>
   );
 };

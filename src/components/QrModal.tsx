@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Check, Copy } from 'lucide-react';
+import { Button } from './ui/Button';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 
 interface QrModalProps {
   url: string;
@@ -10,15 +12,11 @@ interface QrModalProps {
 }
 
 export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, isOpen, onClose }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, copy] = useCopyToClipboard();
 
-  if (!isOpen) return null;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -48,13 +46,10 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, isOpen, onClose
           </span>
         </div>
 
-        <button
-          onClick={handleCopy}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
-        >
+        <Button variant="secondary" onClick={() => copy(url)} className="w-full">
           {copied ? <Check className="w-4 h-4 text-brand-500" /> : <Copy className="w-4 h-4" />}
           <span>{copied ? 'Link Copied!' : 'Copy Share Link'}</span>
-        </button>
+        </Button>
       </div>
     </div>
   );
