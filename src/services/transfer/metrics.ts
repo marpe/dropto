@@ -23,6 +23,8 @@ export class TransferMetricsTracker {
   private bytesTransferred = 0;
   private samples: SpeedSample[] = [];
   private lastSnapshotTimestampMs: number | null = null;
+  // First and latest byte per file position, for how long each file took
+  private fileSpans: { firstMs: number; lastMs: number }[] = [];
 
   constructor(totalBytes: number, totalFiles: number, now: () => number = Date.now) {
     this.totalBytes = totalBytes;
@@ -30,9 +32,12 @@ export class TransferMetricsTracker {
     this.now = now;
   }
 
-  public recordBytes(bytes: number) {
+  /** `position` is the file's place in this transfer (not its manifest index). */
+  public recordBytes(bytes: number, position = 0) {
     const timestampMs = this.now();
     this.startedTimestampMs ??= timestampMs;
+    const span = this.fileSpans[position];
+    this.fileSpans[position] = { firstMs: span?.firstMs ?? timestampMs, lastMs: timestampMs };
     this.bytesTransferred += bytes;
     this.samples.push({ timestampMs, bytes });
     const cutoffMs = timestampMs - SPEED_WINDOW_MS;
@@ -72,6 +77,7 @@ export class TransferMetricsTracker {
       totalFiles: this.totalFiles,
       currentFileName: fileName,
       currentFilePercent: filePercent,
+      fileSeconds: Array.from(this.fileSpans, (span) => (span ? (span.lastMs - span.firstMs) / 1000 : 0)),
     };
   }
 

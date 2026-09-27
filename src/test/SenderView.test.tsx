@@ -26,6 +26,7 @@ const metrics: TransferMetrics = {
   totalFiles: 1,
   currentFileName: 'movie.mkv',
   currentFilePercent: 50,
+  fileSeconds: [],
 };
 
 const noDetails = { device: null, timeZone: null, ip: null };

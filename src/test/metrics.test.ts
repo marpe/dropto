@@ -8,6 +8,19 @@ function createTracker(totalBytes: number, totalFiles = 1) {
 }
 
 describe('TransferMetricsTracker', () => {
+  it('records how long each file took, from its first byte to its last', () => {
+    const { tracker, clock } = createTracker(30, 2);
+    tracker.recordBytes(10, 0);
+    clock.nowMs = 2_000;
+    tracker.recordBytes(10, 0);
+    clock.nowMs = 3_000;
+    tracker.recordBytes(5, 1);
+    clock.nowMs = 3_500;
+    tracker.recordBytes(5, 1);
+
+    expect(tracker.snapshot(1, 'b.bin', 100)?.fileSeconds).toEqual([2, 0.5]);
+  });
+
   it('reports overall progress, speed over the recent window and time remaining', () => {
     const { tracker, clock } = createTracker(10_000);
     tracker.recordBytes(1_000);

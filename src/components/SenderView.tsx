@@ -12,10 +12,10 @@ import type { SenderSession } from '../hooks/useSenderSession';
 import { countActiveReceivers } from '../hooks/senderState';
 import { buildShareUrl } from '../utils/shareLink';
 import { pickFiles } from '../utils/fileSelection';
+import { settledMetrics } from '../utils/transferProgress';
 import { displayPath } from '../utils/filePath';
 import { MetricsDashboard } from './MetricsDashboard';
 import { PeerApprovalModal } from './PeerApprovalModal';
-import { TransferCompleteCard } from './TransferCompleteCard';
 import { FileDropZone } from './FileDropZone';
 import { FileQueue } from './FileQueue';
 import { LinkSection } from './LinkSection';
@@ -113,13 +113,18 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
 
   if (status === 'completed' && focus) {
     return (
-      <Screen key="completed">
-        <TransferCompleteCard
-          title="Transfer complete"
+      // Same key as the live transfer: the dashboard stays put and settles at 100%
+      <Screen key="transfer">
+        <MetricsDashboard
+          metrics={settledMetrics(focus.metrics, pickFiles(files, focus.fileIndices))}
           files={pickFiles(files, focus.fileIndices)}
-          metrics={focus.metrics}
-          corruptedFiles={focus.corruptedFiles}
-          actions={
+          isSender={true}
+          isPaused={false}
+          onTogglePause={actions.togglePause}
+          onCancel={actions.cancel}
+          completion={{
+            corruptedFiles: focus.corruptedFiles,
+            actions: (
             <>
               <Button
                 data-testid="send-again"
@@ -132,7 +137,8 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
                 Send other files
               </Button>
             </>
-          }
+            ),
+          }}
         />
       </Screen>
     );

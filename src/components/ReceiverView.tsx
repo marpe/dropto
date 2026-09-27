@@ -7,13 +7,13 @@ import { Spinner } from './ui/Spinner';
 import { StatusCard } from './ui/StatusCard';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { MetricsDashboard } from './MetricsDashboard';
-import { TransferCompleteCard } from './TransferCompleteCard';
 import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
 import type { WaitingStage } from './WaitingForSenderCard';
 import { IncomingFilesCard } from './IncomingFilesCard';
 import { RoomCodeForm } from './RoomCodeForm';
 import { pickFiles } from '../utils/fileSelection';
+import { settledMetrics } from '../utils/transferProgress';
 import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
@@ -118,16 +118,21 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           />
         )
       ) : connectionState === 'completed' ? (
-        <TransferCompleteCard
-          title="Download complete"
-          actions={
-            <Button onClick={onReset} className="px-6">
-              Receive more files
-            </Button>
-          }
+        <MetricsDashboard
+          metrics={settledMetrics(transferMetrics, transferFiles)}
           files={transferFiles}
-          metrics={transferMetrics}
-          corruptedFiles={corruptedFiles}
+          isSender={false}
+          isPaused={false}
+          onTogglePause={onTogglePause}
+          onCancel={onCancelTransfer}
+          completion={{
+            corruptedFiles,
+            actions: (
+              <Button onClick={onReset} className="px-6">
+                Receive more files
+              </Button>
+            ),
+          }}
         />
       ) : connectionState === 'error' && errorMessage ? (
         // A dead end gets its own screen: the code form would invite retrying something that cannot work

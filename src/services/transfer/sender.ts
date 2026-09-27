@@ -194,7 +194,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
       checksum.update(payload);
       this.conn.send(encodeChunk(fileIndex, chunkIndex, payload));
 
-      this.metrics?.recordBytes(payload.length);
+      this.metrics?.recordBytes(payload.length, position);
       this.emitMetrics(this.metrics?.snapshot(position, file.name, (end / file.size) * 100));
     }
 

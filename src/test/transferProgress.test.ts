@@ -17,13 +17,14 @@ function metricsAt(currentFileIndex: number, currentFilePercent: number): Transf
     totalFiles: files.length,
     currentFileName: files[currentFileIndex].name,
     currentFilePercent,
+    fileSeconds: [3, 1.5, 0],
   };
 }
 
 describe('getFileProgress', () => {
-  it('marks earlier files done, the current one active and later ones pending', () => {
+  it('marks earlier files done with how long they took, the current one active and later ones pending', () => {
     expect(getFileProgress(files, metricsAt(1, 40), [], false)).toEqual([
-      { status: 'done' },
+      { status: 'done', seconds: 3 },
       { status: 'active', percent: 40 },
       { status: 'pending' },
     ]);
@@ -39,9 +40,9 @@ describe('getFileProgress', () => {
 
   it('flags files that failed verification once the transfer completes, matched by their path', () => {
     expect(getFileProgress(files, metricsAt(2, 100), ['docs/b.txt'], true)).toEqual([
-      { status: 'done' },
-      { status: 'corrupted' },
-      { status: 'done' },
+      { status: 'done', seconds: 3 },
+      { status: 'corrupted', seconds: 1.5 },
+      { status: 'done', seconds: 0 },
     ]);
   });
 });
