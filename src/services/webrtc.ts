@@ -28,7 +28,8 @@ const CONNECT_TIMEOUT_MS = 20_000;
 /** One signalling session: a sender's room or a receiver's connection to a room. */
 export class WebRtcService {
   private peer: Peer | null = null;
-  private activeConn: DataConnection | null = null;
+  // A sender's room may hold several receivers; a receiver holds its one connection to the sender
+  private readonly connections = new Set<DataConnection>();
   private readonly handlers: ConnectionEventHandler;
 
   // Standard Google public STUN servers for reliable direct NAT traversal
@@ -108,7 +109,7 @@ export class WebRtcService {
         }, CONNECT_TIMEOUT_MS);
         const onOpen = () => {
           clearTimeout(timeout);
-          this.activeConn = conn;
+          this.connections.add(conn);
           resolve(conn);
         };
         if (conn.open) {
@@ -137,19 +138,13 @@ export class WebRtcService {
     });
   }
 
+  /** Every receiver is announced; how many may stay (and who waits in line) is the session's decision. */
   private handleIncomingConnection(conn: DataConnection) {
-    // One receiver per room: a newcomer must not displace a pending or active peer
-    if (this.activeConn) {
-      conn.close();
-      return;
-    }
-    this.activeConn = conn;
+    this.connections.add(conn);
     this.awaitGreeting(conn);
 
     conn.on('close', () => {
-      if (this.activeConn === conn) {
-        this.activeConn = null;
-      }
+      this.connections.delete(conn);
       this.handlers.onDisconnected?.(conn.peer);
     });
 
@@ -175,7 +170,7 @@ export class WebRtcService {
       clearTimeout(timeout);
       conn.off('data', onData);
       conn.off('open', startFallback);
-      if (this.activeConn === conn) {
+      if (this.connections.has(conn)) {
         this.handlers.onIncomingConnection?.(conn, { shareKey });
       }
     };
@@ -221,13 +216,15 @@ export class WebRtcService {
   }
 
   /**
-   * Gracefully closes the current peer connection (after queued messages are delivered)
-   * but keeps the room open for the next receiver.
+   * Gracefully closes one receiver's connection (or, without `peerId`, every connection) once queued
+   * messages are delivered, but keeps the room open for others.
    */
-  public disconnectPeer() {
-    if (this.activeConn) {
-      const conn = this.activeConn;
-      this.activeConn = null;
+  public disconnectPeer(peerId?: string) {
+    for (const conn of [...this.connections]) {
+      if (peerId !== undefined && conn.peer !== peerId) {
+        continue;
+      }
+      this.connections.delete(conn);
       try {
         conn.close({ flush: true });
       } catch {
@@ -237,7 +234,7 @@ export class WebRtcService {
   }
 
   public destroy() {
-    this.activeConn = null;
+    this.connections.clear();
     if (this.peer) {
       try {
         this.peer.destroy();

@@ -91,6 +91,9 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
       case 'AUTH_REQUEST':
         this.events.onPinRequired?.(message.payload);
         return;
+      case 'QUEUED':
+        this.events.onQueued?.(message.payload.position);
+        return;
       case 'FILE_COMPLETE':
         await this.finishFile(message.payload.fileIndex, message.payload.checksum);
         return;

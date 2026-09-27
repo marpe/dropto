@@ -171,14 +171,14 @@ describe('ReceiverView Component UI & Interaction', () => {
     renderReadyToSave(false);
 
     expect(screen.getByText(/held in memory/i)).toBeDefined();
-    expect(screen.queryByText(/stream direct to disk/i)).toBeNull();
+    expect(screen.queryByText(/straight to disk/i)).toBeNull();
   });
 
   it('promises disk streaming only when the browser supports it', () => {
     renderReadyToSave(true);
 
     expect(screen.queryByText(/held in memory/i)).toBeNull();
-    expect(screen.getByText(/stream direct to disk/i)).toBeDefined();
+    expect(screen.getByText(/straight to disk/i)).toBeDefined();
   });
 
   function renderPinStep(overrides: { pin?: string; isIncorrect?: boolean; attemptsLeft?: number } = {}) {
@@ -304,6 +304,29 @@ describe('ReceiverView Component UI & Interaction', () => {
     fireEvent.submit(screen.getByPlaceholderText(/XXXXXX/));
 
     expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a connecting screen, not the code form, while connecting', () => {
+    const onReset = vi.fn();
+    renderWaiting('connecting', { onReset });
+
+    expect(screen.getByRole('heading', { name: /connecting/i })).toBeDefined();
+    expect(screen.queryByPlaceholderText(/XXXXXX/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the place in line while the sender is busy with others', () => {
+    renderWaiting('queued', { queuePosition: 3 });
+
+    expect(screen.getByRole('heading', { name: /in line/i })).toBeDefined();
+    expect(screen.getByText(/2 people ahead of you/i)).toBeDefined();
+  });
+
+  it('says so when next in line', () => {
+    renderWaiting('queued', { queuePosition: 1 });
+
+    expect(screen.getByText(/you.re next/i)).toBeDefined();
   });
 
   it('shows that it is reconnecting while the sender is briefly away', () => {

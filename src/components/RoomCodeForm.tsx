@@ -4,7 +4,6 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { IconBadge } from './ui/IconBadge';
 import { Notice } from './ui/Notice';
-import { Spinner } from './ui/Spinner';
 import { TextInput } from './ui/TextInput';
 import { getActiveBrand } from '../branding';
 
@@ -12,7 +11,6 @@ interface RoomCodeFormProps {
   roomCode: string;
   onRoomCodeChange: (code: string) => void;
   onConnect: () => void;
-  isConnecting: boolean;
   errorMessage: string | null;
 }
 
@@ -20,10 +18,9 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
   roomCode,
   onRoomCodeChange,
   onConnect,
-  isConnecting,
   errorMessage,
 }) => {
-  const canConnect = roomCode.trim() !== '' && !isConnecting;
+  const canConnect = roomCode.trim() !== '';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,17 +58,8 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
         </label>
 
         <Button data-testid="connect" type="submit" size="lg" disabled={!canConnect} className="w-full py-3 motion-safe:hover:scale-[1.02]">
-          {isConnecting ? (
-            <>
-              <Spinner />
-              <span>Connecting to Peer…</span>
-            </>
-          ) : (
-            <>
-              <span>Connect</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
+          <span>Connect</span>
+          <ArrowRight className="w-4 h-4" />
         </Button>
       </form>
     </Card>

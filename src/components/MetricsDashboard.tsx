@@ -27,13 +27,15 @@ interface StatTileProps {
   label: string;
   value: string;
   isWarning?: boolean;
+  className?: string;
 }
 
-const StatTile: React.FC<StatTileProps> = ({ icon: Icon, label, value, isWarning = false }) => (
+const StatTile: React.FC<StatTileProps> = ({ icon: Icon, label, value, isWarning = false, className }) => (
   <div
     className={cn(
       'p-3.5 rounded-xl bg-surface-2 border border-border-1 transition-colors',
-      isWarning ? 'hover:border-amber-400/40' : 'hover:border-brand-500/40'
+      isWarning ? 'hover:border-amber-400/40' : 'hover:border-brand-500/40',
+      className
     )}
   >
     <div className="flex items-center gap-2 text-text-4 text-xs mb-1">
@@ -88,21 +90,28 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         </div>
       </div>
 
-      <div className="my-5">
+      {/* Decoration only; on a phone the numbers matter more than the space it takes */}
+      <div className="hidden sm:block my-5">
         <AnimatedWave active={!isPaused} />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5 sm:mt-0 mb-6">
         <StatTile icon={Gauge} label="Current Speed" value={formatSpeed(metrics.currentSpeed)} />
         <StatTile icon={Clock} label="ETA Remaining" value={formatDuration(metrics.etaSeconds)} isWarning />
-        <StatTile icon={HardDrive} label="Transferred" value={formatBytes(metrics.bytesTransferred)} />
-        <StatTile icon={CheckCircle2} label="Total Target" value={formatBytes(metrics.totalBytes)} />
+        {/* On a phone the byte counts move into the progress label below */}
+        <StatTile icon={HardDrive} label="Transferred" value={formatBytes(metrics.bytesTransferred)} className="hidden sm:block" />
+        <StatTile icon={CheckCircle2} label="Total Target" value={formatBytes(metrics.totalBytes)} className="hidden sm:block" />
       </div>
 
       <div className="space-y-4">
         <div>
           <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
-            <span className="text-text-3">Total Transfer Progress</span>
+            <span className="text-text-3">
+              <span className="hidden sm:inline">Total Transfer Progress</span>
+              <span className="sm:hidden tabular-nums">
+                {formatBytes(metrics.bytesTransferred)} of {formatBytes(metrics.totalBytes)}
+              </span>
+            </span>
             <span className="font-mono tabular-nums text-brand-500 font-bold">{percentRounded}%</span>
           </div>
           <ProgressBar percent={percentRounded} />

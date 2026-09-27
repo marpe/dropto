@@ -1,3 +1,4 @@
+import type { DataConnection } from 'peerjs';
 import type { ControlMessage, ManifestFile, TransferManifest } from '../../types/transfer';
 
 export const CHUNK_SIZE = 64 * 1024;
@@ -48,6 +49,13 @@ export async function toArrayBuffer(data: unknown): Promise<ArrayBuffer | null> 
     return data.arrayBuffer();
   }
   return null;
+}
+
+/** Control messages travel as JSON strings, which keeps them apart from binary chunks. */
+export function sendControlMessage(conn: DataConnection, message: ControlMessage) {
+  if (conn.open) {
+    conn.send(JSON.stringify(message));
+  }
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -158,6 +166,10 @@ export function parseControlMessage(raw: string): ControlMessage | null {
       return { type: message.type };
     case 'ERROR':
       return typeof payload.message === 'string' ? { type: 'ERROR', payload: { message: payload.message } } : null;
+    case 'QUEUED':
+      return isIndex(payload.position) && payload.position >= 1
+        ? { type: 'QUEUED', payload: { position: payload.position } }
+        : null;
     default:
       return null;
   }

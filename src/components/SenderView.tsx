@@ -5,9 +5,11 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconBadge } from './ui/IconBadge';
 import { LinkButton } from './ui/LinkButton';
 import { Notice } from './ui/Notice';
+import { Screen } from './ui/Screen';
 import { StatusCard } from './ui/StatusCard';
-import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
-import type { SharingOptions } from '../hooks/useSenderSession';
+import type { TransferFile } from '../types/transfer';
+import type { SenderSession } from '../hooks/useSenderSession';
+import { countActiveReceivers } from '../hooks/senderState';
 import { buildShareUrl } from '../utils/shareLink';
 import { pickFiles } from '../utils/fileSelection';
 import { displayPath } from '../utils/filePath';
@@ -20,36 +22,7 @@ import { ShareStep } from './ShareStep';
 import { ReceiverChoosingCard } from './ReceiverChoosingCard';
 
 interface SenderViewProps {
-  roomCode: string;
-  shareKey: string;
-  files: TransferFile[];
-  onAddFiles: (newFiles: File[]) => void;
-  onRemoveFile: (fileId: string) => void;
-  onClearFiles: () => void;
-  transferMetrics: TransferMetrics | null;
-  transferState: SenderStatus;
-  pendingPeerId: string | null;
-  isPendingPeerTrusted: boolean;
-  onApprovePeer: () => void;
-  onRejectPeer: () => void;
-  onTogglePause: () => void;
-  onCancelTransfer: () => void;
-  pin: string;
-  onPinChange: (newPin: string) => void;
-  requireApproval: boolean;
-  onRequireApprovalChange: (requireApproval: boolean) => void;
-  /** The link has been created; the options can then only change through "Edit sharing" */
-  isShared: boolean;
-  onCreateLink: () => void;
-  onUpdateSharing: (options: SharingOptions, applyTo: 'new' | 'now') => void;
-  corruptedFiles: string[];
-  isPaused: boolean;
-  errorMessage: string | null;
-  onDismissError: () => void;
-  onRetryRoom: () => void;
-  roomNotice?: string | null;
-  /** The files the receiver chose; null means all of them */
-  receiverFileIndices?: number[] | null;
+  session: SenderSession;
   /** Offered on the landing page, for when the sender can only read out a room code */
   onSwitchToReceive?: () => void;
 }
@@ -64,56 +37,31 @@ const REMOVAL_TITLES = {
 
 type PendingRemoval = { kind: 'file'; file: TransferFile } | { kind: 'all' } | { kind: 'restart' };
 
-export const SenderView: React.FC<SenderViewProps> = ({
-  roomCode,
-  shareKey,
-  files,
-  onAddFiles,
-  onRemoveFile,
-  onClearFiles,
-  transferMetrics,
-  transferState,
-  pendingPeerId,
-  isPendingPeerTrusted,
-  onApprovePeer,
-  onRejectPeer,
-  onTogglePause,
-  onCancelTransfer,
-  pin,
-  onPinChange,
-  requireApproval,
-  onRequireApprovalChange,
-  isShared,
-  onCreateLink,
-  onUpdateSharing,
-  corruptedFiles,
-  isPaused,
-  errorMessage,
-  onDismissError,
-  onRetryRoom,
-  roomNotice = null,
-  receiverFileIndices = null,
-  onSwitchToReceive,
-}) => {
+export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToReceive }) => {
+  const { state, status, focus, actions } = session;
+  const { files, isShared, options, roomCode, shareKey, receivers, pendingPeers } = state;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>(() => (isShared ? 'share' : 'files'));
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
 
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   const shareUrl = roomCode && shareKey ? buildShareUrl(window.location.href, roomCode, shareKey) : '';
-  const isAwaitingReceiver = transferState === 'awaiting_receiver';
-  const transferFiles = pickFiles(files, receiverFileIndices);
-  const hasRoomError = !roomCode && !!errorMessage;
-  const isLanding = files.length === 0 && !isAwaitingReceiver && !pendingPeerId;
+  const isAwaitingReceiver = status === 'awaiting_receiver';
+  const connectedCount = countActiveReceivers(receivers) + receivers.filter((r) => r.stage === 'queued').length;
+  // Someone is deciding what to download from this list, so removing things from it changes what they see
+  const isSomeoneChoosing = receivers.some((receiver) => receiver.stage === 'choosing');
+  const approvalRequest = pendingPeers.find((peer) => !peer.isTrusted) ?? null;
+  const hasEarlyVisitor = pendingPeers.some((peer) => peer.isTrusted);
+  const hasRoomError = !roomCode && !!state.roomError;
+  const isLanding = files.length === 0 && !isAwaitingReceiver && pendingPeers.length === 0;
   // Nothing to share without files, whatever step the sender was on
   const currentStep: Step = files.length === 0 ? 'files' : step;
 
-  // Removing what a connected receiver is looking at deserves a second thought; otherwise just do it
   const requestRemoveFile = (file: TransferFile) => {
-    if (isAwaitingReceiver) {
+    if (isSomeoneChoosing) {
       setPendingRemoval({ kind: 'file', file });
     } else {
-      onRemoveFile(file.id);
+      actions.removeFile(file.id);
     }
   };
   const requestClearFiles = () => {
@@ -122,72 +70,93 @@ export const SenderView: React.FC<SenderViewProps> = ({
     } else if (isShared) {
       setPendingRemoval({ kind: 'restart' });
     } else {
-      onClearFiles();
+      actions.clearFiles();
     }
   };
   const confirmRemoval = () => {
     if (pendingRemoval?.kind === 'file') {
-      onRemoveFile(pendingRemoval.file.id);
+      actions.removeFile(pendingRemoval.file.id);
     } else if (pendingRemoval) {
-      onClearFiles();
+      actions.clearFiles();
     }
     setPendingRemoval(null);
   };
 
-  if (transferState === 'transferring') {
+  if (status === 'transferring' && focus) {
     return (
-      <div className="w-full space-y-6 animate-fade-in">
-        {transferMetrics && (
+      <Screen key="transfer">
+        {focus.metrics && (
           <MetricsDashboard
-            metrics={transferMetrics}
-            files={transferFiles}
+            metrics={focus.metrics}
+            files={pickFiles(files, focus.fileIndices)}
             isSender={true}
-            isPaused={isPaused}
-            onTogglePause={onTogglePause}
-            onCancel={onCancelTransfer}
+            isPaused={focus.isPaused}
+            onTogglePause={actions.togglePause}
+            onCancel={actions.cancel}
           />
         )}
-      </div>
+      </Screen>
     );
   }
 
-  if (transferState === 'failed') {
+  if (status === 'failed' && focus) {
     return (
-      <StatusCard
-        badge={<IconBadge icon={AlertCircle} tone="danger" />}
-        title="Transfer Failed"
-        description={errorMessage ?? 'The transfer stopped unexpectedly.'}
-      >
-        <Button onClick={onDismissError} className="px-6">
-          Back to Files
-        </Button>
-      </StatusCard>
+      <Screen key="failed">
+        <StatusCard
+          badge={<IconBadge icon={AlertCircle} tone="danger" />}
+          title="Transfer Failed"
+          description={focus.error ?? 'The transfer stopped unexpectedly.'}
+        >
+          <p className="text-xs text-text-4 mb-6">The link still works, so they can try again.</p>
+          <Button data-testid="dismiss-error" onClick={actions.dismissError} className="px-6">
+            Back to link
+          </Button>
+        </StatusCard>
+      </Screen>
     );
   }
 
-  if (transferState === 'completed') {
+  if (status === 'completed' && focus) {
     return (
-      <TransferCompleteCard
-        title="Transfer Complete!"
-        actionLabel="Send More Files"
-        onAction={onClearFiles}
-        files={transferFiles}
-        metrics={transferMetrics}
-        corruptedFiles={corruptedFiles}
-      />
+      <Screen key="completed">
+        <TransferCompleteCard
+          title="Transfer Complete!"
+          files={pickFiles(files, focus.fileIndices)}
+          metrics={focus.metrics}
+          corruptedFiles={focus.corruptedFiles}
+          actions={
+            <>
+              <Button
+                data-testid="send-again"
+                onClick={() => {
+                  // Same files, so straight to choosing how the new link is shared
+                  setStep('share');
+                  actions.stopSharing();
+                }}
+                className="px-6"
+              >
+                Send to someone else
+              </Button>
+              <Button data-testid="send-other-files" variant="secondary" onClick={actions.clearFiles} className="px-6">
+                Send other files
+              </Button>
+            </>
+          }
+        />
+      </Screen>
     );
   }
 
   return (
-    <div className="w-full space-y-6 animate-fade-in">
+    <Screen key={currentStep}>
       {/* Requests only surface once the sender has actually shared; earlier ones wait */}
-      {isShared && pendingPeerId && !isPendingPeerTrusted && (
+      {isShared && approvalRequest && (
         <PeerApprovalModal
-          peerId={pendingPeerId}
+          peerId={approvalRequest.peerId}
           fileCount={files.length}
           totalBytes={totalSize}
-          onApprove={onApprovePeer}
-          onReject={onRejectPeer}
+          onApprove={() => actions.approvePeer(approvalRequest.peerId)}
+          onReject={() => actions.rejectPeer(approvalRequest.peerId)}
           onSelectFiles={() => fileInputRef.current?.click()}
         />
       )}
@@ -206,7 +175,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
             {pendingRemoval.kind === 'all' &&
               'Someone is connected and choosing where to save. Their list will be empty until you add files again.'}
             {pendingRemoval.kind === 'restart' &&
-              'Clearing everything starts a new share: your current link stops working, and you get a new one when you share again.'}
+              'Clearing everything starts a new share: downloads in progress stop, your current link stops working, and you get a new one when you share again.'}
           </p>
         </ConfirmDialog>
       )}
@@ -214,36 +183,37 @@ export const SenderView: React.FC<SenderViewProps> = ({
       {hasRoomError && (
         <Notice tone="danger" icon={AlertCircle}>
           <span className="flex flex-wrap items-center justify-between gap-3">
-            <span>{errorMessage}</span>
-            <Button variant="secondary" size="sm" onClick={onRetryRoom}>
+            <span>{state.roomError}</span>
+            <Button variant="secondary" size="sm" onClick={actions.retryRoom}>
               Retry
             </Button>
           </span>
         </Notice>
       )}
 
-      {isAwaitingReceiver && <ReceiverChoosingCard onCancel={onCancelTransfer} />}
+      {isAwaitingReceiver && <ReceiverChoosingCard onCancel={actions.cancel} />}
 
       {currentStep === 'share' ? (
         <ShareStep
           files={files}
           onEditFiles={() => setStep('files')}
           isShared={isShared}
-          options={{ pin, requireApproval }}
-          onOptionsChange={(options) => {
-            onPinChange(options.pin);
-            onRequireApprovalChange(options.requireApproval);
-          }}
-          onCreateLink={onCreateLink}
-          onUpdateSharing={onUpdateSharing}
-          hasConnectedReceiver={isAwaitingReceiver}
+          options={options}
+          onOptionsChange={actions.setSharingOptions}
+          onCreateLink={actions.createLink}
+          onUpdateSharing={actions.updateSharing}
+          onStopSharing={actions.stopSharing}
+          connectedCount={connectedCount}
+          receivers={receivers}
+          onStopReceiver={actions.stopReceiver}
+          onDismissReceiver={actions.dismissReceiver}
           roomCode={roomCode}
           shareUrl={shareUrl}
-          roomNotice={roomNotice}
+          roomNotice={state.roomNotice}
         />
       ) : (
         <>
-          {pendingPeerId && isPendingPeerTrusted && (
+          {hasEarlyVisitor && (
             <Notice tone="brand" icon={Link2}>
               Someone opened your link. Add files and share them to let them in.
             </Notice>
@@ -251,11 +221,11 @@ export const SenderView: React.FC<SenderViewProps> = ({
 
           {isShared && files.length > 0 && (
             <Notice tone="brand" icon={Radio}>
-              Your link is live: anyone who opens it sees changes to this list.
+              Your link is live: anyone still choosing sees changes to this list.
             </Notice>
           )}
 
-          <FileDropZone onAddFiles={onAddFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />
+          <FileDropZone onAddFiles={actions.addFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />
 
           {isLanding && onSwitchToReceive && (
             <div className="text-center">
@@ -286,6 +256,6 @@ export const SenderView: React.FC<SenderViewProps> = ({
           )}
         </>
       )}
-    </div>
+    </Screen>
   );
 };

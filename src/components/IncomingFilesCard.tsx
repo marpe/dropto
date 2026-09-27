@@ -4,7 +4,6 @@ import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { Card } from './ui/Card';
 import { IconBadge } from './ui/IconBadge';
-import { Notice } from './ui/Notice';
 import { FileTypeIcon } from './ui/FileTypeIcon';
 import { LinkButton } from './ui/LinkButton';
 import type { ManifestFile, TransferManifest } from '../types/transfer';
@@ -111,19 +110,6 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         ))}
       </ul>
 
-      {/* Only Chromium can stream to disk; elsewhere files are buffered in RAM */}
-      {isNativeFSA ? (
-        <Notice tone="brand" icon={ShieldCheck} title="Zero-RAM Native Disk Streaming Supported" className="mb-6">
-          Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream direct to
-          disk to prevent memory overflows.
-        </Notice>
-      ) : (
-        <Notice tone="warning" icon={AlertTriangle} title="This Browser Can’t Stream to Disk" className="mb-6">
-          Each file is held in memory until its download finishes. Files larger than about 1&nbsp;GB may crash this
-          tab — use Chrome or Edge for large transfers.
-        </Notice>
-      )}
-
       <Button
         data-testid="start-download"
         size="lg"
@@ -143,6 +129,24 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
           </>
         )}
       </Button>
+
+      {/* Only Chromium can stream to disk; elsewhere files are buffered in RAM */}
+      <p
+        data-testid="storage-note"
+        className={cn(
+          'flex items-start justify-center gap-1.5 mt-3 text-xs text-center',
+          isNativeFSA ? 'text-text-5' : 'text-text-warning-1'
+        )}
+      >
+        {isNativeFSA ? (
+          <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px" />
+        ) : (
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+        )}
+        {isNativeFSA
+          ? 'Saves straight to disk, so any size works.'
+          : 'Files are held in memory until they finish in this browser; for anything over about 1 GB, use Chrome or Edge.'}
+      </p>
     </Card>
   );
 };

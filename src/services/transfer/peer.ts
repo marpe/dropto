@@ -2,7 +2,7 @@ import type { DataConnection } from 'peerjs';
 import type { ControlMessage, NamedFile, TransferEvents, TransferMetrics } from '../../types/transfer';
 import { displayPath } from '../../utils/filePath';
 import { TransferMetricsTracker } from './metrics';
-import { parseControlMessage, toArrayBuffer } from './protocol';
+import { parseControlMessage, sendControlMessage, toArrayBuffer } from './protocol';
 
 /**
  * Protocol plumbing shared by both ends of one transfer over one connection: ordered message
@@ -61,9 +61,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   }
 
   protected send(message: ControlMessage) {
-    if (this.conn.open) {
-      this.conn.send(JSON.stringify(message));
-    }
+    sendControlMessage(this.conn, message);
   }
 
   protected beginTransfer(totalBytes: number, totalFiles: number) {

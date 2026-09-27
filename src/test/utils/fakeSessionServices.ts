@@ -39,7 +39,12 @@ export class FakeTransfer {
 }
 
 export function createFakePeerConnection(peer: string): DataConnection {
-  return { peer, open: true, close: vi.fn() } as unknown as DataConnection;
+  return { peer, open: true, close: vi.fn(), send: vi.fn() } as unknown as DataConnection;
+}
+
+/** The control messages the session sent straight over a connection (not through an engine). */
+export function sentMessages(conn: DataConnection): { type: string; payload?: Record<string, unknown> }[] {
+  return (conn.send as ReturnType<typeof vi.fn>).mock.calls.map(([data]) => JSON.parse(data as string));
 }
 
 /** Session services whose connections and transfers are recorded so tests can drive their events. */

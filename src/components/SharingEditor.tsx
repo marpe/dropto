@@ -4,19 +4,25 @@ import { Button } from './ui/Button';
 import { LinkButton } from './ui/LinkButton';
 import { Modal } from './ui/Modal';
 import { SharingOptionsForm } from './SharingOptionsForm';
-import type { SharingOptions } from '../hooks/useSenderSession';
+import type { SharingOptions } from '../types/sharing';
 
 interface SharingEditorProps {
   options: SharingOptions;
-  /** Someone is connected who a stricter setting could stop */
-  hasConnectedReceiver: boolean;
+  /** People connected right now (downloading, choosing or in line) whom a stricter setting could stop */
+  connectedCount: number;
   onUpdate: (options: SharingOptions, applyTo: 'new' | 'now') => void;
 }
 
-function describeOptions({ pin, requireApproval }: SharingOptions): string {
+function describeOptions({ pin, requireApproval, allowMultiple, maxSimultaneous }: SharingOptions): string {
   // The PIN is shown: the sender still has to pass it on to the receiver
   const rules = [pin ? `PIN ${pin}` : null, requireApproval ? 'you accept each person' : null].filter(Boolean);
-  return rules.length > 0 ? rules.join(' · ') : 'Anyone with the link joins straight away';
+  const access = rules.length > 0 ? rules.join(' · ') : 'Anyone with the link joins straight away';
+  const audience = !allowMultiple
+    ? 'one download'
+    : maxSimultaneous === 1
+      ? 'several people, one at a time'
+      : `several people, up to ${maxSimultaneous} at a time`;
+  return `${access} · ${audience}`;
 }
 
 /** What got stricter; only these can matter to someone already connected. */
@@ -28,14 +34,19 @@ function describeStricterChanges(current: SharingOptions, next: SharingOptions):
   if (next.requireApproval && !current.requireApproval) {
     changes.push('You accept each person before they connect');
   }
+  if (current.allowMultiple && !next.allowMultiple) {
+    changes.push('Only one person downloads; anyone waiting in line is turned away');
+  } else if (next.allowMultiple && next.maxSimultaneous < current.maxSimultaneous) {
+    changes.push(`At most ${next.maxSimultaneous} download at the same time`);
+  }
   return changes;
 }
 
 /**
  * Edits sharing options once the link is out. Changes are drafted and saved together, so a stricter
- * setting asks at most one question: new connections only, or also stop the current receiver.
+ * setting asks at most one question: new connections only, or also stop everyone connected now.
  */
-export const SharingEditor: React.FC<SharingEditorProps> = ({ options, hasConnectedReceiver, onUpdate }) => {
+export const SharingEditor: React.FC<SharingEditorProps> = ({ options, connectedCount, onUpdate }) => {
   const [draft, setDraft] = useState<SharingOptions | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -57,29 +68,31 @@ export const SharingEditor: React.FC<SharingEditorProps> = ({ options, hasConnec
     setIsConfirming(false);
     setDraft(null);
   };
-  const save = () => {
-    if (hasConnectedReceiver && stricterChanges.length > 0) {
+  const save = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (connectedCount > 0 && stricterChanges.length > 0) {
       setIsConfirming(true);
     } else {
       finish('new');
     }
   };
+  const isSeveral = connectedCount > 1;
 
   return (
-    <div className="space-y-4">
+    <form onSubmit={save} className="space-y-4">
       <SharingOptionsForm options={draft} onChange={setDraft} />
       <div className="flex justify-end gap-3">
         <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
           Cancel
         </Button>
-        <Button data-testid="save-sharing" size="sm" onClick={save}>
+        <Button data-testid="save-sharing" type="submit" size="sm">
           Save
         </Button>
       </div>
 
       {isConfirming && (
         <Modal
-          title="Apply to the current receiver?"
+          title={isSeveral ? 'Apply to people already connected?' : 'Apply to the current receiver?'}
           onClose={() => setIsConfirming(false)}
           footer={
             <div className="flex flex-wrap justify-end gap-3 w-full">
@@ -87,7 +100,7 @@ export const SharingEditor: React.FC<SharingEditorProps> = ({ options, hasConnec
                 Back
               </Button>
               <Button data-testid="apply-now" variant="danger" onClick={() => finish('now')}>
-                Apply now and stop their transfer
+                {isSeveral ? 'Apply now and stop all transfers' : 'Apply now and stop their transfer'}
               </Button>
               <Button data-testid="apply-to-new" onClick={() => finish('new')}>
                 New connections only
@@ -96,8 +109,8 @@ export const SharingEditor: React.FC<SharingEditorProps> = ({ options, hasConnec
           }
         >
           <p className="text-sm text-text-3 mb-3">
-            Someone is connected right now. They joined under the old settings; you can leave them be or stop their
-            transfer so they have to reconnect under the new ones.
+            {isSeveral ? `${connectedCount} people are` : 'Someone is'} connected right now under the old settings. You
+            can leave them be, or stop their transfers so they have to reconnect under the new ones.
           </p>
           <ul className="text-sm text-text-2 list-disc pl-5 space-y-1">
             {stricterChanges.map((change) => (
@@ -106,6 +119,6 @@ export const SharingEditor: React.FC<SharingEditorProps> = ({ options, hasConnec
           </ul>
         </Modal>
       )}
-    </div>
+    </form>
   );
 };
