@@ -387,4 +387,27 @@ describe('useReceiverSession', () => {
     expect(session.engines[1].options.shareKey).toBeNull();
     expect(session.result.current.state.isInvited).toBe(false);
   });
+
+  it('connects with the key when a whole share link is pasted into the code field', async () => {
+    const session = renderReceiverSession();
+
+    await act(async () => {
+      session.result.current.actions.setRoomCode('https://dropto.space/?room=dt-abc234#key=Pasted_Key');
+    });
+
+    expect(session.result.current.state.roomCode).toBe('DT-ABC234');
+    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DT-ABC234', settings);
+    expect(session.engines[0].options.shareKey).toBe('Pasted_Key');
+  });
+
+  it('keeps typed room codes upper-case', () => {
+    const session = renderReceiverSession();
+
+    act(() => {
+      session.result.current.actions.setRoomCode('dw-abc');
+    });
+
+    expect(session.result.current.state.roomCode).toBe('DW-ABC');
+    expect(session.connections).toHaveLength(0);
+  });
 });

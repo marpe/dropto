@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
+import { parseShareUrl } from '../utils/shareLink';
 import type { ShareLink } from '../utils/shareLink';
 import type {
   AppSettings,
@@ -16,6 +17,8 @@ import type { SessionConnection, SessionReceiver, SessionServices } from './sess
 export interface ReceiverSessionState {
   status: ReceiverStatus;
   roomCode: string;
+  /** The last share link seen (opened or pasted); its key is only ever sent to its own room */
+  link: ShareLink;
   /** Connected with the sender's link key, so no approval is needed (only files may still be missing) */
   isInvited: boolean;
   pin: string;
@@ -29,6 +32,7 @@ export interface ReceiverSessionState {
 
 type ReceiverAction =
   | { type: 'ROOM_CODE_CHANGED'; roomCode: string }
+  | { type: 'LINK_PASTED'; link: ShareLink }
   | { type: 'PIN_CHANGED'; pin: string }
   | { type: 'CONNECT_REQUESTED' }
   | { type: 'CONNECTED'; isInvited: boolean }
@@ -54,7 +58,9 @@ const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'pi
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
   switch (action.type) {
     case 'ROOM_CODE_CHANGED':
-      return { ...state, roomCode: action.roomCode };
+      return { ...state, roomCode: action.roomCode.toUpperCase() };
+    case 'LINK_PASTED':
+      return { ...state, roomCode: action.link.roomCode, link: action.link };
     case 'PIN_CHANGED':
       return { ...state, pin: action.pin };
     case 'CONNECT_REQUESTED':
@@ -108,13 +114,14 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
     case 'CANCELLED':
       return { ...state, ...noProgress, status: 'idle', error: null, manifest: null };
     case 'RESET':
-      return { ...initialReceiverState, roomCode: state.roomCode };
+      return { ...initialReceiverState, roomCode: state.roomCode, link: state.link };
   }
 }
 
 export const initialReceiverState: ReceiverSessionState = {
   status: 'idle',
   roomCode: '',
+  link: { roomCode: '', shareKey: null },
   isInvited: false,
   pin: '',
   pinPrompt: null,
@@ -142,7 +149,11 @@ export function useReceiverSession({
   shareLink = noShareLink,
   services = defaultSessionServices,
 }: UseReceiverSessionOptions) {
-  const [state, dispatch] = useReducer(receiverReducer, { ...initialReceiverState, roomCode: shareLink.roomCode });
+  const [state, dispatch] = useReducer(receiverReducer, {
+    ...initialReceiverState,
+    roomCode: shareLink.roomCode,
+    link: shareLink,
+  });
   const connectionRef = useRef<SessionConnection | null>(null);
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
@@ -188,13 +199,13 @@ export function useReceiverSession({
   }, []);
 
   const connectTo = useCallback(
-    async (requestedRoomCode: string) => {
+    async (requestedRoomCode: string, link: ShareLink) => {
       const roomCode = requestedRoomCode.trim().toUpperCase();
       if (!roomCode) {
         return;
       }
       // The key belongs to the room it was shared for; never hand it to another sender
-      const shareKey = roomCode === shareLink.roomCode ? shareLink.shareKey : null;
+      const shareKey = roomCode === link.roomCode ? link.shareKey : null;
       teardown();
       dispatch({ type: 'CONNECT_REQUESTED' });
 
@@ -263,13 +274,13 @@ export function useReceiverSession({
         }
       }
     },
-    [services, teardown, endRun, leave, shareLink]
+    [services, teardown, endRun, leave]
   );
 
   // Opening the sender's link connects straight away: its key admits us without the sender having to accept
   useEffect(() => {
     if (active && shareLink.shareKey) {
-      connectTo(shareLink.roomCode);
+      connectTo(shareLink.roomCode, shareLink);
     }
   }, [active, connectTo, shareLink]);
 
@@ -303,9 +314,18 @@ export function useReceiverSession({
   return {
     state,
     actions: {
-      setRoomCode: (roomCode: string) => dispatch({ type: 'ROOM_CODE_CHANGED', roomCode }),
+      setRoomCode: (input: string) => {
+        // Pasting the whole link is as good as opening it: connect straight away with its key
+        const pastedLink = parseShareUrl(input);
+        if (pastedLink) {
+          dispatch({ type: 'LINK_PASTED', link: pastedLink });
+          connectTo(pastedLink.roomCode, pastedLink);
+          return;
+        }
+        dispatch({ type: 'ROOM_CODE_CHANGED', roomCode: input });
+      },
       setPin: (pin: string) => dispatch({ type: 'PIN_CHANGED', pin }),
-      connect: () => connectTo(state.roomCode),
+      connect: () => connectTo(state.roomCode, state.link),
       submitPin: () => {
         engineRef.current?.submitPin(state.pin);
         dispatch({ type: 'PIN_SUBMITTED' });
