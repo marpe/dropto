@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock, AlertCircle } from 'lucide-react';
+import { Button } from './ui/Button';
+import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
@@ -56,26 +58,14 @@ export const SenderView: React.FC<SenderViewProps> = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, copyLink] = useCopyToClipboard();
+  const [copiedCode, copyCode] = useCopyToClipboard();
 
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
 
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}?room=${roomCode}`
     : '';
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -137,12 +127,9 @@ export const SenderView: React.FC<SenderViewProps> = ({
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 break-words">
             {errorMessage ?? 'The transfer stopped unexpectedly.'}
           </p>
-          <button
-            onClick={onDismissError}
-            className="px-6 py-2.5 rounded-xl font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-[transform,background-color] motion-safe:hover:scale-105"
-          >
+          <Button onClick={onDismissError} className="px-6">
             Back to Files
-          </button>
+          </Button>
         </div>
       ) : transferState === 'completed' ? (
         <TransferCompleteCard
@@ -188,14 +175,10 @@ export const SenderView: React.FC<SenderViewProps> = ({
                   }
                 }}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-105"
-              >
+              <Button onClick={() => fileInputRef.current?.click()}>
                 <FileUp className="w-4 h-4" />
                 <span>Select Files</span>
-              </button>
+              </Button>
 
               <input
                 ref={folderInputRef}
@@ -211,14 +194,10 @@ export const SenderView: React.FC<SenderViewProps> = ({
                   }
                 }}
               />
-              <button
-                type="button"
-                onClick={() => folderInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
-              >
+              <Button variant="secondary" onClick={() => folderInputRef.current?.click()}>
                 <FolderUp className="w-4 h-4" />
                 <span>Select Folder</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -288,12 +267,9 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 {!roomCode && errorMessage ? (
                   <div className="flex items-center justify-center sm:justify-start gap-3">
                     <span className="text-sm text-red-500 break-words min-w-0">{errorMessage}</span>
-                    <button
-                      onClick={onRetryRoom}
-                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors"
-                    >
+                    <Button variant="secondary" size="sm" onClick={onRetryRoom} className="shrink-0">
                       Retry
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <span className="font-mono text-2xl font-black tracking-widest text-brand-500">
@@ -302,20 +278,20 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 )}
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={handleCopyCode}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={!roomCode}
+                  onClick={() => copyCode(roomCode)}
+                  className="px-4 py-2 bg-white dark:bg-zinc-800 hover:bg-zinc-50 border border-zinc-200 dark:border-zinc-700 shadow-sm"
                 >
                   {copiedCode ? <Check className="w-3.5 h-3.5 text-brand-500" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-sm transition-all hover:scale-105"
-                >
+                </Button>
+                <Button size="sm" disabled={!roomCode} onClick={() => copyLink(shareUrl)} className="px-4 py-2 shadow-sm">
                   {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedLink ? 'Link Copied' : 'Copy Link'}</span>
-                </button>
+                </Button>
               </div>
             </div>
 
