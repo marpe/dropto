@@ -7,7 +7,7 @@ description: >-
 
 # marpe Conventions (DropWave / dropto.space)
 
-Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 codebase. Architecture, protocol invariants and commands live in `CLAUDE.md` — read it first; this skill covers *how code should look*.
+Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 codebase. Architecture, protocol invariants and commands live in `CLAUDE.md` — read it first; this skill covers *how code should look*.
 
 **Don't port SolidJS habits here.** Destructuring props is fine, components re-render, effects are `useEffect`, and state lives in `useState`/`useReducer`.
 
@@ -36,7 +36,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 ### Shared UI primitives — reach for these before hand-styling
 - `components/ui/Button` — `variant`: `primary` | `secondary` | `danger` (secondary that turns red on hover: Decline, Cancel transfer) | `ghost` (dialog Cancel, inline actions); `size`: `sm` | `md` | `lg`. Per-site tweaks go via `className` (merged by `cn`). Add a variant rather than restyling a raw `<button>`.
 - `components/ui/IconButton` — icon-only button with a required `title`; `iconButtonClassName()` (`ui/iconButtonStyles.ts`) styles icon links the same way.
-- `components/ui/Card` — the raised section surface (`padding`: `sm` | `md` | `lg`). Never re-type `rounded-3xl bg-white dark:bg-supabase-surface border …`.
+- `components/ui/Card` — the raised section surface (`padding`: `sm` | `md` | `lg`). Never re-type `rounded-3xl bg-surface-1 border …`.
 - `components/ui/StatusCard` — centred state screen: `badge`, `title`, `description`, actions as children (waiting, failed, complete, PIN).
 - `components/ui/IconBadge` — tinted icon tile (`tone`: `brand` | `danger` | `warning`, `size`: `md` | `lg`, `isPulsing` for "waiting on the other device").
 - `components/ui/Notice` — inline callout (`tone`: `brand` | `warning` | `danger`, optional `title`).
@@ -61,21 +61,24 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 
 ## 4. Theme & Styling Tokens
 
-The app supports **light and dark** themes (`useTheme`: System / Light / Dark, chosen in settings; `dark:` variants). Every neutral colour needs its `dark:` counterpart.
+Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/index.css` defines the tokens in `@theme` (light) and overrides them under `.dark` (set by `useTheme` and the boot script). Components only ever name tokens, so a new theme is just another block of overrides. Don't write `dark:` classes or raw neutrals (`zinc-*`, `bg-white`).
 
-| Purpose | Use | Notes |
+| Purpose | Tokens | Notes |
 | :--- | :--- | :--- |
-| Brand accent | `brand-50` … `brand-950` | CSS variables: green for DropWave, orange on dropto.space (`src/index.css`, keyed on `data-brand`) |
-| Dark surfaces | `supabase-bg`, `supabase-surface`, `supabase-card`, `supabase-border` | e.g. `dark:bg-supabase-surface` |
-| Neutrals | Tailwind `zinc-*` | always paired with `dark:` |
-| Danger / warning / success | Tailwind `red-*` / `amber-*` / `brand-*` | |
+| Page | `bg-background` | |
+| Surfaces | `bg-surface-1` raised (cards, dialogs, rows) · `surface-2` sunken (lists, tiles) · `surface-3` controls · `surface-4` controls on hover | |
+| Borders | `border-border-1` dividers · `border-2` panels · `border-3` inputs | A bare `border` already uses `border-2` |
+| Text | `text-text-1` headings → `text-text-5` faint captions; `text-text-on-accent` on `bg-brand-500` | |
+| Status | `text-text-danger-1`, `bg-surface-danger-1`, `border-border-danger-1`, `text-text-warning-1` | Tinted fills like `bg-red-500/10` read the same in both themes and are fine |
+| Brand accent | `brand-50` … `brand-950` | green for DropWave, orange on dropto.space (`:root[data-brand='dropto']`) |
+| File-type accents | `ctp-*` (Catppuccin) | Latte, Mocha under `.dark`; use `components/ui/FileTypeIcon` |
 | Micro-labels | `text-2xs` | the only size below `text-xs` |
-| File-type accents | `ctp-*` (Catppuccin: `red`, `mauve`, `blue`, …, `overlay1`) | Latte in light, Mocha under `.dark` (`src/index.css`); pick via `components/ui/FileTypeIcon`, not ad hoc |
 
-- **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'rgb(var(--brand-500))' }}`.
+- **Adding a token:** declare it in `@theme` with its light value and override it under `.dark`; name it by role (`surface-*`, `border-*`, `text-*`), never by colour.
+- **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'var(--color-brand-500)' }}`.
 - **Never hardcode the brand.** The name, room-code prefix and brand colours come from `getActiveBrand()` / `brand-*`, because the same build is DropWave and dropto.space.
 - **Nothing smaller than `text-xs`** except `text-2xs`. No `text-[Npx]`.
-- **Text on accent backgrounds:** buttons on `bg-brand-500` use `text-supabase-bg` (dark text reads on both green and orange). Don't use `text-white` there.
+- **Text on accent backgrounds:** buttons on `bg-brand-500` use `text-text-on-accent` (dark text reads on both green and orange). Don't use `text-white` there.
 - **Motion:** use `motion-safe:` for scale, bounce or float. List transition properties (`transition-[transform,background-color]`, `transition-colors`), not `transition-all`.
 - **Prevent layout jitter:** keep `font-weight` and border width constant across states. Idle states get `border border-transparent`; only the colour changes.
 - **Never `select-none` on containers** (it blocks copying error text). It's fine on buttons and drag handles.

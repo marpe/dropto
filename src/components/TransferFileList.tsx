@@ -35,12 +35,12 @@ const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => 
     <span
       className={cn(
         'min-w-0 flex-1 truncate font-medium',
-        progress.status === 'pending' ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-200'
+        progress.status === 'pending' ? 'text-text-5' : 'text-text-2'
       )}
     >
       {displayPath(file)}
     </span>
-    <span className="shrink-0 font-mono tabular-nums text-zinc-400">{formatBytes(file.size)}</span>
+    <span className="shrink-0 font-mono tabular-nums text-text-5">{formatBytes(file.size)}</span>
     <span className="shrink-0 w-24 flex items-center justify-end gap-1.5">
       {progress.status === 'active' && (
         <>
@@ -52,10 +52,10 @@ const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => 
       {progress.status === 'corrupted' && (
         <>
           <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <span className="text-amber-600 dark:text-amber-400 font-semibold">Corrupted</span>
+          <span className="text-text-warning-1 font-semibold">Corrupted</span>
         </>
       )}
-      {progress.status === 'pending' && <span className="text-zinc-400 dark:text-zinc-500">Waiting</span>}
+      {progress.status === 'pending' && <span className="text-text-5">Waiting</span>}
     </span>
   </li>
 );

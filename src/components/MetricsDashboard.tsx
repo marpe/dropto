@@ -32,15 +32,15 @@ interface StatTileProps {
 const StatTile: React.FC<StatTileProps> = ({ icon: Icon, label, value, isWarning = false }) => (
   <div
     className={cn(
-      'p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80 transition-colors',
+      'p-3.5 rounded-xl bg-surface-2 border border-border-1 transition-colors',
       isWarning ? 'hover:border-amber-400/40' : 'hover:border-brand-500/40'
     )}
   >
-    <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-xs mb-1">
+    <div className="flex items-center gap-2 text-text-4 text-xs mb-1">
       <Icon className={cn('w-3.5 h-3.5', isWarning ? 'text-amber-400' : 'text-brand-500')} />
       <span>{label}</span>
     </div>
-    <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-zinc-900 dark:text-white">{value}</div>
+    <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-text-1">{value}</div>
   </div>
 );
 
@@ -59,18 +59,18 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
     <Card padding="md" className="w-full relative overflow-hidden">
       <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-zinc-100 dark:border-zinc-800/80">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-border-1">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex h-3 w-3 shrink-0">
             <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-500 opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-500" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            <h3 className="font-bold text-text-1 flex items-center gap-2">
               <span>{isSender ? 'Streaming to Receiver' : 'Receiving Direct to Disk'}</span>
               <Pill>Active P2P</Pill>
             </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+            <p className="text-xs text-text-4 truncate">
               File {metrics.currentFileIndex + 1} of {metrics.totalFiles} • {metrics.currentFileName}
             </p>
           </div>
@@ -102,14 +102,14 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
       <div className="space-y-4">
         <div>
           <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
-            <span className="text-zinc-700 dark:text-zinc-300">Total Transfer Progress</span>
+            <span className="text-text-3">Total Transfer Progress</span>
             <span className="font-mono tabular-nums text-brand-500 font-bold">{percentRounded}%</span>
           </div>
           <ProgressBar percent={percentRounded} />
         </div>
 
         <div>
-          <div className="flex justify-between items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 mb-1.5">
+          <div className="flex justify-between items-center gap-3 text-xs text-text-4 mb-1.5">
             <span className="min-w-0 truncate">Current File: {metrics.currentFileName}</span>
             <span className="font-mono tabular-nums">{filePercentRounded}%</span>
           </div>
@@ -121,7 +121,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         <TransferFileList
           files={files}
           progress={getFileProgress(files, metrics, [], false)}
-          className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800/80"
+          className="mt-5 pt-4 border-t border-border-1"
         />
       )}
     </Card>

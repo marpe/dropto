@@ -17,7 +17,7 @@ interface IconBadgeProps {
 
 const toneClasses: Record<IconBadgeTone, { badge: string; ping: string }> = {
   brand: { badge: 'bg-brand-500/10 border-brand-500/30 text-brand-500', ping: 'bg-brand-500/20' },
-  danger: { badge: 'bg-red-500/10 border-red-500/30 text-red-500', ping: 'bg-red-500/20' },
+  danger: { badge: 'bg-red-500/10 border-red-500/30 text-text-danger-1', ping: 'bg-red-500/20' },
   warning: { badge: 'bg-amber-500/10 border-amber-500/30 text-amber-500', ping: 'bg-amber-500/20' },
 };
 

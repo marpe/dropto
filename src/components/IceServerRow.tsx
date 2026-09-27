@@ -15,7 +15,7 @@ export const IceServerRow: React.FC<IceServerRowProps> = ({ server, error, onCha
   const urls = Array.isArray(server.urls) ? server.urls.join(', ') : server.urls;
 
   return (
-    <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-900/80 rounded-xl border border-zinc-200 dark:border-zinc-700/60 text-xs">
+    <div className="space-y-2 p-3 bg-surface-2 rounded-xl border border-border-2 text-xs">
       <div className="flex items-center gap-2">
         <TextInput
           autoComplete="off"
@@ -30,12 +30,12 @@ export const IceServerRow: React.FC<IceServerRowProps> = ({ server, error, onCha
           aria-label="Remove relay server"
           size="sm"
           onClick={onRemove}
-          className="hover:text-red-500 dark:hover:text-red-400"
+          className="hover:text-text-danger-1"
         >
           <X className="w-4 h-4" />
         </IconButton>
       </div>
-      {error && <p className="text-red-500">{error}</p>}
+      {error && <p className="text-text-danger-1">{error}</p>}
       <div className="grid grid-cols-2 gap-2">
         <TextInput
           autoComplete="off"

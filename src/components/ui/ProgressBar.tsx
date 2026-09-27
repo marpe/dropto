@@ -10,7 +10,7 @@ interface ProgressBarProps {
 }
 
 const trackClasses: Record<ProgressBarVariant, string> = {
-  primary: 'h-3 p-0.5 border border-zinc-200 dark:border-zinc-800',
+  primary: 'h-3 p-0.5 border border-border-2',
   subtle: 'h-1.5',
 };
 
@@ -23,7 +23,7 @@ const fillClasses: Record<ProgressBarVariant, string> = {
 export const ProgressBar: React.FC<ProgressBarProps> = ({ percent, variant = 'primary', className }) => {
   const fraction = Math.min(Math.max(percent, 0), 100) / 100;
   return (
-    <div className={cn('w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden', trackClasses[variant], className)}>
+    <div className={cn('w-full bg-surface-3 rounded-full overflow-hidden', trackClasses[variant], className)}>
       <div
         className={cn('h-full rounded-full origin-left transition-transform duration-300 ease-out', fillClasses[variant])}
         style={{ transform: `scaleX(${fraction})` }}

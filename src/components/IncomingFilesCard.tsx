@@ -30,7 +30,7 @@ const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, i
   <li className="[content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]">
     <label
       className={cn(
-        'flex items-center gap-3 text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 transition-[border-color,opacity]',
+        'flex items-center gap-3 text-xs p-2.5 rounded-xl bg-surface-1 border border-border-1 transition-[border-color,opacity]',
         isSelectable && 'cursor-pointer hover:border-brand-500/30',
         !isSelected && 'opacity-50'
       )}
@@ -39,8 +39,8 @@ const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, i
         <input type="checkbox" checked={isSelected} onChange={onToggle} className="w-4 h-4 shrink-0 accent-brand-500" />
       )}
       <FileTypeIcon name={file.name} mimeType={file.type} />
-      <span className="flex-1 min-w-0 font-semibold text-zinc-800 dark:text-zinc-200 truncate">{displayPath(file)}</span>
-      <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">{formatBytes(file.size)}</span>
+      <span className="flex-1 min-w-0 font-semibold text-text-2 truncate">{displayPath(file)}</span>
+      <span className="font-mono text-text-4 shrink-0">{formatBytes(file.size)}</span>
     </label>
   </li>
 );
@@ -81,8 +81,8 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
       <div className="flex items-center gap-3 mb-6">
         <IconBadge icon={DownloadCloud} size="md" iconClassName="motion-safe:animate-float" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Incoming Files</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+          <h3 className="text-lg font-bold text-text-1">Incoming Files</h3>
+          <p className="text-xs text-text-4 tabular-nums">
             {isEverythingSelected
               ? `${manifest.files.length} ${isMultiFile ? 'files' : 'file'}`
               : `${selectedIndices.length} of ${manifest.files.length} files`}{' '}
@@ -99,7 +99,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         )}
       </div>
 
-      <ul className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2">
+      <ul className="p-3 bg-surface-2 rounded-2xl border border-border-2 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2">
         {manifest.files.map((file) => (
           <IncomingFileRow
             key={file.id}

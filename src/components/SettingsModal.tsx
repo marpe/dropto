@@ -59,7 +59,7 @@ interface SettingsSectionProps {
 
 const SettingsSection: React.FC<SettingsSectionProps> = ({ icon: Icon, title, children }) => (
   <section className="space-y-3">
-    <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-5 flex items-center gap-1.5">
       <Icon className="w-3.5 h-3.5 text-brand-500" /> {title}
     </h4>
     {children}
@@ -74,10 +74,10 @@ interface SettingToggleProps {
 }
 
 const SettingToggle: React.FC<SettingToggleProps> = ({ label, description, isChecked, onChange }) => (
-  <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 cursor-pointer transition-colors">
+  <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border-2 hover:bg-surface-2 cursor-pointer transition-colors">
     <div className="min-w-0">
-      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200 block">{label}</span>
-      {description && <span className="text-xs text-zinc-400">{description}</span>}
+      <span className="text-sm font-medium text-text-2 block">{label}</span>
+      {description && <span className="text-xs text-text-5">{description}</span>}
     </div>
     <input
       type="checkbox"
@@ -95,7 +95,7 @@ interface LabeledFieldProps {
 
 const LabeledField: React.FC<LabeledFieldProps> = ({ label, children }) => (
   <label className="block">
-    <span className="block text-zinc-500 dark:text-zinc-400 mb-1">{label}</span>
+    <span className="block text-text-4 mb-1">{label}</span>
     {children}
   </label>
 );
@@ -145,9 +145,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <Modal onClose={onClose} size="md">
-      <div className="flex items-center gap-2 pb-4 pr-10 border-b border-zinc-100 dark:border-zinc-800">
+      <div className="flex items-center gap-2 pb-4 pr-10 border-b border-border-1">
         <Server className="w-5 h-5 text-brand-500" />
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Settings</h3>
+        <h3 className="text-lg font-bold text-text-1">Settings</h3>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5 pt-4">
@@ -188,7 +188,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           />
 
           {form.useCustomSignaling && (
-            <div className="space-y-2 p-3 bg-zinc-50 dark:bg-zinc-900/80 rounded-xl border border-zinc-200 dark:border-zinc-700/60 text-xs">
+            <div className="space-y-2 p-3 bg-surface-2 rounded-xl border border-border-2 text-xs">
               <LabeledField label="Host">
                 <TextInput
                   placeholder="my-peer-server.com"
@@ -222,14 +222,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onChange={(e) => update({ signalingSecure: e.target.checked })}
                   className="rounded-sm accent-brand-500"
                 />
-                <span className="text-zinc-700 dark:text-zinc-300">Secure (SSL/WSS)</span>
+                <span className="text-text-3">Secure (SSL/WSS)</span>
               </label>
             </div>
           )}
         </SettingsSection>
 
         <SettingsSection icon={Radio} title="Relay Servers (TURN/STUN)">
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-text-5">
             Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers are
             always included.
           </p>
@@ -246,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => update({ customStunTurn: [...form.customStunTurn, { urls: '' }] })}
-            className="text-brand-600 dark:text-brand-400 hover:bg-brand-500/10 dark:hover:bg-brand-500/10"
+            className="text-brand-500 hover:bg-brand-500/10"
           >
             <Plus className="w-3.5 h-3.5" />
             Add relay server

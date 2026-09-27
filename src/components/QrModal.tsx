@@ -16,18 +16,18 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, onClose }) => {
 
   return (
     <Modal onClose={onClose} className="text-center">
-      <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Scan to Connect</h3>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-5">
+      <h3 className="text-lg font-bold text-text-1 mb-1">Scan to Connect</h3>
+      <p className="text-xs text-text-4 mb-5">
         Scan with a phone camera to open the link and receive the files
       </p>
 
       {/* QR codes need dark modules on white in both themes to scan reliably */}
-      <div className="p-4 bg-white rounded-2xl inline-block shadow-inner border border-zinc-200/80 mb-5">
+      <div className="p-4 bg-white rounded-2xl inline-block shadow-inner border border-border-2 mb-5">
         <QRCodeSVG value={url} size={200} level="M" fgColor="#121212" />
       </div>
 
       <div className="mb-4">
-        <span className="text-2xs uppercase font-bold tracking-wider text-zinc-400 block mb-1">Room Code</span>
+        <span className="text-2xs uppercase font-bold tracking-wider text-text-5 block mb-1">Room Code</span>
         <span className="font-mono text-2xl font-black tracking-widest text-brand-500">{roomCode}</span>
       </div>
 

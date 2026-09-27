@@ -19,7 +19,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   return (
     <div
       className={cn(
-        'inline-flex p-1 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800',
+        'inline-flex p-1 rounded-xl bg-surface-3 border border-border-2',
         className
       )}
     >
@@ -31,8 +31,8 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           className={cn(
             'flex flex-1 items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold transition-[color,background-color]',
             optionValue === value
-              ? 'bg-brand-500 text-supabase-bg'
-              : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+              ? 'bg-brand-500 text-text-on-accent'
+              : 'text-text-4 hover:text-text-1'
           )}
         >
           {Icon && <Icon className="w-3.5 h-3.5" />}

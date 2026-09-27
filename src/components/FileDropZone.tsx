@@ -32,7 +32,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
     <div
       data-testid="drop-zone"
       className={cn(
-        'group border-2 border-dashed rounded-3xl text-center transition-colors border-zinc-200 dark:border-zinc-800 hover:border-brand-500/60 bg-white dark:bg-supabase-surface',
+        'group border-2 border-dashed rounded-3xl text-center transition-colors border-border-2 hover:border-brand-500/60 bg-surface-1',
         isCompact ? 'p-5' : 'p-8'
       )}
     >
@@ -43,8 +43,8 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
             className="mx-auto mb-4 motion-safe:group-hover:scale-110 transition-transform"
             iconClassName="motion-safe:animate-float"
           />
-          <h1 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drop files to send</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-xl mx-auto">
+          <h1 className="text-lg font-bold text-text-1 mb-1">Drop files to send</h1>
+          <p className="text-xs text-text-4 mb-6 max-w-xl mx-auto">
             {FACTS.map((fact, index) => (
               <React.Fragment key={fact}>
                 {index > 0 && ' · '}
@@ -86,7 +86,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
           <FolderUp className="w-4 h-4" />
           <span>Folder</span>
         </Button>
-        {isCompact && <span className="text-xs text-zinc-500 dark:text-zinc-400">or drop more anywhere</span>}
+        {isCompact && <span className="text-xs text-text-4">or drop more anywhere</span>}
       </div>
     </div>
   );

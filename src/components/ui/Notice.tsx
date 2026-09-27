@@ -15,7 +15,7 @@ interface NoticeProps {
 const toneClasses: Record<NoticeTone, { box: string; icon: string }> = {
   brand: { box: 'bg-brand-500/10 border-brand-500/20', icon: 'text-brand-500' },
   warning: { box: 'bg-amber-500/10 border-amber-500/30', icon: 'text-amber-500' },
-  danger: { box: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/60', icon: 'text-red-500' },
+  danger: { box: 'bg-surface-danger-1 border-border-danger-1', icon: 'text-text-danger-1' },
 };
 
 /** An inline callout: information, a caveat or an error, next to the thing it is about. */
@@ -25,10 +25,10 @@ export const Notice: React.FC<NoticeProps> = ({ tone, icon: Icon, title, childre
     <div
       className={cn(
         'min-w-0 wrap-break-word',
-        tone === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300'
+        tone === 'danger' ? 'text-text-danger-1' : 'text-text-3'
       )}
     >
-      {title && <span className="font-semibold block text-zinc-900 dark:text-white">{title}</span>}
+      {title && <span className="font-semibold block text-text-1">{title}</span>}
       {children}
     </div>
   </div>

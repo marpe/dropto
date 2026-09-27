@@ -10,11 +10,11 @@ interface ReceiverChoosingCardProps {
 
 /** Shown between admitting a receiver and its first file request, while it picks a save location. */
 export const ReceiverChoosingCard: React.FC<ReceiverChoosingCardProps> = ({ onCancel }) => (
-  <Card padding="md" className="flex flex-col sm:flex-row items-center gap-4 border-brand-500/30 dark:border-brand-500/30 animate-fade-in">
+  <Card padding="md" className="flex flex-col sm:flex-row items-center gap-4 border-brand-500/30 animate-fade-in">
     <IconBadge icon={FolderOpen} size="md" isPulsing />
     <div className="flex-1 min-w-0 text-center sm:text-left">
-      <h3 className="font-bold text-zinc-900 dark:text-white">Receiver connected</h3>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+      <h3 className="font-bold text-text-1">Receiver connected</h3>
+      <p className="text-xs text-text-4">
         They are choosing where to save the files. You can still add or remove files until the download starts.
       </p>
     </div>

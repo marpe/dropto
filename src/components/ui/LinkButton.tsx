@@ -8,7 +8,7 @@ export const LinkButton: React.FC<LinkButtonProps> = ({ type = 'button', classNa
   <button
     type={type}
     className={cn(
-      'inline-flex items-center gap-1 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-brand-500 dark:hover:text-brand-500 transition-colors',
+      'inline-flex items-center gap-1 text-sm font-medium text-text-4 hover:text-brand-500 transition-colors',
       className
     )}
     {...props}
