@@ -116,7 +116,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderPage.goto('/');
     await expect(senderPage.locator('text=DropWave').first()).toBeVisible();
     await addFile(senderPage, 'sample-dataset.dat', 'Simulated 10GB dataset test buffer payload.');
-    await expect(senderPage.locator('text=Ready to Send (1 file')).toBeVisible();
+    await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
     const roomCode = await readRoomCode(senderPage);
 
     // No #key: the room code alone must still need the sender's approval

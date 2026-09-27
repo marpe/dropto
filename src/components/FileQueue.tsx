@@ -45,7 +45,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
     <Card padding="sm">
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-zinc-100 dark:border-zinc-800 mb-3">
         <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-          Ready to Send ({files.length} {files.length === 1 ? 'file' : 'files'} • {formatBytes(totalBytes)})
+          {files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(totalBytes)}
         </span>
         <button
           type="button"
