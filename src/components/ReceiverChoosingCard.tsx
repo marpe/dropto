@@ -19,7 +19,7 @@ export const ReceiverChoosingCard: React.FC<ReceiverChoosingCardProps> = ({ onCa
       </p>
     </div>
     <Button variant="secondary" size="sm" onClick={onCancel} className="shrink-0">
-      Cancel
+      Disconnect
     </Button>
   </Card>
 );

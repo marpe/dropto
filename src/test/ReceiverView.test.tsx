@@ -306,6 +306,25 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onConnect).toHaveBeenCalledTimes(1);
   });
 
+  it('shows why receiving failed on its own screen, offering to try again', () => {
+    const onConnect = vi.fn();
+    renderWaiting('error', { errorMessage: 'This link only worked once.', onConnect });
+
+    expect(screen.getByText('This link only worked once.')).toBeDefined();
+    expect(screen.queryByPlaceholderText(/XXXXXX/)).toBeNull();
+    fireEvent.click(screen.getByTestId('retry-connect'));
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('goes back to the code form to try a different code after a failure', () => {
+    const onReset = vi.fn();
+    renderWaiting('error', { errorMessage: 'This room no longer exists.', onReset });
+
+    fireEvent.click(screen.getByTestId('enter-other-code'));
+
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a connecting screen, not the code form, while connecting', () => {
     const onReset = vi.fn();
     renderWaiting('connecting', { onReset });

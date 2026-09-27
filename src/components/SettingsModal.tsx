@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Server, Volume2, Plus, Radio, Palette, Monitor, Sun, Moon, Info } from 'lucide-react';
+import { ChevronDown, Server, Settings, Volume2, Plus, Radio, Palette, Monitor, Sun, Moon, Info, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
@@ -127,10 +127,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
+  const hasAdvancedSettings = settings.useCustomSignaling || settings.customStunTurn.length > 0;
+
   return (
     <Modal
       title="Settings"
-      icon={Server}
+      icon={Settings}
       onClose={onClose}
       isDirty={isDirty}
       size="md"
@@ -150,20 +152,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <SegmentedControl options={THEME_OPTIONS} value={themePreference} onChange={onThemeChange} className="w-full" />
         </SettingsSection>
 
-        <SettingsSection icon={Volume2} title="General">
+        <SettingsSection icon={Volume2} title="Transfers">
           <ToggleRow
-            label="Audio Chimes on Completion"
+            label="Play a sound when a transfer finishes"
             isChecked={form.enableAudioAlerts}
             onChange={(enableAudioAlerts) => update({ enableAudioAlerts })}
           />
           <ToggleRow
-            label="Screen Wake Lock"
-            description="Prevents device sleep during 10GB transfers"
+            label="Keep the screen on"
+            description="So a sleeping device does not interrupt a long transfer"
             isChecked={form.enableWakeLock}
             onChange={(enableWakeLock) => update({ enableWakeLock })}
           />
           <ToggleRow
-            label="Notify When Done"
+            label="Notify when done"
             description={
               isNotificationBlocked
                 ? 'Notifications are blocked for this site; allow them in your browser settings.'
@@ -174,79 +176,91 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           />
         </SettingsSection>
 
-        <SettingsSection icon={Server} title="Signaling server">
-          <ToggleRow
-            label="Use Custom PeerServer"
-            description="Default is free public 0.peerjs.com"
-            isChecked={form.useCustomSignaling}
-            onChange={(useCustomSignaling) => update({ useCustomSignaling })}
-          />
+        {/* Only needed on restricted networks; starts open when something is already configured */}
+        <details open={hasAdvancedSettings} className="group rounded-xl border border-border-2">
+          <summary className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-text-2 list-none [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-brand-500" />
+              Connection servers
+            </span>
+            <ChevronDown className="w-4 h-4 text-text-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-5 px-3 pb-4 pt-2">
+            <SettingsSection icon={Server} title="Signaling server">
+              <ToggleRow
+                label="Use my own signaling server"
+                description="By default the free public 0.peerjs.com introduces the two devices"
+                isChecked={form.useCustomSignaling}
+                onChange={(useCustomSignaling) => update({ useCustomSignaling })}
+              />
 
-          {form.useCustomSignaling && (
-            <div className="space-y-2 p-3 bg-surface-2 rounded-xl border border-border-2 text-xs">
-              <LabeledField label="Host">
-                <TextInput
-                  placeholder="my-peer-server.com"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={form.signalingHost}
-                  onChange={(e) => update({ signalingHost: e.target.value })}
-                />
-              </LabeledField>
-              <div className="grid grid-cols-2 gap-2">
-                <LabeledField label="Port">
-                  <TextInput
-                    type="number"
-                    value={form.signalingPort}
-                    onChange={(e) => update({ signalingPort: parseInt(e.target.value) || 9000 })}
-                  />
-                </LabeledField>
-                <LabeledField label="Path">
-                  <TextInput
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={form.signalingPath}
-                    onChange={(e) => update({ signalingPath: e.target.value })}
-                  />
-                </LabeledField>
-              </div>
-              <label className="flex items-center gap-2 pt-1 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.signalingSecure}
-                  onChange={(e) => update({ signalingSecure: e.target.checked })}
-                  className="rounded-sm accent-brand-500"
-                />
-                <span className="text-text-3">Secure (SSL/WSS)</span>
-              </label>
-            </div>
-          )}
-        </SettingsSection>
+              {form.useCustomSignaling && (
+                <div className="space-y-2 p-3 bg-surface-2 rounded-xl border border-border-2 text-xs">
+                  <LabeledField label="Host">
+                    <TextInput
+                      placeholder="my-peer-server.com"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={form.signalingHost}
+                      onChange={(e) => update({ signalingHost: e.target.value })}
+                    />
+                  </LabeledField>
+                  <div className="grid grid-cols-2 gap-2">
+                    <LabeledField label="Port">
+                      <TextInput
+                        type="number"
+                        value={form.signalingPort}
+                        onChange={(e) => update({ signalingPort: parseInt(e.target.value) || 9000 })}
+                      />
+                    </LabeledField>
+                    <LabeledField label="Path">
+                      <TextInput
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={form.signalingPath}
+                        onChange={(e) => update({ signalingPath: e.target.value })}
+                      />
+                    </LabeledField>
+                  </div>
+                  <label className="flex items-center gap-2 pt-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.signalingSecure}
+                      onChange={(e) => update({ signalingSecure: e.target.checked })}
+                      className="rounded-sm accent-brand-500"
+                    />
+                    <span className="text-text-3">Secure (SSL/WSS)</span>
+                  </label>
+                </div>
+              )}
+            </SettingsSection>
 
-        <SettingsSection icon={Radio} title="Relay servers (TURN/STUN)">
-          <p className="text-xs text-text-5">
-            Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers are
-            always included.
-          </p>
-          {form.customStunTurn.map((server, index) => (
-            <IceServerRow
-              key={index}
-              server={server}
-              error={showRelayErrors ? relayError(server) : null}
-              onChange={(next) => updateRelay(index, next)}
-              onRemove={() => removeRelay(index)}
-            />
-          ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => update({ customStunTurn: [...form.customStunTurn, { urls: '' }] })}
-            className="text-brand-500 hover:bg-brand-500/10"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add relay server
-          </Button>
-        </SettingsSection>
+            <SettingsSection icon={Radio} title="Relay servers (TURN/STUN)">
+              <p className="text-xs text-text-5">
+                Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers are
+                always included.
+              </p>
+              {form.customStunTurn.map((server, index) => (
+                <IceServerRow
+                  key={index}
+                  server={server}
+                  error={showRelayErrors ? relayError(server) : null}
+                  onChange={(next) => updateRelay(index, next)}
+                  onRemove={() => removeRelay(index)}
+                />
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => update({ customStunTurn: [...form.customStunTurn, { urls: '' }] })}
+                className="text-brand-500 hover:bg-brand-500/10"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add relay server
+              </Button>
+            </SettingsSection>
+          </div>
+        </details>
 
         <SettingsSection icon={Info} title="About">
           <AboutInfo />

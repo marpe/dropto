@@ -1,9 +1,8 @@
 import React from 'react';
-import { DownloadCloud, ArrowRight, AlertCircle } from 'lucide-react';
+import { DownloadCloud, ArrowRight } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { IconBadge } from './ui/IconBadge';
-import { Notice } from './ui/Notice';
 import { TextInput } from './ui/TextInput';
 import { getActiveBrand } from '../branding';
 
@@ -11,14 +10,12 @@ interface RoomCodeFormProps {
   roomCode: string;
   onRoomCodeChange: (code: string) => void;
   onConnect: () => void;
-  errorMessage: string | null;
 }
 
 export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
   roomCode,
   onRoomCodeChange,
   onConnect,
-  errorMessage,
 }) => {
   const canConnect = roomCode.trim() !== '';
 
@@ -37,11 +34,6 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
         Enter the room code the sender gave you, or paste their link.
       </p>
 
-      {errorMessage && (
-        <Notice tone="danger" icon={AlertCircle} className="mb-5">
-          {errorMessage}
-        </Notice>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
         <label className="block">
