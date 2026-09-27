@@ -257,7 +257,7 @@ describe('SenderView', () => {
       focus: makeReceiver({ stage: 'completed', fileIndices: [1] }),
     });
 
-    expect(screen.getByText(/^1 file · /)).toBeDefined();
+    expect(screen.getByTestId('stat-files').textContent).toMatch(/1$/);
   });
 
   it('offers the same files to someone else, or other files, once the download is done', () => {

@@ -43,6 +43,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 code
 - `components/ui/TextInput` — `size` `sm` (settings fields) or `lg` (centred mono codes/PINs).
 - `components/ui/ProgressBar` — `primary` | `subtle`; animates `transform`, not `width`.
 - `components/ui/ToggleRow` — labelled on/off option; children (e.g. an input) show inside the row while it is on.
+- `components/ui/StatTile` — one labelled number in transfer stats (live dashboard and completion card).
 - `components/ui/NumberStepper` — a small whole number picked with − / + (e.g. downloads at the same time).
 - `components/ui/Screen` — one screen of a flow; give it a `key` naming the screen so the enter animation plays on step changes only.
 - Small icon buttons (`IconButton size="sm"`) grow their padding on touch screens (`pointer-coarse:`); don't shrink them back with a `p-*` override.

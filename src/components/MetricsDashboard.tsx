@@ -1,15 +1,14 @@
 import React from 'react';
 import { Gauge, HardDrive, Clock, CheckCircle2, Pause, Play, XCircle } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { Pill } from './ui/Pill';
 import { ProgressBar } from './ui/ProgressBar';
+import { StatTile } from './ui/StatTile';
 import type { ManifestFile, TransferMetrics } from '../types/transfer';
 import { getFileProgress } from '../utils/transferProgress';
 import { TransferFileList } from './TransferFileList';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
-import { cn } from '../utils/cn';
 import { AnimatedWave } from './AnimatedWave';
 
 interface MetricsDashboardProps {
@@ -21,30 +20,6 @@ interface MetricsDashboardProps {
   onTogglePause: () => void;
   onCancel: () => void;
 }
-
-interface StatTileProps {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  isWarning?: boolean;
-  className?: string;
-}
-
-const StatTile: React.FC<StatTileProps> = ({ icon: Icon, label, value, isWarning = false, className }) => (
-  <div
-    className={cn(
-      'p-3.5 rounded-xl bg-surface-2 border border-border-1 transition-colors',
-      isWarning ? 'hover:border-amber-400/40' : 'hover:border-brand-500/40',
-      className
-    )}
-  >
-    <div className="flex items-center gap-2 text-text-4 text-xs mb-1">
-      <Icon className={cn('w-3.5 h-3.5', isWarning ? 'text-amber-400' : 'text-brand-500')} />
-      <span>{label}</span>
-    </div>
-    <div className="text-lg sm:text-xl font-bold font-mono tabular-nums text-text-1">{value}</div>
-  </div>
-);
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   metrics,

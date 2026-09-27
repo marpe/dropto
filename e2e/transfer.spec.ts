@@ -180,7 +180,9 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await receiverPage.getByTestId('start-download').click();
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
+    // Only the chosen file counts, and the stats stay on screen after the transfer
+    await expect(senderPage.getByTestId('stat-files')).toContainText('1');
+    await expect(receiverPage.getByTestId('stat-size')).toBeVisible();
 
     // A one-person link serves a single download; someone else arriving later is told why
     const latecomer = await openReceiver(browser);

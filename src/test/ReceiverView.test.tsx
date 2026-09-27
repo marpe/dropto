@@ -377,7 +377,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     it('shows progress and results for the chosen files only', () => {
       renderWaiting('completed', { manifest: twoFiles, selectedFileIndices: [1], corruptedFiles: [] });
 
-      expect(screen.getByText(/^1 file · /)).toBeDefined();
+      expect(screen.getByTestId('stat-files').textContent).toMatch(/1$/);
     });
   });
 });
