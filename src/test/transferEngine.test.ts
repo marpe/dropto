@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TransferEngine } from '../services/transferEngine';
 import type { TransferFile } from '../types/transfer';
+import { clearFilePickers, createMockDirectoryTree } from './utils/mockFileSystem';
 
 class MockDataConnection {
   public open = true;
@@ -184,6 +185,49 @@ describe('TransferEngine Full Protocol Flow', () => {
 
     expect(await waitFor(() => senderEvents.includes('all'))).toBe(true);
     expect(senderEvents).toEqual(['file:0', 'file:1', 'all']);
+  });
+});
+
+describe('TransferEngine multi-file receive', () => {
+  afterEach(() => {
+    clearFilePickers();
+  });
+
+  it('streams every file into the folder chosen once, without further save dialogs', async () => {
+    const { root, createdFiles, writables } = createMockDirectoryTree();
+    (window as any).showDirectoryPicker = vi.fn().mockResolvedValue(root);
+    // Browsers reject pickers opened without a user gesture; later files must never ask again
+    (window as any).showSaveFilePicker = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('Must be handling a user gesture'), { name: 'SecurityError' }));
+
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+
+    let receiverCompleted = false;
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.startReceiving();
+      },
+      onAllCompleted: () => {
+        receiverCompleted = true;
+      },
+    });
+    senderEngine.init(senderConn as any, true, {});
+
+    const first = { ...createTestFile(100 * 1024, 'a.bin'), relativePath: 'album/a.bin' };
+    const second = { ...createTestFile(70 * 1024, 'b.bin'), relativePath: 'album/raw/b.bin' };
+    await senderEngine.startSenderTransfer([first, second], false);
+
+    expect(await waitFor(() => receiverCompleted)).toBe(true);
+    expect((window as any).showDirectoryPicker).toHaveBeenCalledTimes(1);
+    expect((window as any).showSaveFilePicker).not.toHaveBeenCalled();
+    expect(createdFiles).toEqual(['album/a.bin', 'album/raw/b.bin']);
+    const bytesWritten = (path: string) =>
+      writables[path].write.mock.calls.reduce((acc: number, call: unknown[]) => acc + (call[0] as Uint8Array).byteLength, 0);
+    expect(bytesWritten('album/a.bin')).toBe(100 * 1024);
+    expect(bytesWritten('album/raw/b.bin')).toBe(70 * 1024);
   });
 });
 

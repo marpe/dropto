@@ -264,7 +264,7 @@ export const App: React.FC = () => {
   // Receiver prompts save dialog & begins streaming chunks
   const handleReceiverStartSaving = async () => {
     setReceiverState('transferring');
-    const started = await transferEngine.prepareAndStartReceiverFile(0);
+    const started = await transferEngine.startReceiving();
     if (!started) {
       setReceiverState('connected');
     }
