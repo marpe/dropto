@@ -16,7 +16,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 ## 1. React Invariants
 
 1. **State machines use reducers.** Multi-step flows (sessions, anything with a `status`) go in a `useReducer` with a pure, exported reducer and a typed action union (see `hooks/useSenderSession.ts`). Don't scatter related `useState` calls across `App.tsx`.
-2. **Long-lived callbacks must not capture render state.** Handlers registered with services (`WebRtcService`, `TransferEngine`) outlive the render that created them. They must `dispatch` actions or read refs, never read `state`/props directly. Wrap engine callbacks in the `ifCurrent(...)` guard so events from a replaced or torn-down engine are dropped.
+2. **Long-lived callbacks must not capture render state.** Handlers registered with services (`WebRtcService`, `TransferSender`/`TransferReceiver`) outlive the render that created them. They must `dispatch` actions or read refs, never read `state`/props directly. Wrap engine callbacks in the `ifCurrent(...)` guard so events from a replaced or torn-down engine are dropped.
 3. **Refs hold non-render objects only** (connections, engines, pending `DataConnection`, timers). Never mirror state into a ref during render (`ref.current = value` in the body; oxlint `react(refs)`).
 4. **Effects synchronise with external systems only.** Examples: theme class, settings → `soundService`/`wakeLockService`, session setup/teardown. Derive values during render, or initialise lazily (`useState(() => …)`), rather than calling `setState` synchronously in an effect (oxlint `react(set-state-in-effect)`). Effects that start something return its cleanup.
 5. **Services are injected, not imported, in hooks** that need tests. Follow `hooks/sessionServices.ts`: default real factories, fakes in `src/test/utils/fakeSessionServices.ts`.
@@ -95,13 +95,13 @@ Code explains *what*. Comments only explain *why*: invariants, browser quirks, p
 - Deliver the complete refactor in one pass, not a partial cleanup.
 - No scans inside loops (`.find`/`.filter` per iteration). Index once with a `Map`.
 - Prefer immutable transformations over mutable accumulators.
-- Behaviour changes are test-first. Unit tests go in `src/test/`. Engine tests pair two real `TransferEngine`s via `MockDataConnection`. Hooks are tested through `renderHook` with fake services. UI that depends on a real browser (WebRTC, brand CSS) is covered by Playwright.
+- Behaviour changes are test-first. Unit tests go in `src/test/`. Protocol tests pair a real `TransferSender` and `TransferReceiver` via `MockDataConnection`. Hooks are tested through `renderHook` with fake services. UI that depends on a real browser (WebRTC, brand CSS) is covered by Playwright.
 
 ---
 
 ## 8. App Patterns
 
-- **New protocol message:** add it to `ProtocolMessageType` and handle it in `TransferEngine.handleControlMessage`, guarding the role (`isSender`) and session state. Surface it to the UI only via an `EngineEventCallback`. Test it with a connected engine pair.
+- **New protocol message:** add it to the `ControlMessage` union (`types/transfer.ts`), validate it in `parseControlMessage` (`services/transfer/protocol.ts`), and handle it in the `handleMessage` of the side that receives it (`TransferSender` or `TransferReceiver`; shared messages go in `TransferPeer`). Surface it to the UI only via `TransferEvents`/`ReceiverEvents`. Test it with a connected sender/receiver pair.
 - **New setting:** add it to `AppSettings`, `DEFAULT_SETTINGS` (`hooks/useSettings.ts`) and `SettingsModal`. If a service consumes it, sync it in `useSettings`'s effect. The modal edits a local draft and saves on submit.
 - **File pickers** (`showSaveFilePicker`, `showDirectoryPicker`) run only from a user click. Choose storage once, up front, and reuse it for every file.
 - **New brand or brand-visible string:** update `src/branding.ts` and the boot script in `index.html` together, then regenerate the CSP hash in `vercel.json`. `branding.test.ts` and `csp.test.ts` fail until they agree.

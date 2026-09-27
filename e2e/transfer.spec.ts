@@ -150,7 +150,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     // 5. Sender receives incoming connection request modal
     await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.locator('text=1 files')).toBeVisible();
+    await expect(senderPage.getByText('1 file', { exact: true })).toBeVisible();
 
     // Sender clicks "Accept"
     await senderPage.locator('button:has-text("Accept")').click();

@@ -16,9 +16,8 @@ const settings: AppSettings = {
 };
 
 const manifest: TransferManifest = {
-  sessionId: 's',
   totalBytes: 5,
-  files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain', chunkSize: 65536, totalChunks: 1 }],
+  files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain' }],
 };
 
 function renderReceiverSession(initialRoomCode = '') {

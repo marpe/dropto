@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { soundService } from '../services/sound';
 import type {
   AppSettings,
@@ -138,20 +138,23 @@ export function useReceiverSession({
     settingsRef.current = settings;
   }, [settings]);
 
-  const endRun = (isSuccessful: boolean) => {
-    if (isRunningRef.current) {
-      isRunningRef.current = false;
-      services.effects.onTransferEnded(isSuccessful);
-    }
-  };
+  const endRun = useCallback(
+    (isSuccessful: boolean) => {
+      if (isRunningRef.current) {
+        isRunningRef.current = false;
+        services.effects.onTransferEnded(isSuccessful);
+      }
+    },
+    [services]
+  );
 
-  const teardown = () => {
+  const teardown = useCallback(() => {
     const connection = connectionRef.current;
     endRun(false);
     connectionRef.current = null;
     engineRef.current = null;
     connection?.destroy();
-  };
+  }, [endRun]);
 
   useEffect(() => {
     if (!active) {
@@ -161,7 +164,7 @@ export function useReceiverSession({
       teardown();
       dispatch({ type: 'RESET' });
     };
-  }, [active]);
+  }, [active, teardown]);
 
   /** Stops listening to the engine and closes the peer connection once queued messages are sent. */
   const leave = () => {
