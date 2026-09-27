@@ -51,6 +51,9 @@ function cleanRelayServers(servers: IceServerConfig[]): IceServerConfig[] {
     }));
 }
 
+// The footer's Save button lives outside the <form> and submits it through the native form attribute
+const SETTINGS_FORM_ID = 'settings-form';
+
 interface SettingsSectionProps {
   icon: LucideIcon;
   title: string;
@@ -112,6 +115,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [form, setForm] = useState<AppSettings>(settings);
   const [showRelayErrors, setShowRelayErrors] = useState(false);
   const [isNotificationBlocked, setIsNotificationBlocked] = useState(false);
+  // Theme changes apply instantly and are not part of the draft
+  const isDirty = JSON.stringify(form) !== JSON.stringify(settings);
 
   const update = (changes: Partial<AppSettings>) => setForm({ ...form, ...changes });
 
@@ -144,13 +149,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <Modal onClose={onClose} size="md">
-      <div className="flex items-center gap-2 pb-4 pr-10 border-b border-border-1">
-        <Server className="w-5 h-5 text-brand-500" />
-        <h3 className="text-lg font-bold text-text-1">Settings</h3>
-      </div>
-
-      <form onSubmit={handleSave} className="space-y-5 pt-4">
+    <Modal
+      title="Settings"
+      icon={Server}
+      onClose={onClose}
+      isDirty={isDirty}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form={SETTINGS_FORM_ID}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <form id={SETTINGS_FORM_ID} onSubmit={handleSave} className="space-y-5">
         <SettingsSection icon={Palette} title="Appearance">
           <SegmentedControl options={THEME_OPTIONS} value={themePreference} onChange={onThemeChange} className="w-full" />
         </SettingsSection>
@@ -257,12 +273,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <AboutInfo />
         </SettingsSection>
 
-        <div className="pt-2 flex items-center justify-end gap-3">
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit">Save</Button>
-        </div>
       </form>
     </Modal>
   );

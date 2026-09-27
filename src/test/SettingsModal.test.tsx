@@ -113,4 +113,17 @@ describe('SettingsModal relay servers', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ enableNotifications: true }));
   });
+
+  it('keeps unsaved edits when clicking outside, but closes freely when nothing changed', () => {
+    const { onClose } = renderSettings();
+    const dialog = screen.getByRole('dialog', { hidden: true });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /audio chimes/i }));
+    fireEvent.click(dialog);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /audio chimes/i }));
+    fireEvent.click(dialog);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

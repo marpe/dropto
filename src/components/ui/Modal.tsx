@@ -1,53 +1,114 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { IconButton } from './IconButton';
 import { cn } from '../../utils/cn';
 
 type ModalSize = 'sm' | 'md';
 
 interface ModalProps {
+  title: React.ReactNode;
+  icon?: LucideIcon;
   children: React.ReactNode;
-  /** Adds a close button and Escape to dismiss; omit it when the dialog requires an explicit choice */
+  /** Pinned below the scrolling body, e.g. the dialog's actions */
+  footer?: React.ReactNode;
+  /** Adds a close button, Escape and click-outside; omit it when the dialog requires an explicit choice */
   onClose?: () => void;
+  /** Unsaved edits: Escape and clicking outside are ignored so nothing is lost by accident */
+  isDirty?: boolean;
   size?: ModalSize;
-  className?: string;
+  bodyClassName?: string;
 }
 
 const sizeClasses: Record<ModalSize, string> = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
 };
 
-export const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'sm', className }) => {
+// Native light dismiss (closedby="any"); elsewhere a click on the <dialog> itself is a click on its backdrop
+const supportsClosedBy = typeof HTMLDialogElement !== 'undefined' && 'closedBy' in HTMLDialogElement.prototype;
+
+/**
+ * A native <dialog> opened with showModal(): top layer, inert page behind it, focus handled by the browser.
+ * A centred panel from `sm` up; below that a full-screen drawer that slides up. Header and footer stay put
+ * while the body scrolls.
+ */
+export const Modal: React.FC<ModalProps> = ({
+  title,
+  icon: Icon,
+  children,
+  footer,
+  onClose,
+  isDirty = false,
+  size = 'sm',
+  bodyClassName,
+}) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const isDismissable = !!onClose && !isDirty;
+
   useEffect(() => {
-    if (!onClose) {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) {
       return;
     }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute('open', '');
+    }
+  }, []);
+
+  // Escape and native light dismiss arrive as `cancel`; the parent decides by unmounting
+  const handleCancel = (event: React.SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault();
+    if (isDismissable) {
+      onClose();
+    }
+  };
+
+  const handleClick = (event: React.MouseEvent<HTMLDialogElement>) => {
+    if (!supportsClosedBy && isDismissable && event.target === event.currentTarget) {
+      onClose();
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
-      <div
-        className={cn(
-          'relative w-full max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl bg-surface-1 p-6 shadow-2xl border border-border-2',
-          sizeClasses[size],
-          className
-        )}
-      >
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onCancel={handleCancel}
+      onClick={handleClick}
+      {...{ closedby: isDismissable ? 'any' : 'none' }}
+      className={cn(
+        'open:flex flex-col m-auto p-0 w-full max-w-none text-text-1 bg-surface-1 shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-xs',
+        'transition-[opacity,translate] duration-200 ease-out starting:opacity-0',
+        // Phone: full-screen drawer from the bottom
+        'h-full max-h-full rounded-none starting:translate-y-full',
+        // sm and up: centred panel
+        'sm:h-auto sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
+        sizeClasses[size]
+      )}
+    >
+      <header className="shrink-0 flex items-center gap-2 px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-4 sm:pt-5 border-b border-border-1">
+        {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
+        <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
+          {title}
+        </h2>
         {onClose && (
-          <IconButton title="Close" size="sm" onClick={onClose} className="absolute right-4 top-4">
+          <IconButton title="Close" size="sm" onClick={onClose} className="-mr-2">
             <X className="w-5 h-5" />
           </IconButton>
         )}
-        {children}
-      </div>
-    </div>
+      </header>
+
+      <div className={cn('flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-5', bodyClassName)}>{children}</div>
+
+      {footer && (
+        <footer className="shrink-0 flex items-center justify-end gap-3 px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-border-1">
+          {footer}
+        </footer>
+      )}
+    </dialog>
   );
 };
