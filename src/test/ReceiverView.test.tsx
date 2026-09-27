@@ -182,7 +182,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(screen.getByText(/stream direct to disk/i)).toBeDefined();
   });
 
-  function renderPinStep(overrides: { pin?: string; incorrect?: boolean; attemptsLeft?: number } = {}) {
+  function renderPinStep(overrides: { pin?: string; isIncorrect?: boolean; attemptsLeft?: number } = {}) {
     const onSubmitPin = vi.fn();
     const onPinChange = vi.fn();
     render(
@@ -193,7 +193,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         onPinChange={onPinChange}
         onConnect={() => {}}
         connectionState="pin_required"
-        pinPrompt={{ attemptsLeft: overrides.attemptsLeft ?? 3, incorrect: overrides.incorrect ?? false }}
+        pinPrompt={{ attemptsLeft: overrides.attemptsLeft ?? 3, isIncorrect: overrides.isIncorrect ?? false }}
         onSubmitPin={onSubmitPin}
         manifest={null}
         transferMetrics={null}
@@ -221,7 +221,7 @@ describe('ReceiverView Component UI & Interaction', () => {
   });
 
   it('shows the remaining attempts after a wrong PIN', () => {
-    renderPinStep({ pin: '', incorrect: true, attemptsLeft: 2 });
+    renderPinStep({ pin: '', isIncorrect: true, attemptsLeft: 2 });
 
     expect(screen.getByText(/incorrect pin/i).textContent).toMatch(/2 attempts left/i);
   });

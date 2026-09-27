@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { DataConnection } from 'peerjs';
-import type { EngineEventCallback } from '../../services/transferEngine';
+import type { ReceiverEvents, TransferEvents } from '../../types/transfer';
 import type { ConnectionEventHandler } from '../../services/webrtc';
 import type { SessionServices } from '../../hooks/sessionServices';
 
@@ -16,37 +16,48 @@ export class FakeConnection {
   }
 }
 
-export class FakeEngine {
-  public callbacks: EngineEventCallback = {};
-  public init = vi.fn((_conn: DataConnection, _isSender: boolean, callbacks: EngineEventCallback) => {
-    this.callbacks = callbacks;
-  });
-  public startSenderTransfer = vi.fn().mockResolvedValue(undefined);
+/** Stands in for TransferSender / TransferReceiver; tests fire `events` to simulate the protocol. */
+export class FakeTransfer<Events extends TransferEvents = ReceiverEvents> {
+  public conn: DataConnection;
+  public events: Events;
+  public start = vi.fn();
   public startReceiving = vi.fn().mockResolvedValue(true);
+  public submitPin = vi.fn();
   public togglePause = vi.fn().mockReturnValue(true);
   public cancel = vi.fn();
-  public submitPin = vi.fn();
+
+  constructor(conn: DataConnection, events: Events) {
+    this.conn = conn;
+    this.events = events;
+  }
 }
 
 export function createFakePeerConnection(peer: string): DataConnection {
   return { peer, open: true, close: vi.fn() } as unknown as DataConnection;
 }
 
-/** Session services whose connections and engines are recorded so tests can drive their events. */
+/** Session services whose connections and transfers are recorded so tests can drive their events. */
 export function createFakeServices() {
   const connections: FakeConnection[] = [];
-  const engines: FakeEngine[] = [];
+  const engines: FakeTransfer[] = [];
+  const effects = { onTransferStarted: vi.fn(), onTransferEnded: vi.fn() };
   const services: SessionServices = {
     createConnection: (handlers) => {
       const connection = new FakeConnection(handlers);
       connections.push(connection);
       return connection;
     },
-    createEngine: () => {
-      const engine = new FakeEngine();
+    createSender: (conn, events) => {
+      const engine = new FakeTransfer<ReceiverEvents>(conn, events);
       engines.push(engine);
-      return engine as unknown as ReturnType<SessionServices['createEngine']>;
+      return engine;
     },
+    createReceiver: (conn, events) => {
+      const engine = new FakeTransfer<ReceiverEvents>(conn, events);
+      engines.push(engine);
+      return engine;
+    },
+    effects,
   };
-  return { services, connections, engines };
+  return { services, connections, engines, effects };
 }

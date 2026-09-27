@@ -687,7 +687,7 @@ describe('TransferEngine session PIN', () => {
     await waitFor(() => session.prompts.length > 0);
     await sleep(20);
 
-    expect(session.prompts).toEqual([{ attemptsLeft: 3, incorrect: false }]);
+    expect(session.prompts).toEqual([{ attemptsLeft: 3, isIncorrect: false }]);
     expect(session.getManifest()).toBeNull();
   });
 
@@ -710,7 +710,7 @@ describe('TransferEngine session PIN', () => {
     session.receiverEngine.submitPin('0000');
 
     expect(await waitFor(() => session.prompts.length === 2)).toBe(true);
-    expect(session.prompts[1]).toEqual({ attemptsLeft: 2, incorrect: true });
+    expect(session.prompts[1]).toEqual({ attemptsLeft: 2, isIncorrect: true });
     expect(session.getManifest()).toBeNull();
   });
 

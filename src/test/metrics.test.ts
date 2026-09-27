@@ -1,0 +1,61 @@
+import { describe, it, expect } from 'vitest';
+import { TransferMetricsTracker } from '../services/transfer/metrics';
+
+function createTracker(totalBytes: number, totalFiles = 1) {
+  const clock = { nowMs: 0 };
+  const tracker = new TransferMetricsTracker(totalBytes, totalFiles, () => clock.nowMs);
+  return { tracker, clock };
+}
+
+describe('TransferMetricsTracker', () => {
+  it('reports overall progress, speed over the recent window and time remaining', () => {
+    const { tracker, clock } = createTracker(10_000);
+    tracker.recordBytes(1_000);
+    clock.nowMs = 1_000;
+    tracker.recordBytes(1_000);
+
+    const metrics = tracker.snapshot(0, 'a.bin', 20);
+
+    expect(metrics).toMatchObject({
+      bytesTransferred: 2_000,
+      totalBytes: 10_000,
+      overallPercent: 20,
+      currentSpeed: 2_000,
+      etaSeconds: 4,
+      currentFileIndex: 0,
+      totalFiles: 1,
+      currentFileName: 'a.bin',
+      currentFilePercent: 20,
+    });
+  });
+
+  it('forgets bytes older than the speed window', () => {
+    const { tracker, clock } = createTracker(100_000);
+    tracker.recordBytes(50_000);
+    clock.nowMs = 10_000;
+    tracker.recordBytes(1_000);
+    clock.nowMs = 11_000;
+    tracker.recordBytes(1_000);
+
+    expect(tracker.snapshot(0, 'a.bin', 50)?.currentSpeed).toBe(2_000);
+  });
+
+  it('limits updates to one per interval, except forced ones and a file reaching 100%', () => {
+    const { tracker, clock } = createTracker(1_000);
+
+    expect(tracker.snapshot(0, 'a.bin', 10)).not.toBeNull();
+    clock.nowMs = 50;
+    expect(tracker.snapshot(0, 'a.bin', 20)).toBeNull();
+    expect(tracker.snapshot(0, 'a.bin', 20, { isForced: true })).not.toBeNull();
+    clock.nowMs = 60;
+    expect(tracker.snapshot(0, 'a.bin', 100)).not.toBeNull();
+    clock.nowMs = 300;
+    expect(tracker.snapshot(1, 'b.bin', 5)).not.toBeNull();
+  });
+
+  it('reports zero speed and unknown remaining time before enough data arrives', () => {
+    const { tracker } = createTracker(1_000);
+
+    expect(tracker.snapshot(0, 'a.bin', 0)).toMatchObject({ currentSpeed: 0, etaSeconds: 0, overallPercent: 0 });
+  });
+});

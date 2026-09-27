@@ -43,7 +43,7 @@ async function connect(session: ReturnType<typeof renderReceiverSession>) {
 async function connectWithManifest(session: ReturnType<typeof renderReceiverSession>) {
   const handles = await connect(session);
   act(() => {
-    handles.engine.callbacks.onManifest?.(manifest);
+    handles.engine.events.onManifest?.(manifest);
   });
   return handles;
 }
@@ -66,7 +66,7 @@ describe('useReceiverSession', () => {
     });
 
     expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DW-ROOM22', settings);
-    expect(session.engines[0].init).toHaveBeenCalledWith(expect.anything(), false, expect.any(Object));
+    expect(session.engines).toHaveLength(1);
     expect(session.result.current.state.status).toBe('waiting_approval');
   });
 
@@ -84,18 +84,18 @@ describe('useReceiverSession', () => {
     const { engine } = await connect(session);
 
     act(() => {
-      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+      engine.events.onPinRequired?.({ attemptsLeft: 3, isIncorrect: false });
     });
 
     expect(session.result.current.state.status).toBe('pin_required');
-    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 3, incorrect: false });
+    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 3, isIncorrect: false });
   });
 
   it('submits the entered PIN and shows it is being checked', async () => {
     const session = renderReceiverSession();
     const { engine } = await connect(session);
     act(() => {
-      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+      engine.events.onPinRequired?.({ attemptsLeft: 3, isIncorrect: false });
     });
     act(() => {
       session.result.current.actions.setPin('1234');
@@ -113,7 +113,7 @@ describe('useReceiverSession', () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connect(session);
     act(() => {
-      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+      engine.events.onPinRequired?.({ attemptsLeft: 3, isIncorrect: false });
     });
     act(() => {
       session.result.current.actions.submitPin();
@@ -153,18 +153,18 @@ describe('useReceiverSession', () => {
     });
 
     act(() => {
-      engine.callbacks.onPinRequired?.({ attemptsLeft: 2, incorrect: true });
+      engine.events.onPinRequired?.({ attemptsLeft: 2, isIncorrect: true });
     });
 
     expect(session.result.current.state.pin).toBe('');
-    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 2, incorrect: true });
+    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 2, isIncorrect: true });
   });
 
   it('reports a sender that goes away while the PIN is being entered', async () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connect(session);
     act(() => {
-      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+      engine.events.onPinRequired?.({ attemptsLeft: 3, isIncorrect: false });
     });
 
     act(() => {
@@ -215,6 +215,38 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.status).toBe('connected');
   });
 
+  it('holds device effects from the start of saving until completion', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    expect(session.effects.onTransferStarted).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    expect(session.effects.onTransferStarted).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+    expect(session.effects.onTransferEnded).toHaveBeenCalledWith(true);
+  });
+
+  it('never starts device effects when the save dialog is dismissed', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    engine.startReceiving.mockResolvedValueOnce(false);
+
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    act(() => {
+      session.result.current.actions.cancel();
+    });
+
+    expect(session.effects.onTransferStarted).not.toHaveBeenCalled();
+    expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
+  });
+
   it('shows the transfer while saving', async () => {
     const session = renderReceiverSession();
     await connectWithManifest(session);
@@ -231,7 +263,7 @@ describe('useReceiverSession', () => {
     const { engine, connection } = await connectWithManifest(session);
 
     act(() => {
-      engine.callbacks.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
+      engine.events.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
     });
 
     expect(session.result.current.state.status).toBe('completed');
@@ -244,7 +276,7 @@ describe('useReceiverSession', () => {
     const { engine, connection } = await connectWithManifest(session);
 
     act(() => {
-      engine.callbacks.onError?.('Disk full');
+      engine.events.onError?.('Disk full');
     });
 
     expect(session.result.current.state.status).toBe('error');
@@ -258,7 +290,7 @@ describe('useReceiverSession', () => {
     const { engine } = await connectWithManifest(session);
 
     act(() => {
-      engine.callbacks.onCancelled?.();
+      engine.events.onCancelled?.();
     });
 
     expect(session.result.current.state.status).toBe('error');
@@ -283,7 +315,7 @@ describe('useReceiverSession', () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connectWithManifest(session);
     act(() => {
-      engine.callbacks.onAllCompleted?.({ corruptedFiles: [] });
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
     });
 
     act(() => {
@@ -302,7 +334,7 @@ describe('useReceiverSession', () => {
 
     session.rerender({ active: false });
     act(() => {
-      engine.callbacks.onError?.('Connection to peer lost');
+      engine.events.onError?.('Connection to peer lost');
     });
 
     expect(connection.destroy).toHaveBeenCalled();
@@ -317,7 +349,7 @@ describe('useReceiverSession', () => {
       session.result.current.actions.togglePause();
     });
     act(() => {
-      engine.callbacks.onPaused?.(true);
+      engine.events.onPaused?.(true);
     });
 
     expect(engine.togglePause).toHaveBeenCalled();

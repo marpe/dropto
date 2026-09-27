@@ -9,7 +9,7 @@ import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
 import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
-import type { PinPrompt } from '../services/transferEngine';
+import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
   roomCode: string;
