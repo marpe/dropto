@@ -1,4 +1,6 @@
 import React from 'react';
+import { ArrowLeft } from 'lucide-react';
+import { LinkButton } from './ui/LinkButton';
 import { Spinner } from './ui/Spinner';
 import { StatusCard } from './ui/StatusCard';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
@@ -32,6 +34,7 @@ interface ReceiverViewProps {
   onReset: () => void;
   /** Connected through the sender's link, so there is no approval to wait for */
   isInvited?: boolean;
+  onSwitchToSend?: () => void;
 }
 
 function getWaitingStage(
@@ -71,6 +74,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   corruptedFiles,
   onReset,
   isInvited = false,
+  onSwitchToSend,
 }) => {
   const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
 
@@ -108,13 +112,23 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
       ) : manifest ? (
         <IncomingFilesCard manifest={manifest} isNativeFSA={isNativeFSA} onStartSaving={onStartSaving} />
       ) : (
-        <RoomCodeForm
-          roomCode={roomCode}
-          onRoomCodeChange={onRoomCodeChange}
-          onConnect={onConnect}
-          isConnecting={connectionState === 'connecting'}
-          errorMessage={errorMessage}
-        />
+        <>
+          <RoomCodeForm
+            roomCode={roomCode}
+            onRoomCodeChange={onRoomCodeChange}
+            onConnect={onConnect}
+            isConnecting={connectionState === 'connecting'}
+            errorMessage={errorMessage}
+          />
+          {onSwitchToSend && (
+            <div className="text-center">
+              <LinkButton onClick={onSwitchToSend}>
+                <ArrowLeft className="w-4 h-4" />
+                Send files instead
+              </LinkButton>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -132,4 +132,20 @@ describe('SenderView', () => {
 
     expect(container.querySelector('[data-file-kind="pdf"]')).not.toBeNull();
   });
+
+  it('explains the basics on the landing page and offers receiving by code', () => {
+    const onSwitchToReceive = vi.fn();
+    renderSenderView({ onSwitchToReceive });
+
+    expect(screen.getByText(/no account/i)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: /receive files/i }));
+    expect(onSwitchToReceive).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the landing extras out once files are queued', () => {
+    renderSenderView({ files: [queuedFile], onSwitchToReceive: () => {} });
+
+    expect(screen.queryByText(/no account/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /receive files/i })).toBeNull();
+  });
 });

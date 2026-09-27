@@ -28,7 +28,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 
 - **Push styling down.** Views (`SenderView`, `ReceiverView`, `App`) own layout only (flex/grid, gaps, max-widths). Leaf components own typography, surfaces, borders, focus and hover states.
 - **A long or repeated class list means a component.** If you're copying a styled node, extract it with typed variant props instead.
-- **Encapsulate conceptual units.** Existing examples: `TransferCompleteCard` (success/corrupted states plus confetti), `PinEntryCard`, `MetricsDashboard`, `PeerApprovalModal`, `IceServerRow`, `Footer`. New concepts get the same treatment (e.g. a mode switcher, share box, file-queue row).
+- **Encapsulate conceptual units.** Existing examples: `TransferCompleteCard` (success/corrupted states plus confetti), `PinEntryCard`, `MetricsDashboard`, `PeerApprovalModal`, `IceServerRow`, `ShareBox`, `FileQueue`, `RoomCodeForm`, `BrandMark`. New concepts get the same treatment.
 - **Per-item state belongs in the row component.** Rows with their own edit, draft, copied or visibility state own it. Parents pass data and domain callbacks, never ID-keyed `Record<string, …>` state maps.
 - **Modals** use `components/ui/Modal` (overlay, panel, size `sm`/`md`). Pass `onClose` for a close button plus Escape; omit it when the user must choose (e.g. `PeerApprovalModal`). Parents mount modals conditionally — no `isOpen` props. Never use `alert()` / `confirm()` / `prompt()`.
 - **Transient "done" flags** (copied, saved) use `useCopyToClipboard` or the same pattern: timer cleared on re-trigger and unmount, and the flag set only when the action actually succeeded.
@@ -60,7 +60,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 
 ## 4. Theme & Styling Tokens
 
-The app supports **light and dark** themes (`useDarkMode`, `dark:` variants). Every neutral colour needs its `dark:` counterpart.
+The app supports **light and dark** themes (`useTheme`: System / Light / Dark, chosen in settings; `dark:` variants). Every neutral colour needs its `dark:` counterpart.
 
 | Purpose | Use | Notes |
 | :--- | :--- | :--- |

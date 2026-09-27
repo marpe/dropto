@@ -35,20 +35,20 @@ const BuildStamp: React.FC<{ buildInfo: BuildInfo }> = ({ buildInfo }) => {
   );
 };
 
-export const Footer: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_INFO }) => (
-  <footer className="w-full max-w-3xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400 border-t border-zinc-200 dark:border-zinc-800/80">
-    <div>{getActiveBrand().name}</div>
-    <div className="flex items-center gap-4">
-      <BuildStamp buildInfo={buildInfo} />
-      <a
-        href={REPOSITORY_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-1.5 hover:text-brand-500 transition-colors"
-      >
-        <GitHubIcon className="w-4 h-4" />
-        <span>GitHub</span>
-      </a>
-    </div>
-  </footer>
+/** Build stamp and repository link, shown in the settings dialog. */
+export const AboutInfo: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_INFO }) => (
+  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+    <span>
+      {getActiveBrand().name} · <BuildStamp buildInfo={buildInfo} />
+    </span>
+    <a
+      href={REPOSITORY_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-1.5 hover:text-brand-500 transition-colors"
+    >
+      <GitHubIcon className="w-4 h-4" />
+      <span>GitHub</span>
+    </a>
+  </div>
 );
