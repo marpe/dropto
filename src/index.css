@@ -4,13 +4,17 @@
 
 :root {
   color-scheme: light dark;
-  --scrollbar-thumb: #cbd5e1;
-  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #d4d4d8;
+  --scrollbar-track: #f4f4f5;
+  --accent-color: #3ECF8E;
+  accent-color: #3ECF8E;
 }
 
 .dark {
-  --scrollbar-thumb: #334155;
-  --scrollbar-track: #0f172a;
+  --scrollbar-thumb: #27272a;
+  --scrollbar-track: #121212;
+  --accent-color: #3ECF8E;
+  accent-color: #3ECF8E;
 }
 
 /* Modern standard scrollbar-color */
@@ -22,27 +26,55 @@
 /* Fallback for WebKit browsers */
 @supports not (scrollbar-color: auto) {
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: var(--scrollbar-track);
   }
   ::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 4px;
+    border-radius: 3px;
   }
 }
 
-/* Glassmorphism helpers */
-.glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+/* Supabase high-contrast card styling */
+.supabase-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.dark .glass {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.dark .supabase-card {
+  background: #181818;
+  border: 1px solid #27272a;
+}
+
+.supabase-card:hover {
+  border-color: rgba(62, 207, 142, 0.4);
+}
+
+/* Animated glowing border */
+@keyframes border-glow {
+  0%, 100% {
+    border-color: rgba(62, 207, 142, 0.2);
+    box-shadow: 0 0 15px rgba(62, 207, 142, 0.05);
+  }
+  50% {
+    border-color: rgba(62, 207, 142, 0.6);
+    box-shadow: 0 0 25px rgba(62, 207, 142, 0.15);
+  }
+}
+
+.animate-border-glow {
+  animation: border-glow 3s infinite ease-in-out;
+}
+
+/* Ambient radial glow in background */
+.supabase-glow {
+  background: radial-gradient(circle 500px at 50% 10%, rgba(62, 207, 142, 0.08), transparent 70%);
+}
+
+.dark .supabase-glow {
+  background: radial-gradient(circle 600px at 50% 10%, rgba(62, 207, 142, 0.07), transparent 70%);
 }

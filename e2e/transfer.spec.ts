@@ -21,6 +21,11 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // Re-click to restore
     await themeBtn.click();
 
+    // Verify GitHub repository links in header and footer
+    const githubLinks = page.locator('a[href="https://github.com/marpe/send"]');
+    await expect(githubLinks.first()).toBeVisible();
+    await expect(githubLinks.first()).toHaveAttribute('target', '_blank');
+
     // Open settings modal
     const settingsBtn = page.locator('button[title*="Settings"]');
     await settingsBtn.click();
