@@ -157,4 +157,11 @@ describe('SenderView', () => {
     expect(document.querySelector('[data-status="active"]')?.textContent).toContain('report.pdf');
     expect(document.querySelector('[data-status="pending"]')?.textContent).toContain('notes.txt');
   });
+
+  it('heads the queue with just the file count and total size', () => {
+    renderSenderView({ files: [queuedFile] });
+
+    expect(screen.getByText('1 file · 2 KB')).toBeDefined();
+    expect(screen.queryByText(/ready to send/i)).toBeNull();
+  });
 });
