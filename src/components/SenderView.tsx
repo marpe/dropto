@@ -18,7 +18,7 @@ import { PeerApprovalModal } from './PeerApprovalModal';
 import { TransferCompleteCard } from './TransferCompleteCard';
 import { FileDropZone } from './FileDropZone';
 import { FileQueue } from './FileQueue';
-import { ShareStep } from './ShareStep';
+import { LinkSection } from './LinkSection';
 import { ReceiverChoosingCard } from './ReceiverChoosingCard';
 
 interface SenderViewProps {
@@ -26,8 +26,6 @@ interface SenderViewProps {
   /** Offered on the landing page, for when the sender can only read out a room code */
   onSwitchToReceive?: () => void;
 }
-
-type Step = 'files' | 'share';
 
 const REMOVAL_TITLES = {
   file: 'Remove this file?',
@@ -41,7 +39,6 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   const { state, status, focus, actions } = session;
   const { files, isShared, options, roomCode, shareKey, receivers, pendingPeers } = state;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState<Step>(() => (isShared ? 'share' : 'files'));
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
 
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
@@ -54,8 +51,6 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   const hasEarlyVisitor = pendingPeers.some((peer) => peer.isTrusted);
   const hasRoomError = !roomCode && !!state.roomError;
   const isLanding = files.length === 0 && !isAwaitingReceiver && pendingPeers.length === 0;
-  // Nothing to share without files, whatever step the sender was on
-  const currentStep: Step = files.length === 0 ? 'files' : step;
 
   const requestRemoveFile = (file: TransferFile) => {
     if (isSomeoneChoosing) {
@@ -128,11 +123,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
             <>
               <Button
                 data-testid="send-again"
-                onClick={() => {
-                  // Same files, so straight to choosing how the new link is shared
-                  setStep('share');
-                  actions.stopSharing();
-                }}
+                onClick={actions.stopSharing}
                 className="px-6"
               >
                 Send to someone else
@@ -148,7 +139,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   }
 
   return (
-    <Screen key={currentStep}>
+    <Screen key={files.length === 0 ? 'landing' : 'files'}>
       {/* Requests only surface once the sender has actually shared; earlier ones wait */}
       {isShared && approvalRequest && (
         <PeerApprovalModal
@@ -193,40 +184,15 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
 
       {isAwaitingReceiver && focus && <ReceiverChoosingCard details={focus.details} onCancel={actions.cancel} />}
 
-      {currentStep === 'share' ? (
-        <ShareStep
-          files={files}
-          onEditFiles={() => setStep('files')}
-          isShared={isShared}
-          options={options}
-          onOptionsChange={actions.setSharingOptions}
-          onCreateLink={actions.createLink}
-          onUpdateSharing={actions.updateSharing}
-          onStopSharing={actions.stopSharing}
-          connectedCount={connectedCount}
-          receivers={receivers}
-          onStopReceiver={actions.stopReceiver}
-          onDismissReceiver={actions.dismissReceiver}
-          roomCode={roomCode}
-          shareUrl={shareUrl}
-          roomNotice={state.roomNotice}
-        />
-      ) : (
+      {hasEarlyVisitor && (
+        <Notice tone="brand" icon={Link2}>
+          Someone opened your link. Add files and share them to let them in.
+        </Notice>
+      )}
+
+      {files.length === 0 ? (
         <>
-          {hasEarlyVisitor && (
-            <Notice tone="brand" icon={Link2}>
-              Someone opened your link. Add files and share them to let them in.
-            </Notice>
-          )}
-
-          {isShared && files.length > 0 && (
-            <Notice tone="brand" icon={Radio}>
-              Your link is live: anyone still choosing sees changes to this list.
-            </Notice>
-          )}
-
-          <FileDropZone onAddFiles={actions.addFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />
-
+          <FileDropZone onAddFiles={actions.addFiles} fileInputRef={fileInputRef} />
           {isLanding && onSwitchToReceive && (
             <div className="text-center">
               <LinkButton onClick={onSwitchToReceive}>
@@ -235,26 +201,48 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
               </LinkButton>
             </div>
           )}
-
-          {files.length > 0 && (
-            <FileQueue
-              files={files}
-              onRemoveFile={(fileId) => {
-                const file = files.find((candidate) => candidate.id === fileId);
-                if (file) {
-                  requestRemoveFile(file);
-                }
-              }}
-              onClearFiles={requestClearFiles}
-              footer={
-                <Button data-testid="share-files" onClick={() => setStep('share')} className="w-full">
-                  <span>{isShared ? 'Back to link' : `Share ${files.length === 1 ? '1 file' : `${files.length} files`}`}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              }
-            />
-          )}
         </>
+      ) : (
+        <FileQueue
+          files={files}
+          onAddFiles={actions.addFiles}
+          fileInputRef={fileInputRef}
+          onRemoveFile={(fileId) => {
+            const file = files.find((candidate) => candidate.id === fileId);
+            if (file) {
+              requestRemoveFile(file);
+            }
+          }}
+          onClearFiles={requestClearFiles}
+          footer={
+            isShared ? (
+              <p className="flex items-center justify-center gap-1.5 text-xs text-text-5">
+                <Radio className="w-3.5 h-3.5 text-brand-500" />
+                The link is live: anyone still choosing sees changes to this list.
+              </p>
+            ) : (
+              <Button data-testid="share-files" onClick={actions.createLink} className="w-full">
+                <Link2 className="w-4 h-4" />
+                <span>Share</span>
+              </Button>
+            )
+          }
+        />
+      )}
+
+      {isShared && files.length > 0 && (
+        <LinkSection
+          roomCode={roomCode}
+          shareUrl={shareUrl}
+          roomNotice={state.roomNotice}
+          options={options}
+          onUpdateSharing={actions.updateSharing}
+          onStopSharing={actions.stopSharing}
+          connectedCount={connectedCount}
+          receivers={receivers}
+          onStopReceiver={actions.stopReceiver}
+          onDismissReceiver={actions.dismissReceiver}
+        />
       )}
     </Screen>
   );

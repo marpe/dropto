@@ -117,41 +117,68 @@ describe('SenderView', () => {
     expect(actions.retryRoom).toHaveBeenCalledTimes(1);
   });
 
-  it('asks how to share only after the files are chosen, and shows the link only once created', () => {
+  it('creates the link straight away with Share, without copying anything', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
     const actions = renderSenderView({ state: { files: [queuedFile] } });
-    expect(screen.queryByTestId('create-link')).toBeNull();
     expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
 
     fireEvent.click(screen.getByTestId('share-files'));
-    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
-    fireEvent.click(screen.getByTestId('create-link'));
 
     expect(actions.createLink).toHaveBeenCalledTimes(1);
+    expect(writeText).not.toHaveBeenCalled();
   });
 
-  it('suggests a random PIN when one is required, and never creates a link with an empty one', () => {
-    const actions = renderSenderView({ state: { files: [queuedFile] } });
-    fireEvent.click(screen.getByTestId('share-files'));
+  it('shows the link and its settings below the files once shared, with no separate step', () => {
+    renderSenderView({ state: shared() });
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-
-    expect(actions.setSharingOptions).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }));
-    const pinField = screen.getByTestId('pin-input') as HTMLInputElement;
-    // The field is controlled by the (stubbed) session, so it is still empty: submitting must stop there
-    expect(pinField.value).toBe('');
-    expect(pinField.required).toBe(true);
-    fireEvent.click(screen.getByTestId('create-link'));
-    expect(pinField.checkValidity()).toBe(false);
-    expect(actions.createLink).not.toHaveBeenCalled();
+    expect(screen.getByText('report.pdf')).toBeDefined();
+    expect(screen.getByRole('button', { name: /copy link/i })).toBeDefined();
+    expect(screen.getByRole('checkbox', { name: /require a pin/i })).toBeDefined();
+    expect(screen.queryByTestId('share-files')).toBeNull();
   });
 
-  it('lets the sender go back from the sharing options to edit the files', () => {
-    renderSenderView({ state: { files: [queuedFile] } });
-    fireEvent.click(screen.getByTestId('share-files'));
+  it('lists each file with its size and, where there is room, when it was last modified', () => {
+    renderSenderView({ state: { files: [{ ...queuedFile, lastModified: new Date(2024, 2, 12).getTime() }] } });
 
-    fireEvent.click(screen.getByTestId('edit-files'));
+    const row = screen.getByTestId('file-row');
+    expect(within(row).getByText('2 KB')).toBeDefined();
+    expect(within(row).getByTestId('file-modified').textContent).toMatch(/2024/);
+  });
 
-    expect(screen.getByTestId('pick-files')).toBeDefined();
+  describe('sharing settings', () => {
+    const withPin = (pin: string) => shared({ options: { ...createInitialSenderState().options, pin } });
+
+    it('suggests a random PIN as soon as one is required', () => {
+      const actions = renderSenderView({ state: shared() });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
+
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
+    });
+
+    it('applies a typed PIN when the field is left or Enter is pressed, not on every keystroke', () => {
+      const actions = renderSenderView({ state: withPin('1234') });
+      const pinField = screen.getByTestId('pin-input');
+
+      fireEvent.change(pinField, { target: { value: '56' } });
+      expect(actions.updateSharing).not.toHaveBeenCalled();
+      fireEvent.change(pinField, { target: { value: '5678' } });
+      fireEvent.keyDown(pinField, { key: 'Enter' });
+
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '5678' }), 'new');
+    });
+
+    it('keeps the current PIN when the field is left empty', () => {
+      const actions = renderSenderView({ state: withPin('1234') });
+      const pinField = screen.getByTestId('pin-input') as HTMLInputElement;
+
+      fireEvent.change(pinField, { target: { value: '' } });
+      fireEvent.blur(pinField);
+
+      expect(actions.updateSharing).not.toHaveBeenCalled();
+      expect(pinField.value).toBe('1234');
+    });
   });
 
   it('copies a link that carries the room key', async () => {
@@ -179,7 +206,6 @@ describe('SenderView', () => {
     fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
     expect(actions.cancel).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByTestId('edit-files'));
     expect(screen.getByText('report.pdf')).toBeDefined();
     expect(screen.getByTestId('pick-files')).toBeDefined();
   });
@@ -286,7 +312,7 @@ describe('SenderView', () => {
     expect(actions.clearFiles).toHaveBeenCalledTimes(1);
   });
 
-  it('goes straight to the sharing options when sending the same files to someone else', () => {
+  it('offers Share again for the same files after sending them to someone', () => {
     const session = {
       // Last seen on the file list (e.g. after adding a file), not on the link
       state: { ...createInitialSenderState(), roomCode: 'DW-ABC234', shareKey: 'link-key', files: [queuedFile] },
@@ -299,7 +325,7 @@ describe('SenderView', () => {
 
     rerender(<SenderView session={{ ...session, status: 'waiting', focus: null }} />);
 
-    expect(screen.getByTestId('create-link')).toBeDefined();
+    expect(screen.getByTestId('share-files')).toBeDefined();
   });
 
   describe('stopping the share', () => {
@@ -388,10 +414,8 @@ describe('SenderView', () => {
       const actions = renderSenderView({
         state: several([makeReceiver({ peerId: 'a', stage: 'transferring' }), makeReceiver({ peerId: 'b', stage: 'transferring' })]),
       });
-      fireEvent.click(screen.getByTestId('edit-sharing'));
-
       fireEvent.click(screen.getByTitle('Fewer'));
-      fireEvent.click(screen.getByTestId('save-sharing'));
+      expect(actions.updateSharing).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId('apply-to-new'));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ maxSimultaneous: 1 }), 'new');
@@ -399,48 +423,55 @@ describe('SenderView', () => {
   });
 
   describe('changing how files are shared after the link is out', () => {
-    function editSharing(overrides: SessionOverrides = {}) {
+    function renderWithSomeoneConnected(overrides: SessionOverrides = {}) {
       const receiver = makeReceiver();
-      const actions = renderSenderView({
-        state: shared({ receivers: [receiver] }),
-        status: 'awaiting_receiver',
-        focus: receiver,
-        ...overrides,
-      });
-      fireEvent.click(screen.getByTestId('edit-sharing'));
-      return actions;
+      return renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver, ...overrides });
     }
 
+    it('applies a change at once when nobody is connected', () => {
+      const actions = renderSenderView({ state: shared() });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
+    });
+
     it('asks whether a stricter setting should also stop the current receiver', () => {
-      const actions = editSharing();
+      const actions = renderWithSomeoneConnected();
 
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-      fireEvent.change(screen.getByTestId('pin-input'), { target: { value: '1234' } });
-      fireEvent.click(screen.getByTestId('save-sharing'));
       expect(actions.updateSharing).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByTestId('apply-to-new'));
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '1234' }), 'new');
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
     });
 
     it('can apply a stricter setting to the current receiver too', () => {
-      const actions = editSharing();
+      const actions = renderWithSomeoneConnected();
 
       fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
-      fireEvent.click(screen.getByTestId('save-sharing'));
       fireEvent.click(screen.getByTestId('apply-now'));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'now');
     });
 
-    it('saves without asking when the change only loosens things', () => {
+    it('leaves the settings as they were when the question is dismissed', () => {
+      const actions = renderWithSomeoneConnected();
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
+
+      expect(actions.updateSharing).not.toHaveBeenCalled();
+      expect((screen.getByRole('checkbox', { name: /ask me before anyone connects/i }) as HTMLInputElement).checked).toBe(false);
+    });
+
+    it('applies without asking when the change only loosens things', () => {
       const receiver = makeReceiver();
-      const actions = editSharing({
+      const actions = renderWithSomeoneConnected({
         state: shared({ receivers: [receiver], options: { ...createInitialSenderState().options, pin: '1234' } }),
       });
 
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-      fireEvent.click(screen.getByTestId('save-sharing'));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '' }), 'new');
       expect(screen.queryByTestId('apply-now')).toBeNull();
@@ -451,7 +482,6 @@ describe('SenderView', () => {
     it('warns before removing a file from what a connected receiver is choosing from', () => {
       const receiver = makeReceiver();
       const actions = renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver });
-      fireEvent.click(screen.getByTestId('edit-files'));
 
       fireEvent.click(screen.getByTitle('Remove report.pdf'));
       expect(actions.removeFile).not.toHaveBeenCalled();
@@ -462,7 +492,6 @@ describe('SenderView', () => {
 
     it('warns that clearing everything after sharing replaces the link', () => {
       const actions = renderSenderView({ state: shared() });
-      fireEvent.click(screen.getByTestId('edit-files'));
 
       fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
       expect(actions.clearFiles).not.toHaveBeenCalled();
@@ -472,17 +501,16 @@ describe('SenderView', () => {
       expect(actions.clearFiles).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the PIN in the sharing summary so it can be passed on', () => {
+    it('shows the PIN so it can be passed on', () => {
       renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, pin: '2468' } }) });
 
-      expect(screen.getByText(/PIN 2468/)).toBeDefined();
+      expect((screen.getByTestId('pin-input') as HTMLInputElement).value).toBe('2468');
     });
 
     it('removes straight away when nobody is choosing, noting the link shows the change', () => {
       const actions = renderSenderView({ state: shared() });
-      fireEvent.click(screen.getByTestId('edit-files'));
 
-      expect(screen.getByText(/link is live/i)).toBeDefined();
+      expect(screen.getByText(/still choosing/i)).toBeDefined();
       fireEvent.click(screen.getByTitle('Remove report.pdf'));
 
       expect(actions.removeFile).toHaveBeenCalledWith('f1');
