@@ -155,12 +155,9 @@ export const App: React.FC = () => {
             },
           });
         },
+        // Mid-transfer disconnects are reported by transferEngine via onError
         onDisconnected: () => {
           setConnectedPeerId(null);
-          if (transferState === 'transferring') {
-            setTransferState('failed');
-            setErrorMessage('Peer disconnected unexpectedly');
-          }
         },
         onError: (err) => {
           console.error('WebRTC error:', err);
@@ -169,7 +166,7 @@ export const App: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to init sender:', err);
     }
-  }, [settings, senderFiles, senderPin, transferState]);
+  }, [settings]);
 
   useEffect(() => {
     if (mode === 'send') {
@@ -245,6 +242,8 @@ export const App: React.FC = () => {
         onError: (err) => {
           setReceiverState('error');
           setErrorMessage(err);
+          setManifest(null);
+          setMetrics(null);
           wakeLockService.release();
         },
         onPaused: (paused) => setIsPaused(paused),

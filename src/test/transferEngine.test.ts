@@ -188,6 +188,96 @@ describe('TransferEngine Full Protocol Flow', () => {
   });
 });
 
+describe('TransferEngine connection loss', () => {
+  it('reports an error to the sender when the connection closes mid-transfer', async () => {
+    const { senderConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const errors: string[] = [];
+    senderEngine.init(senderConn as any, true, {
+      onError: (err) => {
+        errors.push(err);
+      },
+    });
+
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    senderConn.emit('close', undefined);
+
+    expect(errors).toHaveLength(1);
+  });
+
+  it('reports an error to the receiver when the connection closes after the manifest arrives', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    let manifestReceived = false;
+    const errors: string[] = [];
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        manifestReceived = true;
+      },
+      onError: (err) => {
+        errors.push(err);
+      },
+    });
+    senderEngine.init(senderConn as any, true, {});
+
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    await waitFor(() => manifestReceived);
+    receiverConn.emit('close', undefined);
+
+    expect(errors).toHaveLength(1);
+  });
+
+  it('does not report an error when the connection closes after the transfer completed', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    const errors: string[] = [];
+    let senderCompleted = false;
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+      onError: (err) => {
+        errors.push(`receiver: ${err}`);
+      },
+    });
+    senderEngine.init(senderConn as any, true, {
+      onAllCompleted: () => {
+        senderCompleted = true;
+      },
+      onError: (err) => {
+        errors.push(`sender: ${err}`);
+      },
+    });
+
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    expect(await waitFor(() => senderCompleted)).toBe(true);
+    senderConn.emit('close', undefined);
+    receiverConn.emit('close', undefined);
+
+    expect(errors).toEqual([]);
+  });
+
+  it('ignores a close from a previous connection after re-initialising', async () => {
+    const engine = new TransferEngine();
+    const oldConn = new MockDataConnection();
+    const { senderConn: newConn } = createConnectedPair();
+    const errors: string[] = [];
+    engine.init(oldConn as any, true, {});
+    engine.init(newConn as any, true, {
+      onError: (err) => {
+        errors.push(err);
+      },
+    });
+
+    await engine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    oldConn.emit('close', undefined);
+
+    expect(errors).toEqual([]);
+  });
+});
+
 describe('TransferEngine multi-file receive', () => {
   afterEach(() => {
     clearFilePickers();

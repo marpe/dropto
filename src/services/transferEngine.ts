@@ -26,6 +26,8 @@ export class TransferEngine {
   private conn: DataConnection | null = null;
   private isSender: boolean = false;
   private callbacks: EngineEventCallback = {};
+  // True from manifest until completion/cancel; a disconnect in this window is a failure
+  private isActive: boolean = false;
 
   // Sender state
   private files: TransferFile[] = [];
@@ -53,6 +55,7 @@ export class TransferEngine {
     this.callbacks = callbacks;
     this.isCancelled = false;
     this.isPaused = false;
+    this.isActive = false;
 
     // Direct access to underlying RTCDataChannel for backpressure and binary config
     const rawChannel = (conn as any).dataChannel as RTCDataChannel;
@@ -63,6 +66,13 @@ export class TransferEngine {
 
     conn.on('data', (data) => {
       this.handleIncomingData(data);
+    });
+
+    conn.on('close', () => {
+      // Ignore closes from a previous session's connection
+      if (this.conn === conn) {
+        this.handleConnectionLost();
+      }
     });
   }
 
@@ -77,6 +87,7 @@ export class TransferEngine {
     this.totalBytesTransferred = 0;
     this.startTime = Date.now();
     this.speedWindow = [];
+    this.isActive = true;
 
     wakeLockService.acquire();
     soundService.playStart();
@@ -310,6 +321,7 @@ export class TransferEngine {
         this.totalBytes = this.manifest.totalBytes;
         this.totalBytesTransferred = 0;
         this.startTime = Date.now();
+        this.isActive = true;
         wakeLockService.acquire();
         soundService.playStart();
         // Notify UI to display manifest & request user save action
@@ -356,6 +368,7 @@ export class TransferEngine {
           // Prepare next file
           this.prepareAndStartReceiverFile(fileIndex + 1);
         } else {
+          this.isActive = false;
           wakeLockService.release();
           soundService.playComplete();
           this.callbacks.onAllCompleted?.();
@@ -369,6 +382,7 @@ export class TransferEngine {
         this.callbacks.onFileComplete?.(fileIndex, verified);
 
         if (fileIndex + 1 >= this.files.length) {
+          this.isActive = false;
           wakeLockService.release();
           soundService.playComplete();
           this.callbacks.onAllCompleted?.();
@@ -426,7 +440,16 @@ export class TransferEngine {
     });
   }
 
+  private handleConnectionLost() {
+    if (!this.isActive) {
+      return;
+    }
+    this.stop();
+    this.callbacks.onError?.('Connection to peer lost');
+  }
+
   private stop() {
+    this.isActive = false;
     this.isCancelled = true;
     wakeLockService.release();
     if (this.currentWriter) {
