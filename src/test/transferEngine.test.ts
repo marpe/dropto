@@ -36,40 +36,62 @@ class MockDataConnection {
   }
 }
 
+function createConnectedPair() {
+  const senderConn = new MockDataConnection();
+  const receiverConn = new MockDataConnection();
+  senderConn.otherEnd = receiverConn;
+  receiverConn.otherEnd = senderConn;
+  return { senderConn, receiverConn };
+}
+
+function createTestFile(sizeBytes: number, name = 'test-video.mp4'): TransferFile {
+  const fileBytes = new Uint8Array(sizeBytes);
+  for (let i = 0; i < fileBytes.length; i++) {
+    fileBytes[i] = (i * 17) & 0xff;
+  }
+  const rawFile = new File([fileBytes], name, { type: 'video/mp4' });
+  return {
+    id: name,
+    name,
+    size: rawFile.size,
+    type: rawFile.type,
+    rawFile,
+    chunkSize: 64 * 1024,
+    totalChunks: Math.ceil(rawFile.size / (64 * 1024)),
+    status: 'pending',
+    bytesTransferred: 0,
+  };
+}
+
+async function waitFor(condition: () => boolean, timeoutMs = 5000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (condition()) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  return condition();
+}
+
+function countSentMessages(conn: MockDataConnection, type: string): number {
+  return (conn.send as ReturnType<typeof vi.fn>).mock.calls.filter(
+    ([data]) => typeof data === 'string' && JSON.parse(data).type === type
+  ).length;
+}
+
 describe('TransferEngine Full Protocol Flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
   it('completes full transfer from sender to receiver with checksum verification', async () => {
-    const senderConn = new MockDataConnection();
-    const receiverConn = new MockDataConnection();
-    senderConn.otherEnd = receiverConn;
-    receiverConn.otherEnd = senderConn;
-
+    const { senderConn, receiverConn } = createConnectedPair();
     const senderEngine = new TransferEngine();
     const receiverEngine = new TransferEngine();
 
-    // Create a 150KB dummy file (spans 3 x 64KB chunks)
-    const fileBytes = new Uint8Array(150 * 1024);
-    for (let i = 0; i < fileBytes.length; i++) {
-      fileBytes[i] = (i * 17) & 0xff;
-    }
-    const testFile = new File([fileBytes], 'test-video.mp4', { type: 'video/mp4' });
-
-    const filesToSend: TransferFile[] = [
-      {
-        id: 'file-1',
-        name: testFile.name,
-        size: testFile.size,
-        type: testFile.type,
-        rawFile: testFile,
-        chunkSize: 64 * 1024,
-        totalChunks: Math.ceil(testFile.size / (64 * 1024)),
-        status: 'pending',
-        bytesTransferred: 0,
-      },
-    ];
+    // 150KB spans 3 x 64KB chunks
+    const filesToSend = [createTestFile(150 * 1024)];
 
     let manifestReceived = false;
     let transferCompleted = false;
@@ -99,23 +121,104 @@ describe('TransferEngine Full Protocol Flow', () => {
     // Start Sender transfer
     await senderEngine.startSenderTransfer(filesToSend, false);
 
-    // Wait for the asynchronous transfer exchange to complete
-    await new Promise<void>((resolve) => {
-      const interval = setInterval(() => {
-        if (transferCompleted) {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 50);
-
-      setTimeout(() => {
-        clearInterval(interval);
-        resolve();
-      }, 5000);
-    });
+    await waitFor(() => transferCompleted);
 
     expect(manifestReceived).toBe(true);
     expect(transferCompleted).toBe(true);
     expect(verifiedResult).toBe(true);
+  });
+
+  it('notifies the sender once the receiver has verified the last file', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+    });
+
+    const senderFileResults: [number, boolean][] = [];
+    let senderCompleted = false;
+    senderEngine.init(senderConn as any, true, {
+      onFileComplete: (idx, verified) => {
+        senderFileResults.push([idx, verified]);
+      },
+      onAllCompleted: () => {
+        senderCompleted = true;
+      },
+    });
+
+    await senderEngine.startSenderTransfer([createTestFile(150 * 1024)], false);
+
+    expect(await waitFor(() => senderCompleted)).toBe(true);
+    expect(senderFileResults).toEqual([[0, true]]);
+  });
+
+  it('completes the sender only after the last of several files is acknowledged', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+    });
+
+    const senderEvents: string[] = [];
+    senderEngine.init(senderConn as any, true, {
+      onFileComplete: (idx) => {
+        senderEvents.push(`file:${idx}`);
+      },
+      onAllCompleted: () => {
+        senderEvents.push('all');
+      },
+    });
+
+    await senderEngine.startSenderTransfer(
+      [createTestFile(100 * 1024, 'a.bin'), createTestFile(70 * 1024, 'b.bin')],
+      false
+    );
+
+    expect(await waitFor(() => senderEvents.includes('all'))).toBe(true);
+    expect(senderEvents).toEqual(['file:0', 'file:1', 'all']);
+  });
+});
+
+describe('TransferEngine cancellation', () => {
+  it('notifies the sender when the receiver cancels', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+
+    let senderCancelled = false;
+    senderEngine.init(senderConn as any, true, {
+      onCancelled: () => {
+        senderCancelled = true;
+      },
+    });
+    receiverEngine.init(receiverConn as any, false, {});
+
+    receiverEngine.cancel();
+
+    expect(await waitFor(() => senderCancelled, 500)).toBe(true);
+  });
+
+  it('does not echo a cancel back to the peer that sent it', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    vi.spyOn(senderConn, 'send');
+    vi.spyOn(receiverConn, 'send');
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    senderEngine.init(senderConn as any, true, {});
+    receiverEngine.init(receiverConn as any, false, {});
+
+    receiverEngine.cancel();
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(countSentMessages(receiverConn, 'TRANSFER_CANCEL')).toBe(1);
+    expect(countSentMessages(senderConn, 'TRANSFER_CANCEL')).toBe(0);
   });
 });
