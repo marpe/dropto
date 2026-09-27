@@ -42,7 +42,7 @@ describe('ReceiverView Component UI & Interaction', () => {
       />
     );
 
-    const connectBtn = screen.getByRole('button', { name: /connect & download/i });
+    const connectBtn = screen.getByTestId('connect');
     expect(connectBtn).toBeDefined();
     fireEvent.click(connectBtn);
     expect(onConnect).toHaveBeenCalledTimes(1);
