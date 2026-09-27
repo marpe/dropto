@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TransferEngine } from '../services/transferEngine';
+import type { TransferResult } from '../services/transferEngine';
 import type { TransferFile } from '../types/transfer';
 import { clearFilePickers, createMockDirectoryTree } from './utils/mockFileSystem';
 
@@ -15,6 +16,8 @@ class MockDataConnection {
 
   private listeners: Record<string, ((data: any) => void)[]> = {};
   public otherEnd: MockDataConnection | null = null;
+  /** Optional hook to corrupt data in flight */
+  public tamper: ((data: any) => any) | null = null;
 
   public on(event: string, callback: (data: any) => void) {
     if (!this.listeners[event]) this.listeners[event] = [];
@@ -22,9 +25,10 @@ class MockDataConnection {
   }
 
   public send(data: any) {
+    const delivered = this.tamper ? this.tamper(data) : data;
     if (this.otherEnd) {
       setTimeout(() => {
-        this.otherEnd?.emit('data', data);
+        this.otherEnd?.emit('data', delivered);
       }, 0);
     }
   }
@@ -444,6 +448,69 @@ describe('TransferEngine multi-file receive', () => {
       writables[path].write.mock.calls.reduce((acc: number, call: unknown[]) => acc + (call[0] as Uint8Array).byteLength, 0);
     expect(bytesWritten('album/a.bin')).toBe(100 * 1024);
     expect(bytesWritten('album/raw/b.bin')).toBe(70 * 1024);
+  });
+});
+
+describe('TransferEngine integrity verification', () => {
+  const HEADER_SIZE = 16;
+
+  /** Flips the first payload byte of the first binary chunk only. */
+  function corruptFirstChunk() {
+    let corrupted = false;
+    return (data: any) => {
+      if (corrupted || !(data instanceof ArrayBuffer)) {
+        return data;
+      }
+      corrupted = true;
+      const copy = new Uint8Array(data.slice(0));
+      copy[HEADER_SIZE] ^= 0xff;
+      return copy.buffer;
+    };
+  }
+
+  async function runTransfer(files: TransferFile[], tamper: ((data: any) => any) | null) {
+    const { senderConn, receiverConn } = createConnectedPair();
+    senderConn.tamper = tamper;
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    let receiverResult: TransferResult | null = null;
+    let senderResult: TransferResult | null = null;
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+      onAllCompleted: (result) => {
+        receiverResult = result;
+      },
+    });
+    senderEngine.init(senderConn as any, true, {
+      onAllCompleted: (result) => {
+        senderResult = result;
+      },
+    });
+
+    await senderEngine.startSenderTransfer(files, false);
+    await waitFor(() => receiverResult !== null && senderResult !== null);
+    return { receiverResult, senderResult };
+  }
+
+  it('reports corrupted files to both sides when a checksum does not match', async () => {
+    const files = [
+      { ...createTestFile(70 * 1024, 'a.bin'), relativePath: 'album/a.bin' },
+      createTestFile(70 * 1024, 'b.bin'),
+    ];
+
+    const { receiverResult, senderResult } = await runTransfer(files, corruptFirstChunk());
+
+    expect(receiverResult).toEqual({ corruptedFiles: ['album/a.bin'] });
+    expect(senderResult).toEqual({ corruptedFiles: ['album/a.bin'] });
+  });
+
+  it('reports no corrupted files when every checksum matches', async () => {
+    const { receiverResult, senderResult } = await runTransfer([createTestFile(70 * 1024)], null);
+
+    expect(receiverResult).toEqual({ corruptedFiles: [] });
+    expect(senderResult).toEqual({ corruptedFiles: [] });
   });
 });
 

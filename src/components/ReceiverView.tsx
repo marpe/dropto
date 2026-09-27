@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { DownloadCloud, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, HardDriveDownload } from 'lucide-react';
+import React, { useState } from 'react';
+import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, HardDriveDownload } from 'lucide-react';
 import type { TransferManifest, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
-import { fireCelebration } from '../services/confetti';
+import { TransferCompleteCard } from './TransferCompleteCard';
 
 interface ReceiverViewProps {
   roomCode: string;
@@ -20,6 +20,7 @@ interface ReceiverViewProps {
   isPaused: boolean;
   errorMessage: string | null;
   isNativeFSA: boolean;
+  corruptedFiles: string[];
 }
 
 export const ReceiverView: React.FC<ReceiverViewProps> = ({
@@ -37,15 +38,10 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   isPaused,
   errorMessage,
   isNativeFSA,
+  corruptedFiles,
 }) => {
   const [pinRequiredBySender] = useState(false);
   const [isPreparingSave, setIsPreparingSave] = useState(false);
-
-  useEffect(() => {
-    if (connectionState === 'completed') {
-      fireCelebration();
-    }
-  }, [connectionState]);
 
   const handleStartSaveClick = async () => {
     setIsPreparingSave(true);
@@ -80,23 +76,13 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           </div>
         )
       ) : connectionState === 'completed' ? (
-        <div className="rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl animate-fade-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] flex items-center justify-center animate-bounce">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-            Download Complete & Verified!
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-            All files were written directly to disk and verified with cryptographic checksums.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2.5 rounded-xl font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
-          >
-            Receive More Files
-          </button>
-        </div>
+        <TransferCompleteCard
+          successTitle="Download Complete & Verified!"
+          successDescription="All files were written directly to disk and verified with CRC-32 checksums."
+          actionLabel="Receive More Files"
+          onAction={() => window.location.reload()}
+          corruptedFiles={corruptedFiles}
+        />
       ) : manifest ? (
         /* Manifest Received - Ready to Choose Save Location */
         <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">

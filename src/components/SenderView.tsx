@@ -1,11 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock, Sparkles } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock } from 'lucide-react';
 import type { TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { QrModal } from './QrModal';
 import { PeerApprovalModal } from './PeerApprovalModal';
-import { fireCelebration } from '../services/confetti';
+import { TransferCompleteCard } from './TransferCompleteCard';
 
 interface SenderViewProps {
   roomCode: string;
@@ -21,6 +21,7 @@ interface SenderViewProps {
   onCancelTransfer: () => void;
   pin: string;
   onPinChange: (newPin: string) => void;
+  corruptedFiles: string[];
 }
 
 export const SenderView: React.FC<SenderViewProps> = ({
@@ -37,6 +38,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
   onCancelTransfer,
   pin,
   onPinChange,
+  corruptedFiles,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -50,12 +52,6 @@ export const SenderView: React.FC<SenderViewProps> = ({
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}?room=${roomCode}`
     : '';
-
-  useEffect(() => {
-    if (transferState === 'completed') {
-      fireCelebration();
-    }
-  }, [transferState]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -121,23 +117,13 @@ export const SenderView: React.FC<SenderViewProps> = ({
           />
         )
       ) : transferState === 'completed' ? (
-        <div className="rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl animate-fade-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] flex items-center justify-center animate-bounce">
-            <Sparkles className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
-            Transfer Complete!
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-            All {files.length} files ({formatBytes(totalSize)}) transferred and verified successfully.
-          </p>
-          <button
-            onClick={onClearFiles}
-            className="px-6 py-2.5 rounded-xl font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
-          >
-            Send More Files
-          </button>
-        </div>
+        <TransferCompleteCard
+          successTitle="Transfer Complete!"
+          successDescription={`All ${files.length} files (${formatBytes(totalSize)}) transferred and verified successfully.`}
+          actionLabel="Send More Files"
+          onAction={onClearFiles}
+          corruptedFiles={corruptedFiles}
+        />
       ) : (
         <>
           {/* File Selection Dropzone with Floating Animation */}

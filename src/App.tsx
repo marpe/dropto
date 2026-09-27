@@ -75,6 +75,7 @@ export const App: React.FC = () => {
   >('idle');
   const [metrics, setMetrics] = useState<TransferMetrics | null>(null);
   const [isPaused, setIsPaused] = useState(false);
+  const [corruptedFiles, setCorruptedFiles] = useState<string[]>([]);
 
   const isNativeFSA = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 
@@ -130,7 +131,8 @@ export const App: React.FC = () => {
                 onMetrics: (m) => setMetrics({ ...m }),
                 onFileStart: (_f, _idx) => {},
                 onFileComplete: (_idx, _verified) => {},
-                onAllCompleted: () => {
+                onAllCompleted: (result) => {
+                  setCorruptedFiles(result.corruptedFiles);
                   setTransferState('completed');
                   wakeLockService.release();
                 },
@@ -208,6 +210,7 @@ export const App: React.FC = () => {
     setSenderFiles([]);
     setTransferState('waiting');
     setMetrics(null);
+    setCorruptedFiles([]);
   };
 
   // Receiver Connect
@@ -230,12 +233,8 @@ export const App: React.FC = () => {
             setManifest({ ...(transferEngine as any).manifest });
           }
         },
-        onFileComplete: (_idx, verified) => {
-          if (!verified) {
-            console.warn('Checksum mismatch on downloaded file');
-          }
-        },
-        onAllCompleted: () => {
+        onAllCompleted: (result) => {
+          setCorruptedFiles(result.corruptedFiles);
           setReceiverState('completed');
           wakeLockService.release();
         },
@@ -349,6 +348,7 @@ export const App: React.FC = () => {
               onCancelTransfer={handleCancelTransfer}
               pin={senderPin}
               onPinChange={setSenderPin}
+              corruptedFiles={corruptedFiles}
             />
           ) : (
             <ReceiverView
@@ -366,6 +366,7 @@ export const App: React.FC = () => {
               isPaused={isPaused}
               errorMessage={errorMessage}
               isNativeFSA={isNativeFSA}
+              corruptedFiles={corruptedFiles}
             />
           )}
         </div>
