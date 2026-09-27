@@ -198,6 +198,9 @@ export class TransferEngine {
     this.receivedBytesForFile = 0;
     this.receiverChecksum.reset();
 
+    // Immediately emit initial metrics so UI switches to metrics dashboard
+    this.emitMetrics(fileMeta.name, 0);
+
     try {
       this.currentWriter = createStorageWriter();
       const prepared = await this.currentWriter.prepare(fileMeta.name, fileMeta.size);
@@ -250,18 +253,37 @@ export class TransferEngine {
   // =================== PROTOCOL CONTROL FRAMES ===================
 
   private async handleIncomingData(data: any) {
+    let buffer: ArrayBuffer | null = null;
+
     if (data instanceof ArrayBuffer) {
-      await this.handleBinaryChunk(data);
+      buffer = data;
+    } else if (data instanceof Uint8Array) {
+      buffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+    } else if (ArrayBuffer.isView(data)) {
+      const view = data as ArrayBufferView;
+      buffer = view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) as ArrayBuffer;
+    } else if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    }
+
+    if (buffer) {
+      await this.handleBinaryChunk(buffer);
       return;
     }
 
+    let msg: ProtocolMessage | null = null;
     if (typeof data === 'string') {
       try {
-        const msg = JSON.parse(data) as ProtocolMessage;
-        this.handleControlMessage(msg);
+        msg = JSON.parse(data) as ProtocolMessage;
       } catch (err) {
         console.warn('Failed to parse protocol JSON message:', err);
       }
+    } else if (typeof data === 'object' && data !== null && 'type' in data) {
+      msg = data as ProtocolMessage;
+    }
+
+    if (msg) {
+      this.handleControlMessage(msg);
     }
   }
 

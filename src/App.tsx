@@ -49,6 +49,10 @@ export const App: React.FC = () => {
   const [senderRoomCode, setSenderRoomCode] = useState<string>('');
   const [senderFiles, setSenderFiles] = useState<TransferFile[]>([]);
   const [senderPin, setSenderPin] = useState<string>('');
+  const senderFilesRef = React.useRef<TransferFile[]>(senderFiles);
+  senderFilesRef.current = senderFiles;
+  const senderPinRef = React.useRef<string>(senderPin);
+  senderPinRef.current = senderPin;
   const [connectedPeerId, setConnectedPeerId] = useState<string | null>(null);
   const [pendingPeer, setPendingPeer] = useState<{
     peerId: string;
@@ -138,8 +142,8 @@ export const App: React.FC = () => {
                 onPaused: (paused) => setIsPaused(paused),
               });
 
-              // Start transferring selected files
-              transferEngine.startSenderTransfer(senderFiles, !!senderPin);
+              // Start transferring selected files using current ref
+              transferEngine.startSenderTransfer(senderFilesRef.current, !!senderPinRef.current);
             },
             reject: () => {
               setPendingPeer(null);

@@ -89,11 +89,17 @@ export class WebRtcService {
           reliable: true,
         });
 
-        conn.on('open', () => {
+        if (conn.open) {
           this.activeConn = conn;
           this.handlers.onConnected?.(conn);
           resolve(conn);
-        });
+        } else {
+          conn.on('open', () => {
+            this.activeConn = conn;
+            this.handlers.onConnected?.(conn);
+            resolve(conn);
+          });
+        }
 
         conn.on('close', () => {
           this.handlers.onDisconnected?.();
@@ -119,10 +125,15 @@ export class WebRtcService {
   }
 
   private handleIncomingConnection(conn: DataConnection) {
-    conn.on('open', () => {
+    if (conn.open) {
       this.activeConn = conn;
       this.handlers.onIncomingConnection?.(conn);
-    });
+    } else {
+      conn.on('open', () => {
+        this.activeConn = conn;
+        this.handlers.onIncomingConnection?.(conn);
+      });
+    }
 
     conn.on('close', () => {
       this.activeConn = null;
