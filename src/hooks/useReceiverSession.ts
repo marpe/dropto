@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { soundService } from '../services/sound';
+import { describePeerError } from '../services/peerErrors';
 import type {
   AppSettings,
   PinPrompt,
@@ -231,12 +232,12 @@ export function useReceiverSession({
       engineRef.current = engine;
       soundService.playConnect();
       dispatch({ type: 'CONNECTED' });
-    } catch (err: any) {
+    } catch (err) {
       if (connectionRef.current === connection) {
         teardown();
         dispatch({
           type: 'CONNECT_FAILED',
-          error: err?.message || 'Failed to connect to the room. Check the room code.',
+          error: describePeerError(err),
         });
       }
     }
