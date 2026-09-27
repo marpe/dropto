@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { Server, Volume2, Plus, Radio } from 'lucide-react';
+import { Server, Volume2, Plus, Radio, Palette, Monitor, Sun, Moon, Info } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { TextInput } from './ui/TextInput';
+import { SegmentedControl } from './ui/SegmentedControl';
+import type { SegmentOption } from './ui/SegmentedControl';
+import { AboutInfo } from './AboutInfo';
+import type { ThemePreference } from '../hooks/useTheme';
 import type { AppSettings, IceServerConfig } from '../types/transfer';
 import { IceServerRow } from './IceServerRow';
 
@@ -11,7 +15,16 @@ interface SettingsModalProps {
   onClose: () => void;
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
+  themePreference: ThemePreference;
+  /** Applied immediately (not part of the saved draft) so the choice can be previewed */
+  onThemeChange: (preference: ThemePreference) => void;
 }
+
+const THEME_OPTIONS: SegmentOption<ThemePreference>[] = [
+  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+];
 
 const RELAY_URL = /^(stun|turns?):\S+$/i;
 
@@ -85,7 +98,13 @@ const LabeledField: React.FC<LabeledFieldProps> = ({ label, children }) => (
 );
 
 /** Mounted fresh on each open, so unsaved edits are discarded on cancel. */
-export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, onSave }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  onClose,
+  settings,
+  onSave,
+  themePreference,
+  onThemeChange,
+}) => {
   const [form, setForm] = useState<AppSettings>(settings);
   const [showRelayErrors, setShowRelayErrors] = useState(false);
 
@@ -117,6 +136,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings,
       </div>
 
       <form onSubmit={handleSave} className="space-y-5 pt-4">
+        <SettingsSection icon={Palette} title="Appearance">
+          <SegmentedControl options={THEME_OPTIONS} value={themePreference} onChange={onThemeChange} className="w-full" />
+        </SettingsSection>
+
         <SettingsSection icon={Volume2} title="General">
           <SettingToggle
             label="Audio Chimes on Completion"
@@ -203,6 +226,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings,
             <Plus className="w-3.5 h-3.5" />
             Add relay server
           </Button>
+        </SettingsSection>
+
+        <SettingsSection icon={Info} title="About">
+          <AboutInfo />
         </SettingsSection>
 
         <div className="pt-2 flex items-center justify-end gap-3">

@@ -61,7 +61,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
           />
           <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Drag & Drop files or directories here</h3>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
-            Up to 10GB+ per file. Direct WebRTC streaming with zero cloud storage.
+            Files or whole folders, any size.
           </p>
         </>
       )}

@@ -7,9 +7,18 @@ import type { AppSettings } from '../types/transfer';
 function renderSettings(settings: AppSettings = DEFAULT_SETTINGS) {
   const onSave = vi.fn();
   const onClose = vi.fn();
-  render(<SettingsModal onClose={onClose} settings={settings} onSave={onSave} />);
+  const onThemeChange = vi.fn();
+  render(
+    <SettingsModal
+      onClose={onClose}
+      settings={settings}
+      onSave={onSave}
+      themePreference="system"
+      onThemeChange={onThemeChange}
+    />
+  );
   const save = () => fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
-  return { onSave, onClose, save };
+  return { onSave, onClose, onThemeChange, save };
 }
 
 describe('SettingsModal relay servers', () => {
@@ -69,5 +78,14 @@ describe('SettingsModal relay servers', () => {
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a theme choice straight away, without saving', () => {
+    const { onThemeChange, onSave } = renderSettings();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dark' }));
+
+    expect(onThemeChange).toHaveBeenCalledWith('dark');
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

@@ -2,38 +2,31 @@ import { test, expect } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
 
 test.describe('DropWave Application End-to-End Tests', () => {
-  test('renders homepage, toggles themes, and opens settings', async ({ page }) => {
+  test('landing page: drop area, receive-by-code link, settings with theme and about', async ({ page }) => {
     await page.goto('/');
 
-    // Check title and branding
     await expect(page).toHaveTitle(/DropWave/i);
     await expect(page.locator('text=DropWave').first()).toBeVisible();
-    await expect(page.locator('text=10GB P2P')).toBeVisible();
+    await expect(page.locator('header')).toHaveCount(0);
+    await expect(page.locator('footer')).toHaveCount(0);
+    await expect(page.getByText('Drag & Drop files or directories here')).toBeVisible();
+    await expect(page.getByText(/No account · Nothing stored/)).toBeVisible();
 
-    // Verify Send / Receive tabs
-    const sendTab = page.locator('button:has-text("Send Files")');
-    const receiveTab = page.locator('button:has-text("Receive Files")');
-    await expect(sendTab).toBeVisible();
-    await expect(receiveTab).toBeVisible();
+    // Receiving by code is one click away, and there is a way back
+    await page.getByRole('button', { name: /receive files/i }).click();
+    await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
+    await page.getByRole('button', { name: /send files instead/i }).click();
+    await expect(page.getByText('Drag & Drop files or directories here')).toBeVisible();
 
-    // Toggle theme
-    const themeBtn = page.locator('button[title*="mode"]');
-    await themeBtn.click();
-    // Re-click to restore
-    await themeBtn.click();
-
-    // Verify GitHub repository links in header and footer
-    const githubLinks = page.locator('a[href="https://github.com/marpe/send"]');
-    await expect(githubLinks.first()).toBeVisible();
-    await expect(githubLinks.first()).toHaveAttribute('target', '_blank');
-
-    // Open settings modal
-    const settingsBtn = page.locator('button[title*="Settings"]');
-    await settingsBtn.click();
+    await page.getByTitle('Settings').click();
     await expect(page.locator('text=Transfer & Network Settings')).toBeVisible();
-    await expect(page.locator('text=Signaling Server')).toBeVisible();
+    await page.getByRole('button', { name: 'Dark' }).click();
+    await expect(page.locator('html')).toHaveClass(/dark/);
+    await page.getByRole('button', { name: 'Light' }).click();
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+    const githubLink = page.locator('a[href="https://github.com/marpe/send"]');
+    await expect(githubLink).toHaveAttribute('target', '_blank');
 
-    // Close settings modal
     await page.locator('button:has-text("Cancel")').click();
     await expect(page.locator('text=Transfer & Network Settings')).not.toBeVisible();
   });
@@ -43,7 +36,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await page.goto('/?brand=dropto');
 
     await expect(page).toHaveTitle('dropto.space — 10GB P2P WebRTC Transfer');
-    await expect(page.locator('header').getByText('dropto.space', { exact: true })).toBeVisible();
+    await expect(page.getByText('dropto.space', { exact: true }).first()).toBeVisible();
     await expect(page.locator('text=DropWave')).toHaveCount(0);
     await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon-dropto.svg');
     const brand500 = await page.evaluate(() =>

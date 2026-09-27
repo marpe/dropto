@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { AlertCircle, Link2 } from 'lucide-react';
+import { AlertCircle, ArrowRight, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { IconBadge } from './ui/IconBadge';
+import { LinkButton } from './ui/LinkButton';
 import { Notice } from './ui/Notice';
 import { StatusCard } from './ui/StatusCard';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
@@ -37,6 +38,8 @@ interface SenderViewProps {
   errorMessage: string | null;
   onDismissError: () => void;
   onRetryRoom: () => void;
+  /** Offered on the landing page, for when the sender can only read out a room code */
+  onSwitchToReceive?: () => void;
 }
 
 export const SenderView: React.FC<SenderViewProps> = ({
@@ -61,12 +64,14 @@ export const SenderView: React.FC<SenderViewProps> = ({
   errorMessage,
   onDismissError,
   onRetryRoom,
+  onSwitchToReceive,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   const shareUrl = roomCode && shareKey ? buildShareUrl(window.location.href, roomCode, shareKey) : '';
   const isAwaitingReceiver = transferState === 'awaiting_receiver';
   const hasRoomError = !roomCode && !!errorMessage;
+  const isLanding = files.length === 0 && !isAwaitingReceiver && !pendingPeerId;
 
   if (transferState === 'transferring') {
     return (
@@ -132,6 +137,20 @@ export const SenderView: React.FC<SenderViewProps> = ({
       )}
 
       <FileDropZone onAddFiles={onAddFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />
+
+      {isLanding && (
+        <div className="text-center space-y-4">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            No account · Nothing stored · Straight from your device to theirs
+          </p>
+          {onSwitchToReceive && (
+            <LinkButton onClick={onSwitchToReceive}>
+              Got a code? Receive files
+              <ArrowRight className="w-4 h-4" />
+            </LinkButton>
+          )}
+        </div>
+      )}
 
       {files.length > 0 && <FileQueue files={files} onRemoveFile={onRemoveFile} onClearFiles={onClearFiles} />}
 
