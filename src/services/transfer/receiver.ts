@@ -135,10 +135,9 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.expectedChunkIndex++;
     this.receivedBytesForFile += payload.length;
 
-    this.metrics?.recordBytes(payload.length);
-    this.emitMetrics(
-      this.metrics?.snapshot(this.selection.indexOf(fileIndex), file.name, (this.receivedBytesForFile / file.size) * 100)
-    );
+    const position = this.selection.indexOf(fileIndex);
+    this.metrics?.recordBytes(payload.length, position);
+    this.emitMetrics(this.metrics?.snapshot(position, file.name, (this.receivedBytesForFile / file.size) * 100));
   }
 
   protected onStop() {

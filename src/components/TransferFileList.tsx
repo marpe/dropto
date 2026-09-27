@@ -5,7 +5,7 @@ import { ProgressBar } from './ui/ProgressBar';
 import type { ManifestFile } from '../types/transfer';
 import type { FileProgress } from '../utils/transferProgress';
 import { displayPath } from '../utils/filePath';
-import { formatBytes } from '../utils/format';
+import { formatBytes, formatDuration } from '../utils/format';
 import { cn } from '../utils/cn';
 
 interface TransferFileListProps {
@@ -17,6 +17,14 @@ interface TransferFileListProps {
 interface TransferFileRowProps {
   file: ManifestFile;
   progress: FileProgress;
+}
+
+/** How long a file took; anything under a second is just "<1s". */
+function formatFileTime(seconds: number | null): string {
+  if (seconds === null) {
+    return '';
+  }
+  return seconds < 1 ? '<1s' : formatDuration(Math.round(seconds));
 }
 
 const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => (
@@ -41,18 +49,27 @@ const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => 
       {displayPath(file)}
     </span>
     <span className="shrink-0 font-mono tabular-nums text-text-5">{formatBytes(file.size)}</span>
-    <span className="shrink-0 w-24 flex items-center justify-end gap-1.5">
+    <span className="shrink-0 w-28 flex items-center justify-end gap-1.5">
       {progress.status === 'active' && (
         <>
           <ProgressBar percent={progress.percent} variant="subtle" className="w-14" />
           <span className="font-mono tabular-nums text-brand-500">{Math.round(progress.percent)}%</span>
         </>
       )}
-      {progress.status === 'done' && <CheckCircle2 className="w-4 h-4 text-brand-500" />}
+      {progress.status === 'done' && (
+        <>
+          <ProgressBar percent={100} variant="subtle" className="w-10" />
+          <span className="w-8 text-right tabular-nums text-text-4">{formatFileTime(progress.seconds)}</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-brand-500" />
+        </>
+      )}
       {progress.status === 'corrupted' && (
         <>
           <AlertTriangle className="w-4 h-4 text-amber-500" />
           <span className="text-text-warning-1 font-semibold">Corrupted</span>
+          {progress.seconds !== null && (
+            <span className="tabular-nums text-text-4">{formatFileTime(progress.seconds)}</span>
+          )}
         </>
       )}
       {progress.status === 'pending' && <span className="text-text-5">Waiting</span>}

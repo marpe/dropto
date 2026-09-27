@@ -33,7 +33,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({ percent, isIdle = fa
             // A round cap would still draw a dot at 0%
             'fill-none transition-[stroke-dashoffset,stroke,opacity] duration-500 ease-out',
             clamped === 0 && 'opacity-0',
-            isIdle ? 'stroke-text-5' : 'stroke-brand-500 drop-shadow-[0_0_6px_var(--color-brand-500)]'
+            isIdle ? 'stroke-text-5' : 'stroke-brand-500'
           )}
         />
       </svg>

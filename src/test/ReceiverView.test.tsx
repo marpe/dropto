@@ -238,6 +238,7 @@ describe('ReceiverView Component UI & Interaction', () => {
       totalFiles: 1,
       currentFileName: 'archive.zip',
       currentFilePercent: 50,
+      fileSeconds: [],
     };
 
     render(

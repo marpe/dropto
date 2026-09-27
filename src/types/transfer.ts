@@ -89,6 +89,8 @@ export interface TransferMetrics {
   totalFiles: number;
   currentFileName: string;
   currentFilePercent: number;
+  /** Seconds from each file's first byte to its last, by position in the transfer; kept once a file is done */
+  fileSeconds: number[];
 }
 
 /** Events a transfer reports to the UI; shared by the sender and receiver. */
