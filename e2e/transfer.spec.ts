@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, newLocalContext, LOCAL_PEER_SERVER_PORT } from './fixtures';
 import type { Browser, Page } from '@playwright/test';
 
 test.describe('DropWave Application End-to-End Tests', () => {
@@ -109,11 +109,20 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
   test('typed room code: sender accepts, receiver saves, both verify', async ({ browser }) => {
     const { senderPage, receiverPage, close } = await openPeers(browser);
+    const signallingUrls: string[] = [];
+    // Vite's HMR socket is also a WebSocket; PeerJS signalling connects to /peerjs
+    senderPage.on('websocket', (socket) => {
+      if (socket.url().includes('/peerjs')) {
+        signallingUrls.push(socket.url());
+      }
+    });
 
     await senderPage.goto('/');
     await addFile(senderPage, 'sample-dataset.dat', 'Simulated 10GB dataset test buffer payload.');
     await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
     const roomCode = await readRoomCode(senderPage);
+    expect(signallingUrls.every((url) => url.includes(`localhost:${LOCAL_PEER_SERVER_PORT}`))).toBe(true);
+    expect(signallingUrls.length).toBeGreaterThan(0);
 
     // No #key: the room code alone must still need the sender's approval
     await receiverPage.goto(`/?room=${roomCode}`);
@@ -225,8 +234,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
 /** Two isolated browser contexts; the receiver's file pickers are stubbed to write nowhere. */
 async function openPeers(browser: Browser) {
-  const senderContext = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
-  const receiverContext = await browser.newContext();
+  const senderContext = await newLocalContext(browser, { permissions: ['clipboard-read', 'clipboard-write'] });
+  const receiverContext = await newLocalContext(browser);
   const senderPage = await senderContext.newPage();
   const receiverPage = await receiverContext.newPage();
   await receiverPage.addInitScript(() => {

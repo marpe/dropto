@@ -18,7 +18,7 @@ npm run test:e2e     # Playwright (Chromium); starts/reuses the dev server
 
 - Single unit test file / test: `npx vitest run src/test/transfer.test.ts -t "PIN"`
 - Single e2e test: `npx playwright test -g "PIN-protected"`
-- CI (`.github/workflows/ci.yml`) runs lint, unit tests and build. E2E is not in CI: its two-browser tests do real WebRTC through the public PeerJS server.
+- CI (`.github/workflows/ci.yml`) runs lint, unit tests and build, plus an e2e job. Playwright starts Vite and a local PeerServer (`npx peerjs --port 9000`, the `peer` dev dependency); `e2e/fixtures.ts` stores settings pointing every test browser at it, so e2e needs no internet. Import `test`/`expect` from `./fixtures`, and create extra browser contexts with `newLocalContext()`.
 - Node `^20.19.0 || >=22.12.0`.
 
 ## Architecture
