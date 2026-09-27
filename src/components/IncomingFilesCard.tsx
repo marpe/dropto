@@ -99,7 +99,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         )}
       </div>
 
-      <ul className="p-3 bg-surface-2 rounded-2xl border border-border-2 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2">
+      <ul className="p-3 bg-surface-2 rounded-2xl border border-border-2 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2 scroll-fade [--scroll-fade-color:var(--color-surface-2)]">
         {manifest.files.map((file) => (
           <IncomingFileRow
             key={file.id}

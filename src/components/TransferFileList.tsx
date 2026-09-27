@@ -62,7 +62,7 @@ const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => 
 
 /** Every file in a transfer with where it stands: waiting, in progress, done or corrupted. */
 export const TransferFileList: React.FC<TransferFileListProps> = ({ files, progress, className }) => (
-  <ul className={cn('max-h-56 overflow-y-auto overscroll-contain space-y-1 text-left', className)}>
+  <ul className={cn('scroll-fade max-h-56 overflow-y-auto overscroll-contain space-y-1 text-left', className)}>
     {files.map((file, index) => (
       <TransferFileRow key={file.id} file={file} progress={progress[index] ?? { status: 'pending' }} />
     ))}
