@@ -15,8 +15,6 @@ function manifestFile(name: string, relativePath?: string): ManifestFile {
     size: 1024,
     type: 'application/octet-stream',
     relativePath,
-    chunkSize: 64 * 1024,
-    totalChunks: 1,
   };
 }
 

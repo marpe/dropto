@@ -5,7 +5,6 @@ import type { TransferManifest, TransferMetrics } from '../types/transfer';
 
 describe('ReceiverView Component UI & Interaction', () => {
   const dummyManifest: TransferManifest = {
-    sessionId: 'test-session',
     totalBytes: 1048576,
     files: [
       {
@@ -13,8 +12,6 @@ describe('ReceiverView Component UI & Interaction', () => {
         name: 'archive.zip',
         size: 1048576,
         type: 'application/zip',
-        chunkSize: 65536,
-        totalChunks: 16,
       },
     ],
   };
