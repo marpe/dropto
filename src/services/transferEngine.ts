@@ -19,6 +19,7 @@ export type EngineEventCallback = {
   onAllCompleted?: () => void;
   onError?: (err: string) => void;
   onPaused?: (isPaused: boolean) => void;
+  onCancelled?: () => void;
 };
 
 export class TransferEngine {
@@ -326,6 +327,13 @@ export class TransferEngine {
           this.currentWriter = null;
         }
 
+        this.sendControlMessage({
+          type: 'FILE_ACK',
+          payload: {
+            fileIndex,
+            verified,
+          },
+        });
         this.callbacks.onFileComplete?.(fileIndex, verified);
 
         // Check if there are more files in manifest
@@ -333,6 +341,19 @@ export class TransferEngine {
           // Prepare next file
           this.prepareAndStartReceiverFile(fileIndex + 1);
         } else {
+          wakeLockService.release();
+          soundService.playComplete();
+          this.callbacks.onAllCompleted?.();
+        }
+        break;
+      }
+
+      case 'FILE_ACK': {
+        // Sender receives confirmation that the receiver finalized and verified a file
+        const { fileIndex, verified } = msg.payload;
+        this.callbacks.onFileComplete?.(fileIndex, verified);
+
+        if (fileIndex + 1 >= this.files.length) {
           wakeLockService.release();
           soundService.playComplete();
           this.callbacks.onAllCompleted?.();
@@ -353,7 +374,9 @@ export class TransferEngine {
       }
 
       case 'TRANSFER_CANCEL': {
-        this.cancel();
+        // Peer cancelled: stop locally without echoing the cancel back
+        this.stop();
+        this.callbacks.onCancelled?.();
         break;
       }
 
@@ -382,15 +405,19 @@ export class TransferEngine {
   }
 
   public cancel() {
+    this.stop();
+    this.sendControlMessage({
+      type: 'TRANSFER_CANCEL',
+    });
+  }
+
+  private stop() {
     this.isCancelled = true;
     wakeLockService.release();
     if (this.currentWriter) {
       this.currentWriter.abort();
       this.currentWriter = null;
     }
-    this.sendControlMessage({
-      type: 'TRANSFER_CANCEL',
-    });
   }
 
   private recordSpeed(bytes: number) {

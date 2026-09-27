@@ -140,6 +140,10 @@ export const App: React.FC = () => {
                   wakeLockService.release();
                 },
                 onPaused: (paused) => setIsPaused(paused),
+                onCancelled: () => {
+                  setTransferState('waiting');
+                  setMetrics(null);
+                },
               });
 
               // Start transferring selected files using current ref
@@ -244,6 +248,12 @@ export const App: React.FC = () => {
           wakeLockService.release();
         },
         onPaused: (paused) => setIsPaused(paused),
+        onCancelled: () => {
+          setReceiverState('error');
+          setErrorMessage('The sender cancelled the transfer.');
+          setManifest(null);
+          setMetrics(null);
+        },
       });
     } catch (err: any) {
       setReceiverState('error');
@@ -269,6 +279,7 @@ export const App: React.FC = () => {
     transferEngine.cancel();
     setTransferState('idle');
     setReceiverState('idle');
+    setManifest(null);
     setMetrics(null);
   };
 
