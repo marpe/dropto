@@ -22,8 +22,11 @@
   --color-text-3: #3f3f46;
   --color-text-4: #71717a;
   --color-text-5: #a1a1aa;
-  /* On brand-filled buttons: dark text reads on both the green and the orange brand */
-  --color-text-on-accent: #121212;
+  /* Filled controls (primary buttons, selected segments) and their text. Without contrast-color() support
+     the text colour is set per brand; with it, the browser picks black or white (see the end of this file) */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-text-on-accent: #ffffff;
 
   /* Status */
   --color-text-danger-1: #dc2626;
@@ -31,18 +34,18 @@
   --color-border-danger-1: #fecaca;
   --color-text-warning-1: #d97706;
 
-  /* Brand accent: DropWave green by default, dropto.space orange below */
-  --color-brand-50: #edfcf4;
-  --color-brand-100: #d5f7e6;
-  --color-brand-200: #aef0d1;
-  --color-brand-300: #76e4b4;
-  --color-brand-400: #52d69b;
-  --color-brand-500: #3ecf8e;
-  --color-brand-600: #24b47e;
-  --color-brand-700: #1c8f65;
-  --color-brand-800: #1a7152;
-  --color-brand-900: #175c44;
-  --color-brand-950: #073324;
+  /* Brand accent: DropWave indigo by default, dropto.space orange below */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-brand-950: #1e1b4b;
 
   /* Catppuccin accents for file-type icons: Latte here, Mocha in the dark theme */
   --color-ctp-red: #d20f39;
@@ -65,6 +68,7 @@
   --animate-float: float 3.5s ease-in-out infinite;
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-screen-in: screen-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-pop-in: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 
   @keyframes float {
     0%,
@@ -82,6 +86,17 @@
     }
     to {
       opacity: 1;
+    }
+  }
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    to {
+      opacity: 1;
+      transform: none;
     }
   }
 
@@ -150,8 +165,18 @@
   --scrollbar-track: #121212;
 }
 
+/* Indigo is dark: on dark surfaces DropWave's accent text and icons step one shade lighter to stay readable */
+.dark:not([data-brand='dropto']) {
+  --color-brand-400: #a5b4fc;
+  --color-brand-500: #818cf8;
+  --color-brand-600: #6366f1;
+}
+
 /* dropto.space orange (data-brand is stamped on <html> by the boot script in index.html) */
 :root[data-brand='dropto'] {
+  --color-accent: #f97316;
+  --color-accent-hover: #ea580c;
+  --color-text-on-accent: #121212;
   --color-brand-50: #fff7ed;
   --color-brand-100: #ffedd5;
   --color-brand-200: #fed7aa;
@@ -163,4 +188,12 @@
   --color-brand-800: #9a3412;
   --color-brand-900: #7c2d12;
   --color-brand-950: #431407;
+}
+
+/* Text on filled controls follows the fill: white on indigo, black on orange (Baseline 2026; the per-brand values above are the fallback) */
+@supports (color: contrast-color(red)) {
+  :root,
+  :root[data-brand='dropto'] {
+    --color-text-on-accent: contrast-color(var(--color-accent));
+  }
 }

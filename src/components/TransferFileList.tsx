@@ -23,7 +23,7 @@ const TransferFileRow: React.FC<TransferFileRowProps> = ({ file, progress }) => 
   <li
     data-status={progress.status}
     className={cn(
-      'flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs border [content-visibility:auto] [contain-intrinsic-size:auto_2.25rem]',
+      'flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs border transition-[background-color,border-color] duration-300 [content-visibility:auto] [contain-intrinsic-size:auto_2.25rem]',
       progress.status === 'active'
         ? 'bg-brand-500/5 border-brand-500/30'
         : progress.status === 'corrupted'

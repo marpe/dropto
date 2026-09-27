@@ -22,7 +22,7 @@ export const PinEntryCard: React.FC<PinEntryCardProps> = ({ pin, prompt, onPinCh
   return (
     <StatusCard
       badge={<IconBadge icon={Lock} />}
-      title="This Transfer Is PIN-Protected"
+      title="Enter the PIN"
       description="Ask the sender for the session PIN to see and download the files."
     >
       {prompt.isIncorrect && (
@@ -42,7 +42,7 @@ export const PinEntryCard: React.FC<PinEntryCardProps> = ({ pin, prompt, onPinCh
           value={pin}
           onChange={(e) => onPinChange(e.target.value)}
         />
-        <Button type="submit" size="lg" disabled={!pin} className="w-full motion-safe:hover:scale-[1.02]">
+        <Button type="submit" size="lg" disabled={!pin} className="w-full">
           Unlock
         </Button>
       </form>

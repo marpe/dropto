@@ -12,7 +12,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     // Receiving by code is one click away, and there is a way back
     await page.getByRole('button', { name: /receive files/i }).click();
-    await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
+    await expect(page.getByTestId('room-code-form')).toBeVisible();
     await page.getByRole('button', { name: /send files instead/i }).click();
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
@@ -47,11 +47,11 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await dropOnPage('first.txt');
     await expect(page.getByText('first.txt')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Clear All' }).click();
+    await page.getByRole('button', { name: /clear all/i }).click();
     await page.getByRole('button', { name: /receive files/i }).click();
     await dropOnPage('second.txt');
     await expect(page.getByText('second.txt')).toBeVisible();
-    await expect(page.locator('text=Receive Files via P2P')).toHaveCount(0);
+    await expect(page.getByTestId('room-code-form')).toHaveCount(0);
   });
 
   test('shows dropto.space branding and orange palette for the dropto brand', async ({ page }) => {
@@ -74,7 +74,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await page.goto('/?room=DW-998877');
 
     // Should automatically be in Receive mode with room code pre-filled
-    await expect(page.locator('text=Receive Files via P2P')).toBeVisible();
+    await expect(page.getByTestId('room-code-form')).toBeVisible();
     const roomInput = page.locator('input[placeholder="DW-XXXXXX"]');
     await expect(roomInput).toHaveValue('DW-998877');
     await expect(page.getByTestId('connect')).toBeEnabled();
@@ -128,15 +128,15 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     // No #key: the room code alone must still need the sender's approval
     await receiverPage.goto(`/?room=${roomCode}`);
-    await expect(receiverPage.locator('text=Receive Files via P2P')).toBeVisible();
+    await expect(receiverPage.getByTestId('room-code-form')).toBeVisible();
     await receiverPage.getByTestId('connect').click();
-    await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
+    await expect(receiverPage.getByRole('heading', { name: /waiting for the sender to accept/i })).toBeVisible({
       timeout: 15000,
     });
 
-    await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByTestId('approve-peer')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.getByText('1 file', { exact: true })).toBeVisible();
-    await senderPage.locator('button:has-text("Accept")').click();
+    await senderPage.getByTestId('approve-peer').click();
 
     await expect(receiverPage.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await expect(receiverPage.locator('text=sample-dataset.dat')).toBeVisible();
@@ -146,8 +146,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
-    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
     await close();
   });
 
@@ -155,17 +155,17 @@ test.describe('DropWave Application End-to-End Tests', () => {
     const { senderPage, receiverPage, close } = await openPeers(browser);
 
     await senderPage.goto('/');
-    await expect(senderPage.getByRole('button', { name: 'Copy Link' })).toHaveCount(0);
+    await expect(senderPage.getByRole('button', { name: /copy link/i })).toHaveCount(0);
     await addFile(senderPage, 'first.txt', 'one');
     await shareFiles(senderPage);
     await readRoomCode(senderPage);
-    await senderPage.getByRole('button', { name: 'Copy Link' }).click();
+    await senderPage.getByRole('button', { name: /copy link/i }).click();
     const link = await senderPage.evaluate(() => navigator.clipboard.readText());
     expect(link).toMatch(/\?room=DW-[A-Z0-9]{6}#key=[\w-]{22}$/);
 
     await receiverPage.goto(link);
     await expect(receiverPage.locator('text=first.txt')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.locator('text=Receiver Connection Request')).toHaveCount(0);
+    await expect(senderPage.getByTestId('approve-peer')).toHaveCount(0);
     await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
     // The key must not linger in the address bar or history
     expect(receiverPage.url()).not.toContain('key=');
@@ -178,8 +178,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // Only take the second file
     await receiverPage.getByRole('checkbox', { name: /first.txt/ }).uncheck();
     await receiverPage.getByTestId('start-download').click();
-    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
     // Only the chosen file counts, and the stats stay on screen after the transfer
     await expect(senderPage.getByTestId('stat-files')).toContainText('1');
     await expect(receiverPage.getByTestId('stat-size')).toBeVisible();
@@ -216,16 +216,16 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(senderPage.getByTestId('receiver-row')).toHaveCount(2);
 
     await first.getByTestId('start-download').click();
-    await expect(first.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+    await expect(first.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
 
     // A slot freed up: the next person gets the files without doing anything
     await expect(second.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await second.page.getByTestId('start-download').click();
-    await expect(second.page.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+    await expect(second.page.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
 
     await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(2);
     // The link stays on screen for more people
-    await expect(senderPage.getByRole('button', { name: 'Copy Link' })).toBeVisible();
+    await expect(senderPage.getByRole('button', { name: /copy link/i })).toBeVisible();
     await second.close();
     await close();
   });
@@ -240,15 +240,15 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await receiverPage.goto(`/?room=${roomCode}`);
     await receiverPage.getByTestId('connect').click();
-    await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
+    await expect(receiverPage.getByRole('heading', { name: /waiting for the sender to accept/i })).toBeVisible({
       timeout: 15000,
     });
-    await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByTestId('approve-peer')).toBeVisible({ timeout: 15000 });
 
     await receiverPage.getByRole('button', { name: 'Cancel' }).click();
 
     await expect(receiverPage.locator('input[placeholder="DW-XXXXXX"]')).toBeVisible();
-    await expect(senderPage.locator('text=Receiver Connection Request')).toHaveCount(0, { timeout: 15000 });
+    await expect(senderPage.getByTestId('approve-peer')).toHaveCount(0, { timeout: 15000 });
     await close();
   });
 
@@ -262,10 +262,10 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await receiverPage.goto(`/?room=${roomCode}`);
     await receiverPage.getByTestId('connect').click();
-    await senderPage.locator('button:has-text("Accept")').click({ timeout: 15000 });
+    await senderPage.getByTestId('approve-peer').click({ timeout: 15000 });
 
     // File names must stay hidden until the PIN is accepted
-    await expect(receiverPage.locator('text=This Transfer Is PIN-Protected')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByPlaceholder('Session PIN…')).toBeVisible({ timeout: 15000 });
     await expect(receiverPage.locator('text=secret-plans.pdf')).toHaveCount(0);
 
     const pinInput = receiverPage.locator('input[placeholder="Session PIN…"]');
@@ -278,8 +278,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(receiverPage.locator('text=secret-plans.pdf')).toBeVisible({ timeout: 15000 });
 
     await receiverPage.getByTestId('start-download').click();
-    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
     await close();
   });
 });

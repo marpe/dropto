@@ -1,15 +1,14 @@
 import React from 'react';
-import { Gauge, HardDrive, Clock, CheckCircle2, Pause, Play, XCircle } from 'lucide-react';
+import { Clock, Gauge, Pause, Play, Timer, TrendingUp, XCircle } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
-import { Pill } from './ui/Pill';
-import { ProgressBar } from './ui/ProgressBar';
+import { ProgressRing } from './ui/ProgressRing';
 import { StatTile } from './ui/StatTile';
 import type { ManifestFile, TransferMetrics } from '../types/transfer';
 import { getFileProgress } from '../utils/transferProgress';
 import { TransferFileList } from './TransferFileList';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
-import { AnimatedWave } from './AnimatedWave';
+import { cn } from '../utils/cn';
 
 interface MetricsDashboardProps {
   metrics: TransferMetrics;
@@ -21,6 +20,7 @@ interface MetricsDashboardProps {
   onCancel: () => void;
 }
 
+/** The live transfer: overall progress as a ring, the numbers beside it, and each file below. */
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   metrics,
   files,
@@ -29,33 +29,29 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   onTogglePause,
   onCancel,
 }) => {
-  const percentRounded = Math.min(Math.round(metrics.overallPercent), 100);
-  const filePercentRounded = Math.round(metrics.currentFilePercent);
+  const percent = Math.min(Math.floor(metrics.overallPercent), 100);
+  const isMultiFile = files.length > 1;
 
   return (
-    <Card padding="md" className="w-full relative overflow-hidden">
-      <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-border-1">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative flex h-3 w-3 shrink-0">
-            <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-500 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-500" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-bold text-text-1 flex items-center gap-2">
-              <span>{isSender ? 'Streaming to Receiver' : 'Receiving Direct to Disk'}</span>
-              <Pill>Active P2P</Pill>
-            </h3>
-            <p className="text-xs text-text-4 truncate">
-              File {metrics.currentFileIndex + 1} of {metrics.totalFiles} • {metrics.currentFileName}
-            </p>
-          </div>
+    <Card padding="md" className="w-full">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 font-semibold text-text-1">
+            <span className="relative flex size-2.5 shrink-0">
+              {!isPaused && <span className="absolute inset-0 rounded-full bg-brand-500 opacity-75 motion-safe:animate-ping" />}
+              <span className={cn('relative size-2.5 rounded-full', isPaused ? 'bg-text-5' : 'bg-brand-500')} />
+            </span>
+            {isPaused ? 'Paused' : isSender ? 'Sending' : 'Receiving'}
+          </p>
+          <p className="text-xs text-text-4 truncate mt-0.5">
+            {isMultiFile && `File ${metrics.currentFileIndex + 1} of ${metrics.totalFiles} · `}
+            {metrics.currentFileName}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onTogglePause}>
-            {isPaused ? <Play className="w-3.5 h-3.5 text-brand-500" /> : <Pause className="w-3.5 h-3.5 text-amber-500" />}
+            {isPaused ? <Play className="w-3.5 h-3.5 text-brand-500" /> : <Pause className="w-3.5 h-3.5" />}
             <span>{isPaused ? 'Resume' : 'Pause'}</span>
           </Button>
           <Button variant="danger" size="sm" onClick={onCancel}>
@@ -65,47 +61,31 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Decoration only; on a phone the numbers matter more than the space it takes */}
-      <div className="hidden sm:block my-5">
-        <AnimatedWave active={!isPaused} />
-      </div>
+      <div className="flex flex-col sm:flex-row items-center gap-6 my-6">
+        <ProgressRing percent={metrics.overallPercent} isIdle={isPaused}>
+          <span data-testid="overall-percent" className="block text-4xl font-bold tracking-tight tabular-nums text-text-1">
+            {percent}
+            <span className="text-lg text-text-4">%</span>
+          </span>
+          <span className="block text-2xs text-text-5 tabular-nums">
+            {formatBytes(metrics.bytesTransferred)} of {formatBytes(metrics.totalBytes)}
+          </span>
+        </ProgressRing>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5 sm:mt-0 mb-6">
-        <StatTile icon={Gauge} label="Current Speed" value={formatSpeed(metrics.currentSpeed)} />
-        <StatTile icon={Clock} label="ETA Remaining" value={formatDuration(metrics.etaSeconds)} isWarning />
-        {/* On a phone the byte counts move into the progress label below */}
-        <StatTile icon={HardDrive} label="Transferred" value={formatBytes(metrics.bytesTransferred)} className="hidden sm:block" />
-        <StatTile icon={CheckCircle2} label="Total Target" value={formatBytes(metrics.totalBytes)} className="hidden sm:block" />
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <div className="flex justify-between items-center text-xs font-semibold mb-1.5">
-            <span className="text-text-3">
-              <span className="hidden sm:inline">Total Transfer Progress</span>
-              <span className="sm:hidden tabular-nums">
-                {formatBytes(metrics.bytesTransferred)} of {formatBytes(metrics.totalBytes)}
-              </span>
-            </span>
-            <span className="font-mono tabular-nums text-brand-500 font-bold">{percentRounded}%</span>
-          </div>
-          <ProgressBar percent={percentRounded} />
-        </div>
-
-        <div>
-          <div className="flex justify-between items-center gap-3 text-xs text-text-4 mb-1.5">
-            <span className="min-w-0 truncate">Current File: {metrics.currentFileName}</span>
-            <span className="font-mono tabular-nums">{filePercentRounded}%</span>
-          </div>
-          <ProgressBar percent={filePercentRounded} variant="subtle" />
+        <div className="grid grid-cols-2 gap-3 w-full flex-1">
+          <StatTile icon={Gauge} label="Speed" value={isPaused ? '—' : formatSpeed(metrics.currentSpeed)} />
+          <StatTile icon={Clock} label="Time left" value={isPaused ? '—' : formatDuration(metrics.etaSeconds)} isWarning />
+          {/* On a phone the two numbers above are what matters */}
+          <StatTile icon={Timer} label="Elapsed" value={metrics.elapsedSeconds > 0 ? formatDuration(metrics.elapsedSeconds) : '—'} className="hidden sm:block" />
+          <StatTile icon={TrendingUp} label="Average" value={formatSpeed(metrics.averageSpeed)} className="hidden sm:block" />
         </div>
       </div>
 
-      {files.length > 1 && (
+      {isMultiFile && (
         <TransferFileList
           files={files}
           progress={getFileProgress(files, metrics, [], false)}
-          className="mt-5 pt-4 border-t border-border-1"
+          className="pt-4 border-t border-border-1"
         />
       )}
     </Card>

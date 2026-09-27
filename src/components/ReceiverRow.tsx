@@ -61,7 +61,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
   const Icon = receiver.isPaused ? Pause : STAGE_ICONS[receiver.stage];
 
   return (
-    <li data-testid="receiver-row" data-stage={receiver.stage} className="flex items-center gap-3 py-2.5">
+    <li data-testid="receiver-row" data-stage={receiver.stage} className="flex items-center gap-3 py-2.5 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
       <Icon className={cn('w-4 h-4 shrink-0', STAGE_TONES[receiver.stage])} />
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-baseline justify-between gap-2">

@@ -104,7 +104,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       <Screen key="failed">
         <StatusCard
           badge={<IconBadge icon={AlertCircle} tone="danger" />}
-          title="Transfer Failed"
+          title="Transfer failed"
           description={focus.error ?? 'The transfer stopped unexpectedly.'}
         >
           <p className="text-xs text-text-4 mb-6">The link still works, so they can try again.</p>
@@ -120,7 +120,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
     return (
       <Screen key="completed">
         <TransferCompleteCard
-          title="Transfer Complete!"
+          title="Transfer complete"
           files={pickFiles(files, focus.fileIndices)}
           metrics={focus.metrics}
           corruptedFiles={focus.corruptedFiles}

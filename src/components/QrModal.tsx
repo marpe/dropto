@@ -16,13 +16,13 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, onClose }) => {
 
   return (
     <Modal
-      title="Scan to Connect"
+      title="Scan to receive"
       onClose={onClose}
       bodyClassName="text-center"
       footer={
         <Button variant="secondary" onClick={() => copy(url)} className="w-full">
           {copied ? <Check className="w-4 h-4 text-brand-500" /> : <Copy className="w-4 h-4" />}
-          <span>{copied ? 'Copied' : 'Copy Link'}</span>
+          <span>{copied ? 'Copied' : 'Copy link'}</span>
         </Button>
       }
     >
@@ -36,7 +36,7 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, onClose }) => {
       </div>
 
       <div>
-        <span className="text-2xs uppercase font-bold tracking-wider text-text-5 block mb-1">Room Code</span>
+        <span className="text-2xs uppercase font-bold tracking-wider text-text-5 block mb-1">Room code</span>
         <span className="font-mono text-2xl font-black tracking-widest text-brand-500">{roomCode}</span>
       </div>
     </Modal>

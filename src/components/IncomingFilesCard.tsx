@@ -26,7 +26,7 @@ interface IncomingFileRowProps {
 }
 
 const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, isSelected, onToggle }) => (
-  <li className="[content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]">
+  <li className="transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1 [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]">
     <label
       className={cn(
         'flex items-center gap-3 text-xs p-2.5 rounded-xl bg-surface-1 border border-border-1 transition-[border-color,opacity]',
@@ -80,7 +80,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
       <div className="flex items-center gap-3 mb-6">
         <IconBadge icon={DownloadCloud} size="md" iconClassName="motion-safe:animate-float" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-bold text-text-1">Incoming Files</h3>
+          <h3 className="text-lg font-bold text-text-1">Incoming files</h3>
           <p className="text-xs text-text-4 tabular-nums">
             {isEverythingSelected
               ? `${manifest.files.length} ${isMultiFile ? 'files' : 'file'}`
@@ -115,17 +115,17 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         size="lg"
         onClick={handleStartSaveClick}
         disabled={isPreparingSave || selectedIndices.length === 0}
-        className="w-full rounded-2xl shadow-xl disabled:opacity-75 motion-safe:hover:scale-[1.02]"
+        className="w-full rounded-2xl shadow-xl disabled:opacity-75"
       >
         {isPreparingSave ? (
           <>
             <Spinner className="w-5 h-5" />
-            <span>{isMultiFile ? 'Opening Folder Dialog…' : 'Opening File Dialog…'}</span>
+            <span>{isMultiFile ? 'Opening folder picker…' : 'Opening save dialog…'}</span>
           </>
         ) : (
           <>
             <HardDriveDownload className="w-5 h-5" />
-            <span>{isMultiFile ? 'Select Download Folder' : 'Select Save Location'} & Start Download</span>
+            <span>{isMultiFile ? 'Choose a folder and download' : 'Choose where to save and download'}</span>
           </>
         )}
       </Button>

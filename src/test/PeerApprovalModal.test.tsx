@@ -24,7 +24,7 @@ describe('PeerApprovalModal', () => {
 
     const accept = screen.getByRole('button', { name: /accept/i });
     expect((accept as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/add files/i)).toBeDefined();
+    expect(screen.getByText(/nothing is queued/i)).toBeDefined();
 
     fireEvent.click(accept);
     expect(onApprove).not.toHaveBeenCalled();
@@ -33,7 +33,7 @@ describe('PeerApprovalModal', () => {
   it('lets the sender pick files without leaving the request', () => {
     const { onSelectFiles } = renderModal(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /select files/i }));
+    fireEvent.click(screen.getByTestId('add-files'));
 
     expect(onSelectFiles).toHaveBeenCalledTimes(1);
   });

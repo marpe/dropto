@@ -67,7 +67,7 @@ One build serves two brands, picked from the hostname:
 | Domain | Name | Accent | Room codes |
 | :--- | :--- | :--- | :--- |
 | `dropto.space`, `www.dropto.space` | dropto.space | Orange `#F97316` | `DT-XXXXXX` |
-| any other host | DropWave | Green `#3ECF8E` | `DW-XXXXXX` |
+| any other host | DropWave | Indigo `#4F46E5` | `DW-XXXXXX` |
 
 The boot script in `index.html` detects the brand before first paint and stamps `data-brand` on `<html>`; colours come from CSS variables in `src/index.css`, and names/assets from `src/branding.ts`. Room codes work across both domains. In development, append `?brand=dropto` to preview the other brand locally.
 

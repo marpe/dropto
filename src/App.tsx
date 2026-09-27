@@ -87,7 +87,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      <main className="flex-1 w-full max-w-3xl mx-auto px-4 pt-12 pb-10 sm:pt-20 space-y-8">
+      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-12 pb-10 sm:pt-20 space-y-8">
         {mode === 'send' ? (
           <SenderView session={sender} onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')} />
         ) : (

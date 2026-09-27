@@ -21,7 +21,7 @@ interface FileQueueRowProps {
 }
 
 const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
-  <li className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-2 border border-border-1 text-xs hover:border-brand-500/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_3.25rem]">
+  <li className="flex items-center gap-3 p-2.5 rounded-xl bg-surface-2 border border-border-1 text-xs hover:border-brand-500/30 transition-[border-color,opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1 [content-visibility:auto] [contain-intrinsic-size:auto_3.25rem]">
     <FileTypeIcon name={file.name} mimeType={file.type} />
     <div className="min-w-0 flex-1">
       <span className="font-semibold text-text-2 block truncate">
@@ -54,7 +54,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
           onClick={onClearFiles}
           className="shrink-0 text-xs text-text-danger-1 hover:text-text-danger-1 font-medium transition-colors"
         >
-          Clear All
+          Clear all
         </button>
       </div>
 

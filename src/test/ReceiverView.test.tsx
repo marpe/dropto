@@ -48,7 +48,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onConnect).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers onStartSaving and shows loading feedback when clicking "Select Save Location & Start Download"', async () => {
+  it('starts saving and shows feedback while the save dialog is open', async () => {
     let resolveSave: () => void = () => {};
     const savePromise = new Promise<void>((resolve) => {
       resolveSave = resolve;
@@ -79,7 +79,7 @@ describe('ReceiverView Component UI & Interaction', () => {
       />
     );
 
-    const saveButton = screen.getByRole('button', { name: /select save location & start download/i });
+    const saveButton = screen.getByTestId('start-download');
     expect(saveButton).toBeDefined();
 
     // Click the button
@@ -87,12 +87,12 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onStartSaving).toHaveBeenCalledTimes(1);
 
     // Verify loading feedback immediately appears
-    expect(screen.getByText(/opening file dialog/i)).toBeDefined();
+    expect(screen.getByText(/opening save dialog/i)).toBeDefined();
 
     // Resolve the promise
     resolveSave();
     await waitFor(() => {
-      expect(screen.queryByText(/opening file dialog/i)).toBeNull();
+      expect(screen.queryByText(/opening save dialog/i)).toBeNull();
     });
   });
 
@@ -138,7 +138,7 @@ describe('ReceiverView Component UI & Interaction', () => {
   it('shows that a submitted PIN is being checked', () => {
     renderWaiting('verifying_pin');
 
-    expect(screen.getByRole('heading', { name: /checking pin/i })).toBeDefined();
+    expect(screen.getByRole('heading', { name: /checking the pin/i })).toBeDefined();
     expect(screen.queryByRole('heading', { name: /waiting for the sender to accept/i })).toBeNull();
   });
 
@@ -263,9 +263,9 @@ describe('ReceiverView Component UI & Interaction', () => {
       />
     );
 
-    expect(screen.getByText(/Receiving Direct to Disk/i)).toBeDefined();
-    expect(screen.getByText(/Current Speed/i)).toBeDefined();
-    expect(screen.getAllByText(/50%/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('Receiving')).toBeDefined();
+    expect(screen.getByText('Speed')).toBeDefined();
+    expect(screen.getByTestId('overall-percent').textContent).toBe('50%');
   });
 
   it('waits for the files, not for approval, after opening the sender link', () => {
