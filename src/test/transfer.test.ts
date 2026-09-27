@@ -385,6 +385,41 @@ describe('introduction and live file list', () => {
   });
 });
 
+describe('pause and resume', () => {
+  const fileChunksSent = (conn: MockDataConnection) => conn.sent.filter((data) => typeof data !== 'string').length;
+
+  it('holds file data while paused and finishes after resuming', async () => {
+    const pair = createTransferPair();
+    pair.sender.togglePause();
+    pair.sender.start([createTestFile(3 * 64 * 1024)]);
+    await sleep(50);
+    expect(fileChunksSent(pair.senderConn)).toBe(0);
+
+    pair.sender.togglePause();
+
+    expect(await waitFor(pair.isComplete)).toBe(true);
+    expect(fileChunksSent(pair.senderConn)).toBe(3);
+  });
+
+  // Hidden tabs throttle timers to once a second (or once a minute), so a polling loop would stall resume
+  it('waits for resume without scheduling timers', async () => {
+    const pair = createTransferPair();
+    pair.sender.togglePause();
+    pair.sender.start([createTestFile(64 * 1024)]);
+    await sleep(20);
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+
+    const PAUSED_FOR_MS = 250;
+    await sleep(PAUSED_FOR_MS);
+    const timersWhilePaused = setTimeoutSpy.mock.calls.filter(([, delayMs]) => delayMs !== PAUSED_FOR_MS).length;
+    setTimeoutSpy.mockRestore();
+    pair.sender.togglePause();
+
+    expect(timersWhilePaused).toBe(0);
+    expect(await waitFor(pair.isComplete)).toBe(true);
+  });
+});
+
 describe('backpressure', () => {
   it('stops sending while the channel buffer is full and resumes once it drains', async () => {
     const senderConn = new MockDataConnection();
