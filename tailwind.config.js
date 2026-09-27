@@ -15,6 +15,13 @@ export default {
             `rgb(var(--brand-${shade}) / <alpha-value>)`,
           ])
         ),
+        // Catppuccin accents for file-type icons; RGB triples in src/index.css switch flavour with the theme
+        ctp: Object.fromEntries(
+          ['red', 'maroon', 'peach', 'yellow', 'green', 'teal', 'sky', 'sapphire', 'blue', 'lavender', 'mauve', 'pink', 'flamingo', 'overlay1'].map((name) => [
+            name,
+            `rgb(var(--ctp-${name}) / <alpha-value>)`,
+          ])
+        ),
         supabase: {
           bg: '#121212',
           surface: '#181818',

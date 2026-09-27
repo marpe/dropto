@@ -126,4 +126,10 @@ describe('SenderView', () => {
     expect(screen.getByText(/opened your link/i)).toBeDefined();
     expect(screen.queryByRole('button', { name: /accept/i })).toBeNull();
   });
+
+  it('marks queued files with an icon for their type', () => {
+    const { container } = renderSenderView({ files: [queuedFile] });
+
+    expect(container.querySelector('[data-file-kind="pdf"]')).not.toBeNull();
+  });
 });

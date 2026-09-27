@@ -280,4 +280,10 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(screen.getByRole('heading', { name: /waiting for the sender.s files/i })).toBeDefined();
     expect(screen.queryByRole('button', { name: /start download/i })).toBeNull();
   });
+
+  it('marks offered files with an icon for their type', () => {
+    renderWaiting('connected', { manifest: dummyManifest });
+
+    expect(document.querySelector('[data-file-kind="archive"]')).not.toBeNull();
+  });
 });

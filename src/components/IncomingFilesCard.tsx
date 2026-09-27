@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DownloadCloud, ShieldCheck, AlertTriangle, HardDriveDownload } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
+import { FileTypeIcon } from './ui/FileTypeIcon';
 import type { TransferManifest } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 
@@ -46,9 +47,10 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         {manifest.files.map((file) => (
           <li
             key={file.id}
-            className="flex justify-between items-center gap-3 text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-brand-500/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]"
+            className="flex items-center gap-3 text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-brand-500/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]"
           >
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+            <FileTypeIcon name={file.name} mimeType={file.type} />
+            <span className="flex-1 min-w-0 font-semibold text-zinc-800 dark:text-zinc-200 truncate">
               {file.relativePath || file.name}
             </span>
             <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">{formatBytes(file.size)}</span>
