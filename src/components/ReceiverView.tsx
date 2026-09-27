@@ -8,6 +8,7 @@ import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
 import { PinEntryCard } from './PinEntryCard';
+import { WaitingForSenderCard } from './WaitingForSenderCard';
 import type { PinPrompt } from '../services/transferEngine';
 
 interface ReceiverViewProps {
@@ -92,6 +93,12 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           actionLabel="Receive More Files"
           onAction={onReset}
           corruptedFiles={corruptedFiles}
+        />
+      ) : connectionState === 'waiting_approval' || connectionState === 'verifying_pin' ? (
+        <WaitingForSenderCard
+          stage={connectionState === 'verifying_pin' ? 'pin' : 'approval'}
+          roomCode={roomCode}
+          onCancel={onCancelTransfer}
         />
       ) : connectionState === 'pin_required' && pinPrompt ? (
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
@@ -210,18 +217,13 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             <Button
               size="lg"
               onClick={onConnect}
-              disabled={!roomCode.trim() || connectionState === 'connecting' || connectionState === 'waiting_approval'}
+              disabled={!roomCode.trim() || connectionState === 'connecting'}
               className="w-full py-3 motion-safe:hover:scale-[1.02]"
             >
               {connectionState === 'connecting' ? (
                 <>
                   <Spinner />
                   <span>Connecting to Peer…</span>
-                </>
-              ) : connectionState === 'waiting_approval' ? (
-                <>
-                  <Spinner />
-                  <span>Waiting for Sender Approval…</span>
                 </>
               ) : (
                 <>
