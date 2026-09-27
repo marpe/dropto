@@ -56,7 +56,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
         </button>
       </div>
 
-      <ul className="max-h-56 overflow-y-auto overscroll-contain space-y-2 pr-1">
+      <ul className="scroll-fade max-h-56 overflow-y-auto overscroll-contain space-y-2 pr-1">
         {files.map((file) => (
           <FileQueueRow key={file.id} file={file} onRemove={() => onRemoveFile(file.id)} />
         ))}

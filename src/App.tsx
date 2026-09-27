@@ -62,7 +62,7 @@ export const App: React.FC = () => {
   const { isDraggingFiles } = usePageFileDrop(canTakeFiles ? addDroppedFiles : null);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-text-1 page-glow transition-colors">
+    <div className="min-h-dvh flex flex-col page-glow">
       <IconButton
         title="Settings"
         onClick={() => setIsSettingsOpen(true)}

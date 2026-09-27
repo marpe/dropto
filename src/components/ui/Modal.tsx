@@ -102,7 +102,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
       </header>
 
-      <div className={cn('flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-5', bodyClassName)}>{children}</div>
+      <div className={cn('scroll-fade flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-5', bodyClassName)}>{children}</div>
 
       {footer && (
         <footer className="shrink-0 flex items-center justify-end gap-3 px-6 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 border-t border-border-1">

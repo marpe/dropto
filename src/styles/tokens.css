@@ -1,0 +1,154 @@
+/*
+  Theme tokens. Components use only these semantic colours (bg-surface-1, text-text-4, border-border-2, …),
+  never raw neutrals or dark: variants: a theme is nothing but a set of overrides of these variables.
+  The light theme is the default; `.dark` on <html> (set by useTheme and the boot script in index.html) swaps it.
+*/
+@theme {
+  /* Page and layered surfaces */
+  --color-background: #fafafa;
+  --color-surface-1: #ffffff; /* raised: cards, dialogs, list rows */
+  --color-surface-2: #fafafa; /* sunken: lists, stat tiles, inset panels */
+  --color-surface-3: #f4f4f5; /* controls: secondary buttons, progress tracks */
+  --color-surface-4: #e4e4e7; /* controls on hover */
+
+  /* Borders, from subtle dividers to input outlines */
+  --color-border-1: #f4f4f5;
+  --color-border-2: #e4e4e7;
+  --color-border-3: #d4d4d8;
+
+  /* Text, from headings (1) to faint captions (5) */
+  --color-text-1: #18181b;
+  --color-text-2: #27272a;
+  --color-text-3: #3f3f46;
+  --color-text-4: #71717a;
+  --color-text-5: #a1a1aa;
+  /* On brand-filled buttons: dark text reads on both the green and the orange brand */
+  --color-text-on-accent: #121212;
+
+  /* Status */
+  --color-text-danger-1: #dc2626;
+  --color-surface-danger-1: #fef2f2;
+  --color-border-danger-1: #fecaca;
+  --color-text-warning-1: #d97706;
+
+  /* Brand accent: DropWave green by default, dropto.space orange below */
+  --color-brand-50: #edfcf4;
+  --color-brand-100: #d5f7e6;
+  --color-brand-200: #aef0d1;
+  --color-brand-300: #76e4b4;
+  --color-brand-400: #52d69b;
+  --color-brand-500: #3ecf8e;
+  --color-brand-600: #24b47e;
+  --color-brand-700: #1c8f65;
+  --color-brand-800: #1a7152;
+  --color-brand-900: #175c44;
+  --color-brand-950: #073324;
+
+  /* Catppuccin accents for file-type icons: Latte here, Mocha in the dark theme */
+  --color-ctp-red: #d20f39;
+  --color-ctp-maroon: #e64553;
+  --color-ctp-peach: #fe640b;
+  --color-ctp-yellow: #df8e1d;
+  --color-ctp-green: #40a02b;
+  --color-ctp-teal: #179299;
+  --color-ctp-sky: #04a5e5;
+  --color-ctp-sapphire: #209fb5;
+  --color-ctp-blue: #1e66f5;
+  --color-ctp-lavender: #7287fd;
+  --color-ctp-mauve: #8839ef;
+  --color-ctp-pink: #ea76cb;
+  --color-ctp-flamingo: #dd7878;
+  --color-ctp-overlay1: #8c8fa1;
+
+  --text-2xs: 0.625rem;
+
+  --animate-float: float 3.5s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.2s ease-out;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* A stray dark: variant follows the app's theme choice rather than the OS; prefer tokens though */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  accent-color: var(--color-brand-500);
+  --scrollbar-thumb: #d4d4d8;
+  --scrollbar-track: #f4f4f5;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-background: #121212;
+  --color-surface-1: #181818;
+  --color-surface-2: #131315;
+  --color-surface-3: #27272a;
+  --color-surface-4: #3f3f46;
+
+  --color-border-1: #202023;
+  --color-border-2: #27272a;
+  --color-border-3: #3f3f46;
+
+  --color-text-1: #fafafa;
+  --color-text-2: #e4e4e7;
+  --color-text-3: #d4d4d8;
+  --color-text-4: #a1a1aa;
+  --color-text-5: #71717a;
+
+  --color-text-danger-1: #f87171;
+  --color-surface-danger-1: #2a1215;
+  --color-border-danger-1: #5c1d1d;
+  --color-text-warning-1: #fbbf24;
+
+  --color-ctp-red: #f38ba8;
+  --color-ctp-maroon: #eba0ac;
+  --color-ctp-peach: #fab387;
+  --color-ctp-yellow: #f9e2af;
+  --color-ctp-green: #a6e3a1;
+  --color-ctp-teal: #94e2d5;
+  --color-ctp-sky: #89dceb;
+  --color-ctp-sapphire: #74c7ec;
+  --color-ctp-blue: #89b4fa;
+  --color-ctp-lavender: #b4befe;
+  --color-ctp-mauve: #cba6f7;
+  --color-ctp-pink: #f5c2e7;
+  --color-ctp-flamingo: #f2cdcd;
+  --color-ctp-overlay1: #7f849c;
+
+  --scrollbar-thumb: #27272a;
+  --scrollbar-track: #121212;
+}
+
+/* dropto.space orange (data-brand is stamped on <html> by the boot script in index.html) */
+:root[data-brand='dropto'] {
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+  --color-brand-950: #431407;
+}

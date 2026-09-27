@@ -74,6 +74,8 @@ Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/
 | File-type accents | `ctp-*` (Catppuccin) | Latte, Mocha under `.dark`; use `components/ui/FileTypeIcon` |
 | Micro-labels | `text-2xs` | the only size below `text-xs` |
 
+- **Scroll areas** get the `scroll-fade` class (fades the edge that has more content; `src/styles/scroll-fade.css`). If the scroller's background isn't `surface-1`, also set `[--scroll-fade-color:var(--color-surface-2)]` (or whichever surface).
+- **Element defaults** (pointer cursor on enabled buttons, focus ring, selection, text wrapping) live in `src/styles/base.css`; don't repeat them per component.
 - **Adding a token:** declare it in `@theme` with its light value and override it under `.dark`; name it by role (`surface-*`, `border-*`, `text-*`), never by colour.
 - **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'var(--color-brand-500)' }}`.
 - **Never hardcode the brand.** The name, room-code prefix and brand colours come from `getActiveBrand()` / `brand-*`, because the same build is DropWave and dropto.space.

@@ -1,0 +1,49 @@
+/*
+  `.scroll-fade` on a scroll area fades its top/bottom edge while there is more content that way.
+  It uses scroll-state container queries (Chrome 133+): the container's own pseudo-elements query it.
+  Where unsupported the fades simply never appear. The fade blends into --scroll-fade-color, so set it
+  to the scroller's background when that is not surface-1 (e.g. `[--scroll-fade-color:var(--color-surface-2)]`).
+*/
+@layer components {
+  .scroll-fade {
+    --scroll-fade-size: 1.5rem;
+    container-type: scroll-state;
+
+    &::before,
+    &::after {
+      content: '';
+      display: block;
+      position: sticky;
+      z-index: 1;
+      height: var(--scroll-fade-size);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    /* Negative margins keep the fades from taking up room in the content */
+    &::before {
+      top: 0;
+      margin-bottom: calc(-1 * var(--scroll-fade-size));
+      background: linear-gradient(to bottom, var(--scroll-fade-color, var(--color-surface-1)), transparent);
+    }
+
+    &::after {
+      bottom: 0;
+      margin-top: calc(-1 * var(--scroll-fade-size));
+      background: linear-gradient(to top, var(--scroll-fade-color, var(--color-surface-1)), transparent);
+    }
+
+    @container scroll-state(scrollable: top) {
+      &::before {
+        opacity: 1;
+      }
+    }
+
+    @container scroll-state(scrollable: bottom) {
+      &::after {
+        opacity: 1;
+      }
+    }
+  }
+}
