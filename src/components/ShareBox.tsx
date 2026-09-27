@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { QrCode, Copy, Check, Lock, Share2 } from 'lucide-react';
+import { QrCode, Copy, Check, Lock, Share2, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { Notice } from './ui/Notice';
 import { TextInput } from './ui/TextInput';
 import { QrModal } from './QrModal';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
@@ -15,6 +16,8 @@ interface ShareBoxProps {
   onPinChange: (pin: string) => void;
   errorMessage: string | null;
   onRetryRoom: () => void;
+  /** Why the code changed (e.g. after repeated wrong PINs) */
+  notice?: string | null;
 }
 
 const canWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -37,6 +40,7 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
   onPinChange,
   errorMessage,
   onRetryRoom,
+  notice = null,
 }) => {
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [copiedLink, copyLink] = useCopyToClipboard();
@@ -45,6 +49,12 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
   return (
     <Card padding="md">
       {isQrOpen && <QrModal onClose={() => setIsQrOpen(false)} roomCode={roomCode} url={shareUrl} />}
+
+      {notice && (
+        <Notice tone="warning" icon={ShieldAlert} className="mb-4">
+          {notice}
+        </Notice>
+      )}
 
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">

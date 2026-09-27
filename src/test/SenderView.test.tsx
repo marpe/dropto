@@ -164,4 +164,10 @@ describe('SenderView', () => {
     expect(screen.getByText('1 file · 2 KB')).toBeDefined();
     expect(screen.queryByText(/ready to send/i)).toBeNull();
   });
+
+  it('explains why the room code changed', () => {
+    renderSenderView({ files: [queuedFile], roomNotice: 'This is a new room.' });
+
+    expect(screen.getByText('This is a new room.')).toBeDefined();
+  });
 });

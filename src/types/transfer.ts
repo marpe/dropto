@@ -89,6 +89,8 @@ export interface TransferEvents {
 export interface SenderEvents extends TransferEvents {
   /** The receiver chose a destination and requested the first file; the file list is now fixed */
   onReceiverStarted?: () => void;
+  /** A receiver used up its PIN attempts; the transfer then fails as usual */
+  onPinLockout?: () => void;
 }
 
 export interface ReceiverEvents extends TransferEvents {

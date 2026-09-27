@@ -417,6 +417,40 @@ describe('useSenderSession', () => {
     expect(result.current.state.files.map((file) => file.name)).toEqual(['report.pdf', 'new.txt']);
   });
 
+  it('moves to a new room after repeated PIN lockouts, so guessing cannot go on', async () => {
+    const session = await renderSenderSession();
+    act(() => {
+      session.result.current.actions.addFiles([new File(['x'], 'x.txt')]);
+      session.result.current.actions.setPin('1234');
+    });
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      act(() => {
+        session.connection.handlers.onIncomingConnection?.(createFakePeerConnection(`guesser-${attempt}`), typedCode);
+      });
+      act(() => {
+        session.result.current.actions.approvePeer();
+      });
+      act(() => {
+        session.engines[attempt].events.onPinLockout?.();
+        session.engines[attempt].events.onError?.('Too many incorrect PIN attempts');
+      });
+      if (attempt < 2) {
+        expect(session.connections).toHaveLength(1);
+        act(() => {
+          session.result.current.actions.dismissError();
+        });
+      }
+    }
+
+    await waitFor(() => expect(session.connections).toHaveLength(2));
+    // Never the remembered room: the point is that the old code stops working
+    expect(session.connections[1].initSender).toHaveBeenCalledWith(settings, { preferredRoomId: undefined });
+    expect(session.connections[0].destroy).toHaveBeenCalled();
+    expect(session.result.current.state.status).toBe('waiting');
+    expect(session.result.current.state.roomNotice).toMatch(/new room/i);
+  });
+
   it('uses a fresh link key for every new room', async () => {
     const first = await renderSenderSession();
     sessionStorage.clear();

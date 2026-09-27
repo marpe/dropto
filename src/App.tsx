@@ -110,6 +110,7 @@ export const App: React.FC = () => {
             errorMessage={sender.state.error}
             onDismissError={sender.actions.dismissError}
             onRetryRoom={sender.actions.retryRoom}
+            roomNotice={sender.state.roomNotice}
             onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')}
           />
         ) : (
