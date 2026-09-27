@@ -124,18 +124,25 @@ export class WebRtcService {
   }
 
   private handleIncomingConnection(conn: DataConnection) {
+    // One receiver per room: a newcomer must not displace a pending or active peer
+    if (this.activeConn) {
+      conn.close();
+      return;
+    }
+    this.activeConn = conn;
+
     if (conn.open) {
-      this.activeConn = conn;
       this.handlers.onIncomingConnection?.(conn);
     } else {
       conn.on('open', () => {
-        this.activeConn = conn;
         this.handlers.onIncomingConnection?.(conn);
       });
     }
 
     conn.on('close', () => {
-      this.activeConn = null;
+      if (this.activeConn === conn) {
+        this.activeConn = null;
+      }
       this.handlers.onDisconnected?.();
     });
 
