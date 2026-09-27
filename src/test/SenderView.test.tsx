@@ -147,6 +147,24 @@ describe('SenderView', () => {
   });
 
   describe('sharing settings', () => {
+    it('turns on simultaneous downloads by raising the number above one', () => {
+      const actions = renderSenderView({ state: shared() });
+      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('1');
+
+      fireEvent.click(screen.getByTitle('More'));
+
+      expect(actions.updateSharing).toHaveBeenCalledWith(
+        expect.objectContaining({ allowMultiple: true, maxSimultaneous: 2 }),
+        'new'
+      );
+    });
+
+    it('shows the download limit when several people may download', () => {
+      renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, allowMultiple: true, maxSimultaneous: 4 } }) });
+
+      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('4');
+    });
+
     const withPin = (pin: string) => shared({ options: { ...createInitialSenderState().options, pin } });
 
     it('suggests a random PIN as soon as one is required', () => {
@@ -418,7 +436,8 @@ describe('SenderView', () => {
       expect(actions.updateSharing).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId('apply-to-new'));
 
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ maxSimultaneous: 1 }), 'new');
+      // Down to one is the one-person link again
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ allowMultiple: false }), 'new');
     });
   });
 
@@ -431,7 +450,7 @@ describe('SenderView', () => {
     it('applies a change at once when nobody is connected', () => {
       const actions = renderSenderView({ state: shared() });
 
-      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
     });
@@ -449,7 +468,7 @@ describe('SenderView', () => {
     it('can apply a stricter setting to the current receiver too', () => {
       const actions = renderWithSomeoneConnected();
 
-      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
       fireEvent.click(screen.getByTestId('apply-now'));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'now');
@@ -458,11 +477,11 @@ describe('SenderView', () => {
     it('leaves the settings as they were when the question is dismissed', () => {
       const actions = renderWithSomeoneConnected();
 
-      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
       fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
 
       expect(actions.updateSharing).not.toHaveBeenCalled();
-      expect((screen.getByRole('checkbox', { name: /ask me before anyone connects/i }) as HTMLInputElement).checked).toBe(false);
+      expect((screen.getByRole('checkbox', { name: /require connection approval/i }) as HTMLInputElement).checked).toBe(false);
     });
 
     it('applies without asking when the change only loosens things', () => {
@@ -495,7 +514,7 @@ describe('SenderView', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
       expect(actions.clearFiles).not.toHaveBeenCalled();
-      expect(screen.getByText(/link stops working/i)).toBeDefined();
+      expect(screen.getByText(/current link stops working/i)).toBeDefined();
       fireEvent.click(screen.getByTestId('confirm'));
 
       expect(actions.clearFiles).toHaveBeenCalledTimes(1);

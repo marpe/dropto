@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Unlink } from 'lucide-react';
+import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
-import { LinkButton } from './ui/LinkButton';
 import { ShareBox } from './ShareBox';
-import { ShareActivity } from './ShareActivity';
+import { ReceiverList } from './ReceiverList';
 import { SharingSettings } from './SharingSettings';
 import type { SenderReceiver, SharingOptions } from '../types/sharing';
+import { countActiveReceivers } from '../hooks/senderState';
 
 interface LinkSectionProps {
   roomCode: string;
@@ -22,7 +23,19 @@ interface LinkSectionProps {
   onDismissReceiver: (peerId: string) => void;
 }
 
-/** Below the files once shared: the link to pass on, who is using it, and who may. */
+function describeActivity(receivers: SenderReceiver[]): string {
+  const active = countActiveReceivers(receivers);
+  const waiting = receivers.filter((receiver) => receiver.stage === 'queued').length;
+  const done = receivers.filter((receiver) => receiver.stage === 'completed').length;
+  const parts = [
+    active > 0 ? `${active} connected` : null,
+    waiting > 0 ? `${waiting} waiting` : null,
+    done > 0 ? `${done} done` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'Waiting for someone';
+}
+
+/** Below the files once shared: the link to pass on, who is using it, its settings and a way to end it. */
 export const LinkSection: React.FC<LinkSectionProps> = ({
   roomCode,
   shareUrl,
@@ -36,8 +49,9 @@ export const LinkSection: React.FC<LinkSectionProps> = ({
   onDismissReceiver,
 }) => {
   const [isConfirmingStop, setIsConfirmingStop] = useState(false);
-  // One person connected gets the full-screen card above; the quiet line is only for an idle link
-  const showsActivity = options.allowMultiple || connectedCount === 0;
+  const isIdle = connectedCount === 0 && receivers.length === 0;
+  // With one person at a time, whoever is connected gets the full-screen card instead of a list
+  const showsList = options.allowMultiple && receivers.length > 0;
 
   const requestStopSharing = () => {
     if (connectedCount > 0) {
@@ -48,22 +62,38 @@ export const LinkSection: React.FC<LinkSectionProps> = ({
   };
 
   return (
-    <Card padding="md" data-testid="link-section" className="space-y-5 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-2">
+    <Card
+      padding="md"
+      data-testid="link-section"
+      className="space-y-5 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-2"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-bold text-text-1">Your link</h2>
+        <span
+          data-testid={isIdle ? 'share-waiting' : 'share-status'}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border-2 bg-surface-2 px-2.5 py-1 text-xs text-text-4 tabular-nums"
+        >
+          <span className="relative flex size-2">
+            {isIdle && <span className="absolute inset-0 rounded-full bg-brand-500/60 motion-safe:animate-ping" />}
+            <span className="relative size-2 rounded-full bg-brand-500" />
+          </span>
+          {describeActivity(receivers)}
+        </span>
+      </div>
+
       <ShareBox roomCode={roomCode} shareUrl={shareUrl} notice={roomNotice} />
-      {showsActivity && (
-        <ShareActivity
-          receivers={receivers}
-          isListed={options.allowMultiple}
-          onStopReceiver={onStopReceiver}
-          onDismissReceiver={onDismissReceiver}
-        />
+
+      {showsList && (
+        <ReceiverList receivers={receivers} onStopReceiver={onStopReceiver} onDismissReceiver={onDismissReceiver} />
       )}
+
       <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} />
-      <div className="text-center">
-        <LinkButton data-testid="stop-sharing" onClick={requestStopSharing} className="text-xs">
+
+      <div className="flex justify-end pt-4 border-t border-border-1">
+        <Button data-testid="stop-sharing" variant="danger" size="sm" onClick={requestStopSharing}>
           <Unlink className="w-3.5 h-3.5" />
           Stop sharing
-        </LinkButton>
+        </Button>
       </div>
 
       {isConfirmingStop && (

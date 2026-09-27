@@ -45,7 +45,8 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 code
 - `components/ui/ToggleRow` — labelled on/off option; children (e.g. an input) show inside the row while it is on.
 - `components/ui/ProgressRing` — circular overall progress with content in the middle (live transfer).
 - `components/ui/StatTile` — one labelled number in transfer stats (live dashboard and completion card).
-- `components/ui/NumberStepper` — a small whole number picked with − / + (e.g. downloads at the same time).
+- `components/ui/NumberStepper` — a bare − / + number control (its label is the accessible name); place it in an `OptionRow`.
+- `components/ui/OptionRow` — a settings row with a label, description and any control on the right; `ToggleRow` is the on/off variant (same box, `optionRowStyles.ts`).
 - `components/ui/Screen` — one screen of a flow; give it a `key` naming the screen so the enter animation plays on step changes only.
 - Small icon buttons (`IconButton size="sm"`) grow their padding on touch screens (`pointer-coarse:`); don't shrink them back with a `p-*` override.
 - `components/ui/ConfirmDialog` — in-app confirmation on `Modal` (Back / confirm, `tone="danger"` for destructive actions). Ask only when someone is actually affected; default to the non-destructive choice.

@@ -53,7 +53,7 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
 
   return (
     <section className="space-y-3">
-      <h3 className="text-xs font-semibold text-text-3">Who can use the link</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-5">Settings</h3>
       <SharingOptionsForm options={options} onChange={change} />
 
       {pending && (

@@ -1,4 +1,5 @@
 import React from 'react';
+import { optionBoxClassName } from './optionRowStyles';
 
 interface ToggleRowProps {
   label: string;
@@ -14,7 +15,7 @@ interface ToggleRowProps {
  * The control is a native checkbox drawn as a switch, so forms, labels and keyboard use keep working.
  */
 export const ToggleRow: React.FC<ToggleRowProps> = ({ label, description, isChecked, onChange, children }) => (
-  <div className="rounded-xl border border-border-2 transition-colors has-[label:hover]:bg-surface-2 has-checked:border-brand-500/40">
+  <div className={optionBoxClassName}>
     <label className="flex items-center justify-between gap-3 p-3">
       <div className="min-w-0">
         <span className="text-sm font-medium text-text-2 block">{label}</span>
