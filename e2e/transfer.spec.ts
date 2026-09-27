@@ -17,7 +17,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     await page.getByTitle('Settings').click();
-    await expect(page.locator('text=Transfer & Network Settings')).toBeVisible();
+    await expect(page.locator('text=Settings')).toBeVisible();
     await page.getByRole('button', { name: 'Dark' }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Light' }).click();
@@ -26,7 +26,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(githubLink).toHaveAttribute('target', '_blank');
 
     await page.locator('button:has-text("Cancel")').click();
-    await expect(page.locator('text=Transfer & Network Settings')).not.toBeVisible();
+    await expect(page.locator('text=Settings')).not.toBeVisible();
   });
 
   test('files dropped anywhere on the page are queued, even from the receive form', async ({ page }) => {
