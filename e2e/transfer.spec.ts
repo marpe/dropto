@@ -171,7 +171,6 @@ test.describe('DropWave Application End-to-End Tests', () => {
     expect(receiverPage.url()).not.toContain('key=');
 
     // Files can still change while the receiver is choosing where to save
-    await senderPage.getByTestId('edit-files').click();
     await addFile(senderPage, 'second.txt', 'two');
     await expect(receiverPage.locator('text=second.txt')).toBeVisible({ timeout: 15000 });
 
@@ -192,7 +191,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     // The same files can go to someone else on a new link
     await senderPage.getByTestId('send-again').click();
-    await senderPage.getByTestId('create-link').click();
+    await senderPage.getByTestId('share-files').click();
     const newCode = await readRoomCode(senderPage);
     expect(newCode).not.toBe(readRoomCodeFromLink(link));
     await close();
@@ -331,12 +330,13 @@ interface ShareOptions {
   simultaneous?: number;
 }
 
-/** Moves from the file list to the share step and creates the link, optionally behind a PIN or for several people. */
+/** Creates the link, then sets it up (settings apply as they change), optionally behind a PIN or for several people. */
 async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) {
   await page.getByTestId('share-files').click();
   if (pin) {
     await page.getByRole('checkbox', { name: /require a pin/i }).check();
     await page.getByTestId('pin-input').fill(pin);
+    await page.getByTestId('pin-input').press('Enter');
   }
   if (simultaneous) {
     await page.getByRole('checkbox', { name: /let several people download/i }).check();
@@ -345,7 +345,6 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
       await page.getByTitle('Fewer').click();
     }
   }
-  await page.getByTestId('create-link').click();
 }
 
 /** The room code is shown once the link has been created. */

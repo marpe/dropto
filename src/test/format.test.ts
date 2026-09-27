@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
+import { formatBytes, formatDuration, formatModified, formatSpeed } from '../utils/format';
 
 describe('format utilities', () => {
   it('formats bytes accurately up to 10GB and beyond', () => {
@@ -20,5 +20,25 @@ describe('format utilities', () => {
     expect(formatDuration(45)).toBe('45s');
     expect(formatDuration(135)).toBe('2m 15s');
     expect(formatDuration(3665)).toBe('1h 1m 5s');
+  });
+});
+
+describe('formatModified', () => {
+  const now = new Date(2026, 8, 28, 15, 0).getTime();
+
+  it('shows the time for files changed today', () => {
+    expect(formatModified(new Date(2026, 8, 28, 9, 5).getTime(), now, 'en-GB')).toBe('09:05');
+  });
+
+  it('shows day and month for earlier this year', () => {
+    expect(formatModified(new Date(2026, 2, 12).getTime(), now, 'en-GB')).toBe('12 Mar');
+  });
+
+  it('adds the year for older files', () => {
+    expect(formatModified(new Date(2024, 2, 12).getTime(), now, 'en-GB')).toBe('12 Mar 2024');
+  });
+
+  it('shows nothing when the date is unknown', () => {
+    expect(formatModified(undefined, now)).toBe('');
   });
 });

@@ -29,3 +29,17 @@ export function formatDuration(seconds: number): string {
   }
   return `${secs}s`;
 }
+
+/** A file's last-modified time, as short as it can be: the time today, the date otherwise (year only when not this year). */
+export function formatModified(timestampMs: number | undefined, nowMs: number = Date.now(), locale?: string): string {
+  if (timestampMs === undefined || !isFinite(timestampMs)) {
+    return '';
+  }
+  const date = new Date(timestampMs);
+  const now = new Date(nowMs);
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  }
+  const isThisYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', ...(!isThisYear && { year: 'numeric' }) });
+}
