@@ -66,6 +66,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     );
     expect(brand500).toBe('#f97316');
     await addFile(page, 'brand.txt', 'orange');
+    await shareFiles(page);
     await expect(page.locator('.font-mono.text-2xl.font-black')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
   });
 
@@ -120,6 +121,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderPage.goto('/');
     await addFile(senderPage, 'sample-dataset.dat', 'Simulated 10GB dataset test buffer payload.');
     await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
+    await shareFiles(senderPage);
     const roomCode = await readRoomCode(senderPage);
     expect(signallingUrls.every((url) => url.includes(`localhost:${LOCAL_PEER_SERVER_PORT}`))).toBe(true);
     expect(signallingUrls.length).toBeGreaterThan(0);
@@ -155,6 +157,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderPage.goto('/');
     await expect(senderPage.getByRole('button', { name: 'Copy Link' })).toHaveCount(0);
     await addFile(senderPage, 'first.txt', 'one');
+    await shareFiles(senderPage);
     await readRoomCode(senderPage);
     await senderPage.getByRole('button', { name: 'Copy Link' }).click();
     const link = await senderPage.evaluate(() => navigator.clipboard.readText());
@@ -167,6 +170,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // The key must not linger in the address bar or history
     expect(receiverPage.url()).not.toContain('key=');
 
+    // Files can still change while the receiver is choosing where to save
+    await senderPage.getByTestId('edit-files').click();
     await addFile(senderPage, 'second.txt', 'two');
     await expect(receiverPage.locator('text=second.txt')).toBeVisible({ timeout: 15000 });
 
@@ -184,6 +189,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await senderPage.goto('/');
     await addFile(senderPage, 'waiting.txt', 'wait');
+    await shareFiles(senderPage);
     const roomCode = await readRoomCode(senderPage);
 
     await receiverPage.goto(`/?room=${roomCode}`);
@@ -205,8 +211,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await senderPage.goto('/');
     await addFile(senderPage, 'secret-plans.pdf', 'top secret', 'application/pdf');
+    await shareFiles(senderPage, { pin: '2468' });
     const roomCode = await readRoomCode(senderPage);
-    await senderPage.locator('input[placeholder="e.g. 1234"]').fill('2468');
 
     await receiverPage.goto(`/?room=${roomCode}`);
     await receiverPage.getByTestId('connect').click();
@@ -262,7 +268,17 @@ async function addFile(page: Page, name: string, content: string, mimeType = 'te
   await expect(page.locator(`text=${name}`)).toBeVisible();
 }
 
-/** The room code is shown once files are queued. */
+/** The room code is shown once the link has been created. */
+/** Moves from the file list to the share step and creates the link, optionally behind a PIN. */
+async function shareFiles(page: Page, { pin }: { pin?: string } = {}) {
+  await page.getByTestId('share-files').click();
+  if (pin) {
+    await page.getByRole('checkbox', { name: /require a pin/i }).check();
+    await page.getByPlaceholder('e.g. 1234').fill(pin);
+  }
+  await page.getByTestId('create-link').click();
+}
+
 async function readRoomCode(page: Page): Promise<string> {
   const roomCodeElement = page.locator('.font-mono.text-2xl.font-black');
   await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });

@@ -11,6 +11,8 @@ interface FileQueueProps {
   files: TransferFile[];
   onRemoveFile: (fileId: string) => void;
   onClearFiles: () => void;
+  /** Below the list, e.g. the step's main action */
+  footer?: React.ReactNode;
 }
 
 interface FileQueueRowProps {
@@ -38,7 +40,7 @@ const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
   </li>
 );
 
-export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onClearFiles }) => {
+export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onClearFiles, footer }) => {
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
 
   return (
@@ -61,6 +63,8 @@ export const FileQueue: React.FC<FileQueueProps> = ({ files, onRemoveFile, onCle
           <FileQueueRow key={file.id} file={file} onRemove={() => onRemoveFile(file.id)} />
         ))}
       </ul>
+
+      {footer && <div className="pt-4 mt-3 border-t border-border-1">{footer}</div>}
     </Card>
   );
 };

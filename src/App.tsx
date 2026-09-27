@@ -102,6 +102,11 @@ export const App: React.FC = () => {
             onCancelTransfer={sender.actions.cancel}
             pin={sender.state.pin}
             onPinChange={sender.actions.setPin}
+            requireApproval={sender.state.requireApproval}
+            onRequireApprovalChange={sender.actions.setRequireApproval}
+            isShared={sender.state.isShared}
+            onCreateLink={sender.actions.createLink}
+            onUpdateSharing={sender.actions.updateSharing}
             corruptedFiles={sender.state.corruptedFiles}
             isPaused={sender.state.isPaused}
             errorMessage={sender.state.error}

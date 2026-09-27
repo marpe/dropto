@@ -44,6 +44,11 @@ function renderSenderViewProps(overrides: Partial<ComponentProps<typeof SenderVi
     onCancelTransfer: () => {},
     pin: '',
     onPinChange: () => {},
+    requireApproval: false,
+    onRequireApprovalChange: () => {},
+    isShared: false,
+    onCreateLink: () => {},
+    onUpdateSharing: () => {},
     corruptedFiles: [],
     isPaused: false,
     errorMessage: null,
@@ -92,18 +97,32 @@ describe('SenderView', () => {
     expect(onRetryRoom).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the share box hidden until there is something to send', () => {
-    const { rerender } = renderSenderView();
+  it('asks how to share only after the files are chosen, and shows the link only once created', () => {
+    const onCreateLink = vi.fn();
+    renderSenderView({ files: [queuedFile], onCreateLink });
+    expect(screen.queryByTestId('create-link')).toBeNull();
     expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
 
-    rerender(<SenderView {...renderSenderViewProps({ files: [queuedFile] })} />);
-    expect(screen.getByRole('button', { name: /copy link/i })).toBeDefined();
+    fireEvent.click(screen.getByTestId('share-files'));
+    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
+    fireEvent.click(screen.getByTestId('create-link'));
+
+    expect(onCreateLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the sender go back from the sharing options to edit the files', () => {
+    renderSenderView({ files: [queuedFile] });
+    fireEvent.click(screen.getByTestId('share-files'));
+
+    fireEvent.click(screen.getByTestId('edit-files'));
+
+    expect(screen.getByTestId('pick-files')).toBeDefined();
   });
 
   it('copies a link that carries the room key', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    renderSenderView({ files: [queuedFile] });
+    renderSenderView({ files: [queuedFile], isShared: true });
 
     fireEvent.click(screen.getByRole('button', { name: /copy link/i }));
 
@@ -112,13 +131,15 @@ describe('SenderView', () => {
 
   it('shows that the receiver is choosing where to save, while files can still change', () => {
     const onCancelTransfer = vi.fn();
-    renderSenderView({ transferState: 'awaiting_receiver', files: [queuedFile], onCancelTransfer });
+    renderSenderView({ transferState: 'awaiting_receiver', files: [queuedFile], isShared: true, onCancelTransfer });
 
     expect(screen.getByText(/choosing where to save/i)).toBeDefined();
-    expect(screen.getByText('report.pdf')).toBeDefined();
-    expect(screen.getByTestId('pick-files')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onCancelTransfer).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('edit-files'));
+    expect(screen.getByText('report.pdf')).toBeDefined();
+    expect(screen.getByTestId('pick-files')).toBeDefined();
   });
 
   it('asks for files, not approval, when a receiver opened the link early', () => {
@@ -164,7 +185,7 @@ describe('SenderView', () => {
   });
 
   it('explains why the room code changed', () => {
-    renderSenderView({ files: [queuedFile], roomNotice: 'This is a new room.' });
+    renderSenderView({ files: [queuedFile], isShared: true, roomNotice: 'This is a new room.' });
 
     expect(screen.getByText('This is a new room.')).toBeDefined();
   });
@@ -174,5 +195,90 @@ describe('SenderView', () => {
     renderSenderView({ transferState: 'completed', files: [queuedFile, second], receiverFileIndices: [1] });
 
     expect(screen.getByText(/^1 file · /)).toBeDefined();
+  });
+
+  describe('changing how files are shared after the link is out', () => {
+    function editSharing(overrides: Partial<ComponentProps<typeof SenderView>> = {}) {
+      const onUpdateSharing = vi.fn();
+      renderSenderView({ files: [queuedFile], isShared: true, onUpdateSharing, ...overrides });
+      fireEvent.click(screen.getByTestId('edit-sharing'));
+      return { onUpdateSharing };
+    }
+
+    it('asks whether a stricter setting should also stop the current receiver', () => {
+      const { onUpdateSharing } = editSharing({ transferState: 'awaiting_receiver' });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
+      fireEvent.change(screen.getByPlaceholderText(/e\.g\. 1234/i), { target: { value: '1234' } });
+      fireEvent.click(screen.getByTestId('save-sharing'));
+      expect(onUpdateSharing).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId('apply-to-new'));
+      expect(onUpdateSharing).toHaveBeenCalledWith({ pin: '1234', requireApproval: false }, 'new');
+    });
+
+    it('can apply a stricter setting to the current receiver too', () => {
+      const { onUpdateSharing } = editSharing({ transferState: 'awaiting_receiver' });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /ask me before anyone connects/i }));
+      fireEvent.click(screen.getByTestId('save-sharing'));
+      fireEvent.click(screen.getByTestId('apply-now'));
+
+      expect(onUpdateSharing).toHaveBeenCalledWith({ pin: '', requireApproval: true }, 'now');
+    });
+
+    it('saves without asking when nobody is connected or the change only loosens things', () => {
+      const { onUpdateSharing } = editSharing({ pin: '1234', transferState: 'awaiting_receiver' });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
+      fireEvent.click(screen.getByTestId('save-sharing'));
+
+      expect(onUpdateSharing).toHaveBeenCalledWith({ pin: '', requireApproval: false }, 'new');
+      expect(screen.queryByTestId('apply-now')).toBeNull();
+    });
+  });
+
+  describe('editing files after sharing', () => {
+    it('warns before removing a file from what a connected receiver is choosing from', () => {
+      const onRemoveFile = vi.fn();
+      renderSenderView({ files: [queuedFile], isShared: true, transferState: 'awaiting_receiver', onRemoveFile });
+      fireEvent.click(screen.getByTestId('edit-files'));
+
+      fireEvent.click(screen.getByTitle('Remove report.pdf'));
+      expect(onRemoveFile).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId('confirm'));
+
+      expect(onRemoveFile).toHaveBeenCalledWith('f1');
+    });
+
+    it('warns that clearing everything after sharing replaces the link', () => {
+      const onClearFiles = vi.fn();
+      renderSenderView({ files: [queuedFile], isShared: true, onClearFiles });
+      fireEvent.click(screen.getByTestId('edit-files'));
+
+      fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
+      expect(onClearFiles).not.toHaveBeenCalled();
+      expect(screen.getByText(/link stops working/i)).toBeDefined();
+      fireEvent.click(screen.getByTestId('confirm'));
+
+      expect(onClearFiles).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the PIN in the sharing summary so it can be passed on', () => {
+      renderSenderView({ files: [queuedFile], isShared: true, pin: '2468' });
+
+      expect(screen.getByText(/PIN 2468/)).toBeDefined();
+    });
+
+    it('removes straight away when nobody is connected, noting the link shows the change', () => {
+      const onRemoveFile = vi.fn();
+      renderSenderView({ files: [queuedFile], isShared: true, onRemoveFile });
+      fireEvent.click(screen.getByTestId('edit-files'));
+
+      expect(screen.getByText(/link is live/i)).toBeDefined();
+      fireEvent.click(screen.getByTitle('Remove report.pdf'));
+
+      expect(onRemoveFile).toHaveBeenCalledWith('f1');
+    });
   });
 });

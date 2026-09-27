@@ -305,6 +305,9 @@ describe('useSenderSession', () => {
     act(() => {
       session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
     });
+    act(() => {
+      session.result.current.actions.createLink();
+    });
 
     act(() => {
       session.connection.handlers.onIncomingConnection?.(peerConn, { shareKey: session.result.current.state.shareKey });
@@ -332,7 +335,7 @@ describe('useSenderSession', () => {
     expect(session.result.current.state.isPendingPeerTrusted).toBe(false);
   });
 
-  it('holds a link receiver until files are queued, then offers them', async () => {
+  it('holds a link receiver until files are queued and the link is created, then offers them', async () => {
     const session = await renderSenderSession();
     act(() => {
       session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('receiver-1'), {
@@ -344,6 +347,11 @@ describe('useSenderSession', () => {
 
     act(() => {
       session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+    });
+    expect(session.engines).toHaveLength(0);
+
+    act(() => {
+      session.result.current.actions.createLink();
     });
 
     expect(session.engines).toHaveLength(1);
@@ -451,6 +459,108 @@ describe('useSenderSession', () => {
     expect(session.connections[0].destroy).toHaveBeenCalled();
     expect(session.result.current.state.status).toBe('waiting');
     expect(session.result.current.state.roomNotice).toMatch(/new room/i);
+  });
+
+  describe('sharing', () => {
+    const linkGreeting = (session: Awaited<ReturnType<typeof renderSenderSession>>) => ({
+      shareKey: session.result.current.state.shareKey,
+    });
+
+    it('keeps link receivers waiting until the sender creates the link', async () => {
+      const session = await renderSenderSession();
+      act(() => {
+        session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+      });
+      act(() => {
+        session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('early'), linkGreeting(session));
+      });
+      expect(session.result.current.state.isShared).toBe(false);
+      expect(session.engines).toHaveLength(0);
+
+      act(() => {
+        session.result.current.actions.createLink();
+      });
+
+      expect(session.result.current.state.isShared).toBe(true);
+      expect(session.engines).toHaveLength(1);
+    });
+
+    it('asks before admitting link receivers when approval is required', async () => {
+      const session = await renderSenderSession();
+      act(() => {
+        session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+        session.result.current.actions.setRequireApproval(true);
+      });
+      act(() => {
+        session.result.current.actions.createLink();
+      });
+
+      act(() => {
+        session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('receiver-1'), linkGreeting(session));
+      });
+
+      expect(session.engines).toHaveLength(0);
+      expect(session.result.current.state.pendingPeerId).toBe('receiver-1');
+      expect(session.result.current.state.isPendingPeerTrusted).toBe(false);
+    });
+
+    it('applies changed settings to new connections only, unless told to stop current transfers', async () => {
+      const { engine, result } = await startTransfer();
+
+      act(() => {
+        result.current.actions.updateSharing({ pin: '9999', requireApproval: false }, 'new');
+      });
+      expect(engine.cancel).not.toHaveBeenCalled();
+      expect(result.current.state.pin).toBe('9999');
+      expect(result.current.state.status).toBe('awaiting_receiver');
+
+      act(() => {
+        result.current.actions.updateSharing({ pin: '1111', requireApproval: true }, 'now');
+      });
+      expect(engine.cancel).toHaveBeenCalledTimes(1);
+      expect(result.current.state.status).toBe('waiting');
+      expect(result.current.state.requireApproval).toBe(true);
+    });
+
+    it('gives new connections the current PIN', async () => {
+      const session = await renderSenderSession();
+      act(() => {
+        session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+      });
+      act(() => {
+        session.result.current.actions.createLink();
+      });
+      act(() => {
+        session.result.current.actions.updateSharing({ pin: '4242', requireApproval: false }, 'new');
+      });
+
+      act(() => {
+        session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('receiver-1'), linkGreeting(session));
+      });
+
+      expect(session.engines[0].start).toHaveBeenCalledWith(expect.any(Array), '4242');
+    });
+
+    it('starts the next batch with a fresh link, so earlier recipients cannot join it', async () => {
+      const session = await renderSenderSession();
+      act(() => {
+        session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+      });
+      act(() => {
+        session.result.current.actions.createLink();
+      });
+      const firstKey = session.result.current.state.shareKey;
+
+      act(() => {
+        session.result.current.actions.clearFiles();
+      });
+
+      await waitFor(() => expect(session.connections).toHaveLength(2));
+      expect(session.connections[1].initSender).toHaveBeenCalledWith(settings, { preferredRoomId: undefined });
+      await waitFor(() => expect(session.result.current.state.shareKey).not.toBe(''));
+      expect(session.result.current.state.shareKey).not.toBe(firstKey);
+      expect(session.result.current.state.isShared).toBe(false);
+    });
   });
 
   it('uses a fresh link key for every new room', async () => {

@@ -16,8 +16,12 @@ export interface SenderSessionState {
   shareKey: string;
   files: TransferFile[];
   pin: string;
+  /** Even receivers with the link key must be accepted by hand */
+  requireApproval: boolean;
+  /** The sender has finished choosing and created the link; until then nobody is admitted */
+  isShared: boolean;
   pendingPeerId: string | null;
-  /** The pending receiver opened the share link; it is admitted as soon as files are queued */
+  /** The pending receiver may be admitted without asking (valid link key, approval not required) once shared */
   isPendingPeerTrusted: boolean;
   connectedPeerId: string | null;
   metrics: TransferMetrics | null;
@@ -42,6 +46,8 @@ type SenderAction =
   | { type: 'FILES_CLEARED' }
   | { type: 'QUEUE_EMPTIED' }
   | { type: 'PIN_CHANGED'; pin: string }
+  | { type: 'APPROVAL_REQUIREMENT_CHANGED'; requireApproval: boolean }
+  | { type: 'LINK_CREATED' }
   | { type: 'PEER_REQUESTED'; peerId: string; isTrusted: boolean }
   | { type: 'PEER_REJECTED' }
   | { type: 'PEER_DISCONNECTED'; peerId?: string }
@@ -61,6 +67,8 @@ export const initialSenderState: SenderSessionState = {
   shareKey: '',
   files: [],
   pin: '',
+  requireApproval: false,
+  isShared: false,
   pendingPeerId: null,
   isPendingPeerTrusted: false,
   connectedPeerId: null,
@@ -104,6 +112,7 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
         status: 'idle',
         roomCode: '',
         shareKey: '',
+        isShared: false,
         pendingPeerId: null,
         isPendingPeerTrusted: false,
         connectedPeerId: null,
@@ -114,11 +123,23 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
     case 'FILE_REMOVED':
       return { ...state, files: state.files.filter((f) => f.id !== action.fileId) };
     case 'FILES_CLEARED':
-      return { ...state, ...noProgress, files: [], status: 'waiting', connectedPeerId: null, corruptedFiles: [] };
+      return {
+        ...state,
+        ...noProgress,
+        files: [],
+        status: 'waiting',
+        connectedPeerId: null,
+        corruptedFiles: [],
+        isShared: false,
+      };
     case 'QUEUE_EMPTIED':
       return { ...state, files: [] };
     case 'PIN_CHANGED':
       return { ...state, pin: action.pin };
+    case 'APPROVAL_REQUIREMENT_CHANGED':
+      return { ...state, requireApproval: action.requireApproval };
+    case 'LINK_CREATED':
+      return { ...state, isShared: true };
     case 'PEER_REQUESTED':
       return { ...state, pendingPeerId: action.peerId, isPendingPeerTrusted: action.isTrusted };
     case 'PEER_REJECTED':
@@ -184,6 +205,11 @@ function fileIdentity(file: TransferFile): string {
   return `${displayPath(file)}|${file.size}|${file.lastModified}`;
 }
 
+export interface SharingOptions {
+  pin: string;
+  requireApproval: boolean;
+}
+
 interface OpenRoomOptions {
   /** Never reuse the remembered room, so its code and link stop working */
   isFresh?: boolean;
@@ -205,15 +231,25 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   const shareKeyRef = useRef<string | null>(null);
   const settingsRef = useRef(settings);
   // Read by connection callbacks, which outlive the render that registered them
-  const queueRef = useRef({ files: state.files, pin: state.pin });
+  const queueRef = useRef({
+    files: state.files,
+    pin: state.pin,
+    isShared: state.isShared,
+    requireApproval: state.requireApproval,
+  });
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
   useEffect(() => {
-    queueRef.current = { files: state.files, pin: state.pin };
-  }, [state.files, state.pin]);
+    queueRef.current = {
+      files: state.files,
+      pin: state.pin,
+      isShared: state.isShared,
+      requireApproval: state.requireApproval,
+    };
+  }, [state.files, state.pin, state.isShared, state.requireApproval]);
 
   const startTransfer = useCallback(
     (conn: DataConnection, files: TransferFile[], pin: string) => {
@@ -277,14 +313,16 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
           return;
         }
         soundService.playConnect();
-        const isTrusted = greeting.shareKey !== null && greeting.shareKey === shareKeyRef.current;
-        const { files, pin } = queueRef.current;
-        if (isTrusted && files.length > 0) {
+        const { files, pin, isShared, requireApproval } = queueRef.current;
+        const hasLinkKey = greeting.shareKey !== null && greeting.shareKey === shareKeyRef.current;
+        const isAdmittable = hasLinkKey && !requireApproval;
+        if (isAdmittable && isShared && files.length > 0) {
           startTransfer(conn, files, pin);
           return;
         }
+        // Held until the link exists and files are queued, or (without the key) until approved
         pendingConnRef.current = conn;
-        dispatch({ type: 'PEER_REQUESTED', peerId: conn.peer, isTrusted });
+        dispatch({ type: 'PEER_REQUESTED', peerId: conn.peer, isTrusted: isAdmittable });
       },
       onDisconnected: (peerId) => {
         if (connectionRef.current !== connection) {
@@ -359,10 +397,35 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       engineRef.current?.updateFiles(files);
       return;
     }
+    admitHeldReceiver(files, state.isShared);
+  };
+
+  /** A link receiver that arrived early is admitted once the link exists and there is something to send. */
+  const admitHeldReceiver = (files: TransferFile[], isShared: boolean) => {
     const conn = pendingConnRef.current;
-    if (conn && state.isPendingPeerTrusted && files.length > 0) {
+    if (conn && state.isPendingPeerTrusted && isShared && files.length > 0) {
       pendingConnRef.current = null;
       startTransfer(conn, files, state.pin);
+    }
+  };
+
+  const createLink = () => {
+    if (state.files.length === 0) {
+      return;
+    }
+    dispatch({ type: 'LINK_CREATED' });
+    admitHeldReceiver(state.files, true);
+  };
+
+  /**
+   * Changes the sharing options once the link is out. PIN and approval are checked when someone connects,
+   * so 'new' leaves current receivers alone; 'now' stops the current transfer so it has to reconnect.
+   */
+  const updateSharing = ({ pin, requireApproval }: SharingOptions, applyTo: 'new' | 'now') => {
+    dispatch({ type: 'PIN_CHANGED', pin });
+    dispatch({ type: 'APPROVAL_REQUIREMENT_CHANGED', requireApproval });
+    if (applyTo === 'now' && engineRef.current) {
+      cancel();
     }
   };
 
@@ -415,6 +478,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     engineRef.current = null;
     connectionRef.current?.disconnectPeer();
     dispatch({ type: 'FILES_CLEARED' });
+    // A new batch gets a new link: whoever had the old one must not be let into the next share
+    if (state.isShared) {
+      openRoom({ isFresh: true });
+    }
   };
 
   return {
@@ -424,6 +491,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       removeFile,
       clearFiles,
       setPin: (pin: string) => dispatch({ type: 'PIN_CHANGED', pin }),
+      setRequireApproval: (requireApproval: boolean) =>
+        dispatch({ type: 'APPROVAL_REQUIREMENT_CHANGED', requireApproval }),
+      createLink,
+      updateSharing,
       approvePeer,
       rejectPeer,
       togglePause: () => engineRef.current?.togglePause(),
