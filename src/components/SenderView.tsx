@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock, Sparkles } from 'lucide-react';
 import type { TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { QrModal } from './QrModal';
 import { PeerApprovalModal } from './PeerApprovalModal';
+import { fireCelebration } from '../services/confetti';
 
 interface SenderViewProps {
   roomCode: string;
@@ -49,6 +50,12 @@ export const SenderView: React.FC<SenderViewProps> = ({
   const shareUrl = typeof window !== 'undefined'
     ? `${window.location.origin}${window.location.pathname}?room=${roomCode}`
     : '';
+
+  useEffect(() => {
+    if (transferState === 'completed') {
+      fireCelebration();
+    }
+  }, [transferState]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -114,44 +121,44 @@ export const SenderView: React.FC<SenderViewProps> = ({
           />
         )
       ) : transferState === 'completed' ? (
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-xl">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+        <div className="rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl animate-fade-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] flex items-center justify-center animate-bounce">
             <Sparkles className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
+          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
             Transfer Complete!
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
             All {files.length} files ({formatBytes(totalSize)}) transferred and verified successfully.
           </p>
           <button
             onClick={onClearFiles}
-            className="px-6 py-2.5 rounded-xl font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20"
+            className="px-6 py-2.5 rounded-xl font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
           >
             Send More Files
           </button>
         </div>
       ) : (
         <>
-          {/* File Selection Dropzone */}
+          {/* File Selection Dropzone with Floating Animation */}
           <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
+            className={`group border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
               isDragging
-                ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 scale-[1.01]'
-                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white/50 dark:bg-slate-900/50'
+                ? 'border-[#3ECF8E] bg-[#3ECF8E]/10 scale-[1.01] shadow-xl shadow-[#3ECF8E]/10'
+                : 'border-zinc-200 dark:border-zinc-800 hover:border-[#3ECF8E]/60 bg-white dark:bg-[#181818]'
             }`}
           >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-inner">
-              <UploadCloud className="w-8 h-8" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-[#3ECF8E] flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+              <UploadCloud className="w-8 h-8 animate-float" />
             </div>
 
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">
               Drag & Drop files or directories here
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
               Up to 10GB+ per file. Direct WebRTC streaming with zero cloud storage.
             </p>
 
@@ -170,7 +177,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
               >
                 <FileUp className="w-4 h-4" />
                 <span>Select Files</span>
@@ -193,7 +200,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
               <button
                 type="button"
                 onClick={() => folderInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
               >
                 <FolderUp className="w-4 h-4" />
                 <span>Select Folder</span>
@@ -203,9 +210,9 @@ export const SenderView: React.FC<SenderViewProps> = ({
 
           {/* Queued Files List */}
           {files.length > 0 && (
-            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
-                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            <div className="rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800 mb-3">
+                <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
                   Ready to Send ({files.length} {files.length === 1 ? 'file' : 'files'} • {formatBytes(totalSize)})
                 </span>
                 <button
@@ -220,17 +227,17 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800/80 text-xs"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 text-xs hover:border-[#3ECF8E]/30 transition-colors"
                   >
                     <div className="truncate mr-3">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 block truncate">
+                      <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">
                         {file.relativePath || file.name}
                       </span>
-                      <span className="text-slate-400 font-mono">{formatBytes(file.size)}</span>
+                      <span className="text-zinc-400 font-mono">{formatBytes(file.size)}</span>
                     </div>
                     <button
                       onClick={() => onRemoveFile(file.id)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                      className="p-1 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -241,19 +248,19 @@ export const SenderView: React.FC<SenderViewProps> = ({
           )}
 
           {/* Share & Pair Box */}
-          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-xl relative overflow-hidden">
+          <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl relative overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h4 className="font-bold text-slate-900 dark:text-white">
+                <h4 className="font-bold text-zinc-900 dark:text-white">
                   Share with Receiver
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   {connectedPeerId ? `Connected to peer (${connectedPeerId})` : 'The receiver needs this 6-digit code or link to establish the direct P2P connection.'}
                 </p>
               </div>
               <button
                 onClick={() => setIsQrOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#3ECF8E]/10 text-[#3ECF8E] hover:bg-[#3ECF8E]/20 transition-all hover:scale-105"
               >
                 <QrCode className="w-4 h-4" />
                 <span>Show QR</span>
@@ -261,24 +268,24 @@ export const SenderView: React.FC<SenderViewProps> = ({
             </div>
 
             {/* Room Code Display */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 mb-4">
+            <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/80 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-4">
               <div className="flex-1 text-center sm:text-left">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Room Code</span>
-                <span className="font-mono text-2xl font-black tracking-widest text-indigo-600 dark:text-indigo-400">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block">Room Code</span>
+                <span className="font-mono text-2xl font-black tracking-widest text-[#3ECF8E]">
                   {roomCode || 'Generating...'}
                 </span>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleCopyCode}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
                 >
-                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-[#3ECF8E]" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
                 </button>
                 <button
                   onClick={handleCopyLink}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-sm transition-all hover:scale-105"
                 >
                   {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedLink ? 'Link Copied' : 'Copy Link'}</span>
@@ -287,10 +294,10 @@ export const SenderView: React.FC<SenderViewProps> = ({
             </div>
 
             {/* Optional Room PIN */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4 text-slate-400" />
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                <Lock className="w-4 h-4 text-zinc-400" />
+                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                   Require Session PIN (Optional)
                 </span>
               </div>
@@ -300,7 +307,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 placeholder="e.g. 1234"
                 value={pin}
                 onChange={(e) => onPinChange(e.target.value)}
-                className="w-24 text-center font-mono text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                className="w-24 text-center font-mono text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:border-[#3ECF8E] focus:outline-none"
               />
             </div>
           </div>
