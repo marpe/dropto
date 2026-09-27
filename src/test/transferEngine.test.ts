@@ -278,6 +278,132 @@ describe('TransferEngine connection loss', () => {
   });
 });
 
+describe('TransferEngine storage and read failures', () => {
+  afterEach(() => {
+    clearFilePickers();
+  });
+
+  function useSaveFilePickerWith(writable: { write: (chunk: Uint8Array) => Promise<void> }) {
+    (window as any).showSaveFilePicker = vi.fn().mockResolvedValue({
+      createWritable: vi.fn().mockResolvedValue({
+        write: writable.write,
+        close: vi.fn().mockResolvedValue(undefined),
+        abort: vi.fn().mockResolvedValue(undefined),
+      }),
+    });
+  }
+
+  function startPair(receiverErrors: string[], senderErrors: string[]) {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    let receiverCompleted = false;
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+      onAllCompleted: () => {
+        receiverCompleted = true;
+      },
+      onError: (err) => {
+        receiverErrors.push(err);
+      },
+    });
+    senderEngine.init(senderConn as any, true, {
+      onError: (err) => {
+        senderErrors.push(err);
+      },
+    });
+    return { senderEngine, isReceiverCompleted: () => receiverCompleted };
+  }
+
+  it('writes received chunks to disk one at a time', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    useSaveFilePickerWith({
+      write: async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight--;
+      },
+    });
+    const { senderEngine, isReceiverCompleted } = startPair([], []);
+
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 4)], false);
+
+    expect(await waitFor(isReceiverCompleted)).toBe(true);
+    expect(maxInFlight).toBe(1);
+  });
+
+  it('reports a disk write failure on both sides', async () => {
+    useSaveFilePickerWith({
+      write: () => Promise.reject(new Error('Disk full')),
+    });
+    const receiverErrors: string[] = [];
+    const senderErrors: string[] = [];
+    const { senderEngine, isReceiverCompleted } = startPair(receiverErrors, senderErrors);
+
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 3)], false);
+
+    expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
+    // Let any in-flight FILE_COMPLETE arrive; it must not complete the failed transfer
+    await new Promise((r) => setTimeout(r, 50));
+    expect(receiverErrors).toHaveLength(1);
+    expect(senderErrors).toHaveLength(1);
+    expect(isReceiverCompleted()).toBe(false);
+  });
+
+  it('reports a storage preparation failure on both sides', async () => {
+    const { root } = createMockDirectoryTree();
+    root.getFileHandle = vi.fn().mockRejectedValue(
+      Object.assign(new Error('Permission revoked'), { name: 'NotAllowedError' })
+    );
+    (window as any).showDirectoryPicker = vi.fn().mockResolvedValue(root);
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    const receiverErrors: string[] = [];
+    const senderErrors: string[] = [];
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.startReceiving();
+      },
+      onError: (err) => {
+        receiverErrors.push(err);
+      },
+    });
+    senderEngine.init(senderConn as any, true, {
+      onError: (err) => {
+        senderErrors.push(err);
+      },
+    });
+
+    await senderEngine.startSenderTransfer([createTestFile(1024, 'a.bin'), createTestFile(1024, 'b.bin')], false);
+
+    expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
+    expect(receiverErrors).toHaveLength(1);
+    expect(senderErrors).toHaveLength(1);
+  });
+
+  it('reports an unreadable source file on both sides', async () => {
+    const receiverErrors: string[] = [];
+    const senderErrors: string[] = [];
+    const { senderEngine } = startPair(receiverErrors, senderErrors);
+    const unreadable = createTestFile(10 * 1024);
+    unreadable.rawFile = {
+      size: unreadable.size,
+      slice: () => ({ arrayBuffer: () => Promise.reject(new Error('File was modified')) }),
+    } as unknown as File;
+
+    await senderEngine.startSenderTransfer([unreadable], false);
+
+    expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
+    expect(receiverErrors).toHaveLength(1);
+    expect(senderErrors).toHaveLength(1);
+  });
+});
+
 describe('TransferEngine multi-file receive', () => {
   afterEach(() => {
     clearFilePickers();
