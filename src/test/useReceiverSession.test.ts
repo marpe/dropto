@@ -13,6 +13,7 @@ const settings: AppSettings = {
   customStunTurn: [],
   enableAudioAlerts: false,
   enableWakeLock: false,
+  enableNotifications: false,
 };
 
 const manifest: TransferManifest = {

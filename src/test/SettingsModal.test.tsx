@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SettingsModal } from '../components/SettingsModal';
 import { DEFAULT_SETTINGS } from '../hooks/useSettings';
 import type { AppSettings } from '../types/transfer';
@@ -87,5 +87,30 @@ describe('SettingsModal relay servers', () => {
 
     expect(onThemeChange).toHaveBeenCalledWith('dark');
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('asks the browser before turning on notifications, and stays off if refused', async () => {
+    const onSave = vi.fn();
+    const requestPermission = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(
+      <SettingsModal
+        onClose={() => {}}
+        settings={DEFAULT_SETTINGS}
+        onSave={onSave}
+        themePreference="system"
+        onThemeChange={() => {}}
+        requestNotificationPermission={requestPermission}
+      />
+    );
+    const toggle = screen.getByRole('checkbox', { name: /notify when done/i });
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getByText(/blocked/i)).toBeDefined());
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect((toggle as HTMLInputElement).checked).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ enableNotifications: true }));
   });
 });

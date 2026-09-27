@@ -1,5 +1,6 @@
 import { soundService } from './sound';
 import { wakeLockService } from './wakeLock';
+import { notificationService } from './notifications';
 
 /** Device-level side effects around a transfer, kept out of the protocol code. */
 export interface TransferEffects {
@@ -17,5 +18,6 @@ export const defaultTransferEffects: TransferEffects = {
     if (isSuccessful) {
       soundService.playComplete();
     }
+    notificationService.notifyTransferEnded(isSuccessful);
   },
 };
