@@ -13,14 +13,13 @@ const BuildStamp: React.FC<{ buildInfo: BuildInfo }> = ({ buildInfo }) => {
   }
   return (
     <span className="tabular-nums">
-      Build{' '}
       <a
         href={`${REPOSITORY_URL}/commit/${buildInfo.commit}`}
         target="_blank"
         rel="noopener noreferrer"
         className="font-mono hover:text-brand-500 transition-colors"
       >
-        {buildInfo.commit}
+        #{buildInfo.commit}
       </a>
       {buildInfo.builtAtIso && (
         <>
@@ -38,7 +37,7 @@ const BuildStamp: React.FC<{ buildInfo: BuildInfo }> = ({ buildInfo }) => {
 
 export const Footer: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_INFO }) => (
   <footer className="w-full max-w-3xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400 border-t border-zinc-200 dark:border-zinc-800/80">
-    <div>{getActiveBrand().name} • Browser-only WebRTC P2P Transfer • Files never touch an intermediate server</div>
+    <div>{getActiveBrand().name}</div>
     <div className="flex items-center gap-4">
       <BuildStamp buildInfo={buildInfo} />
       <a
@@ -48,7 +47,7 @@ export const Footer: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_
         className="flex items-center gap-1.5 hover:text-brand-500 transition-colors"
       >
         <GitHubIcon className="w-4 h-4" />
-        <span>GitHub (marpe/send)</span>
+        <span>GitHub</span>
       </a>
     </div>
   </footer>
