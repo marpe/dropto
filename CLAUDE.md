@@ -35,11 +35,14 @@ Layers, from the network up:
 
 Control messages are JSON strings; data chunks are binary with a 16-byte big-endian header: `u32 fileIndex | u64 chunkIndex | u32 payloadLength`, then a 64 KB payload.
 
-Flow: sender approves peer, then `TransferSender.start(files, pin)`. If there's a PIN, the sender sends `AUTH_REQUEST` and waits for `AUTH_RESPONSE` (3 attempts); after that comes `MANIFEST`. The receiver then calls `startReceiving()` and sends `FILE_START`. For each file: chunks, then `FILE_COMPLETE {checksum}` (CRC-32), then `FILE_ACK {isVerified}`, then the next `FILE_START`. The last ack fires `onAllCompleted({ corruptedFiles })` on both sides.
+Admission: the receiver's first message is always `HELLO {shareKey}`. `WebRtcService` waits for it (3 s timeout → no key) before announcing the connection with `onIncomingConnection(conn, { shareKey })`. Each sender room has a random 128-bit key (`utils/shareLink.ts`) carried in the link's fragment (`?room=DW-XXXXXX#key=…`, never sent to servers). A matching key is admitted without asking, or held until files are queued; no key or a wrong key gets the Accept prompt. The receiver auto-connects when opened with a key, strips it from the address bar, and only presents it to the room it was shared for. The room code and key persist in `sessionStorage` (`utils/roomMemory.ts`) so a sender reload keeps shared links working.
+
+Flow: sender admits the peer, then `TransferSender.start(files, pin)`. If there's a PIN, the sender sends `AUTH_REQUEST` and waits for `AUTH_RESPONSE` (3 attempts); after that comes `MANIFEST`. The receiver then calls `startReceiving()` and sends `FILE_START`. For each file: chunks, then `FILE_COMPLETE {checksum}` (CRC-32), then `FILE_ACK {isVerified}`, then the next `FILE_START`. The last ack fires `onAllCompleted({ corruptedFiles })` on both sides.
 
 Invariants that tests rely on:
 - Incoming messages go through a single serialized promise queue, so disk writes never overlap. The `FILE_START` handler must **not** await the file stream, or pause/cancel messages would be blocked.
 - The sender only honours `FILE_START` after it has sent the manifest (the PIN gate).
+- Until the first `FILE_START` (sender status `awaiting_receiver`), `updateFiles()` re-sends `MANIFEST` so the receiver's list stays live; afterwards the list is frozen. A receiver whose manifest changed while its save picker was open aborts `startReceiving()` and asks again. A receiver leaving before its first `FILE_START` returns the sender to `waiting` without an error.
 - The receiver validates each chunk's file index, sequence and size against the manifest *before* checksumming or writing it.
 - `TRANSFER_CANCEL` from the peer stops locally without echoing it back. Local fatal errors go through `failTransfer()`, which sends `ERROR` to the peer.
 - A connection closing while a transfer is active surfaces as `onError`. After a stop, late messages are ignored.

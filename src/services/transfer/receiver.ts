@@ -9,6 +9,8 @@ import { decodeChunk } from './protocol';
 export interface ReceiverOptions {
   /** Picks where files are written; must run inside a user gesture (file pickers). */
   chooseStorage?: (files: ManifestFile[]) => Promise<WriterFactory | null>;
+  /** Key from the sender's share link; lets the sender admit this receiver without asking */
+  shareKey?: string | null;
 }
 
 /** Receives a manifest, then writes each file to the chosen storage while verifying it. */
@@ -22,9 +24,15 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   private receivedBytesForFile = 0;
   private expectedChunkIndex = 0;
 
-  constructor(conn: DataConnection, events: ReceiverEvents, { chooseStorage = chooseWriterFactory }: ReceiverOptions = {}) {
+  constructor(
+    conn: DataConnection,
+    events: ReceiverEvents,
+    { chooseStorage = chooseWriterFactory, shareKey = null }: ReceiverOptions = {}
+  ) {
     super(conn, events);
     this.chooseStorage = chooseStorage;
+    // Always the first message: the sender decides between auto-admitting and asking
+    this.send({ type: 'HELLO', payload: { shareKey } });
   }
 
   public submitPin(pin: string) {
@@ -33,11 +41,13 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
 
   /** Picks the save destination once (inside the user's click) and requests the first file. */
   public async startReceiving(): Promise<boolean> {
-    if (!this.manifest || this.manifest.files.length === 0) {
+    const manifest = this.manifest;
+    if (!manifest || manifest.files.length === 0) {
       return false;
     }
-    const createWriter = await this.chooseStorage(this.manifest.files);
-    if (!createWriter) {
+    const createWriter = await this.chooseStorage(manifest.files);
+    // The sender changed the list while the picker was open; the choice may not fit it (e.g. one-file dialog)
+    if (!createWriter || this.manifest !== manifest) {
       return false;
     }
     this.createWriter = createWriter;
@@ -47,6 +57,10 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   protected async handleMessage(message: ControlMessage) {
     switch (message.type) {
       case 'MANIFEST':
+        // The sender may refine the list while this side is choosing; never once writing started
+        if (this.createWriter) {
+          throw new Error('The sender changed the file list after the download started');
+        }
         this.manifest = message.payload;
         this.beginTransfer(message.payload.totalBytes, message.payload.files.length);
         this.events.onManifest?.(message.payload);

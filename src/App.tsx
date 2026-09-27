@@ -10,12 +10,18 @@ import { useSenderSession } from './hooks/useSenderSession';
 import { useReceiverSession } from './hooks/useReceiverSession';
 import { useLeaveGuard } from './hooks/useLeaveGuard';
 import { useProgressTitle } from './hooks/useProgressTitle';
+import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
+import type { ShareLink } from './utils/shareLink';
 
 type Mode = 'send' | 'receive';
 
-/** Room code from a ?room=XX-XXXXXX share link, if the page was opened through one. */
-function getSharedRoomCode(): string {
-  return new URLSearchParams(window.location.search).get('room')?.toUpperCase() ?? '';
+/** Reads the link the page was opened with, then hides its key from the address bar, history and screenshots. */
+function readShareLink(): ShareLink {
+  const link = parseShareLink(window.location.search, window.location.hash);
+  if (link.shareKey) {
+    window.history.replaceState(window.history.state, '', stripShareKeyFromUrl(window.location.href));
+  }
+  return link;
 }
 
 const isNativeFSA = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
@@ -24,13 +30,15 @@ export const App: React.FC = () => {
   const [darkMode, toggleDarkMode] = useDarkMode();
   const [settings, saveSettings] = useSettings();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [sharedRoomCode] = useState(getSharedRoomCode);
-  const [mode, setMode] = useState<Mode>(sharedRoomCode ? 'receive' : 'send');
+  const [shareLink] = useState(readShareLink);
+  const [mode, setMode] = useState<Mode>(shareLink.roomCode ? 'receive' : 'send');
 
   const sender = useSenderSession({ active: mode === 'send', settings });
-  const receiver = useReceiverSession({ active: mode === 'receive', settings, initialRoomCode: sharedRoomCode });
+  const receiver = useReceiverSession({ active: mode === 'receive', settings, shareLink });
 
   const isTransferring = sender.state.status === 'transferring' || receiver.state.status === 'transferring';
+  // A receiver choosing where to save would be dropped by a mode switch too
+  const isSessionBusy = isTransferring || sender.state.status === 'awaiting_receiver';
   useLeaveGuard(isTransferring);
   const activeMetrics =
     sender.state.status === 'transferring' ? sender.state.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
@@ -51,16 +59,16 @@ export const App: React.FC = () => {
         <SettingsModal onClose={() => setIsSettingsOpen(false)} settings={settings} onSave={saveSettings} />
       )}
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8">
         {/* Switching modes tears down the other session, so it is hidden mid-transfer */}
-        {!isTransferring && (
+        {!isSessionBusy && (
           <div className="flex justify-center mb-8">
             <div className="inline-flex p-1 rounded-2xl bg-zinc-200/80 dark:bg-supabase-surface border border-zinc-300/60 dark:border-zinc-800">
               {(['send', 'receive'] as const).map((option) => (
                 <button
                   key={option}
                   onClick={() => setMode(option)}
-                  className={`py-2 px-6 rounded-xl text-sm font-bold transition-all ${
+                  className={`py-2 px-6 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow] ${
                     mode === option
                       ? 'bg-brand-500 text-supabase-bg shadow-md shadow-brand-500/20'
                       : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
@@ -77,14 +85,15 @@ export const App: React.FC = () => {
           {mode === 'send' ? (
             <SenderView
               roomCode={sender.state.roomCode}
+              shareKey={sender.state.shareKey}
               files={sender.state.files}
               onAddFiles={sender.actions.addFiles}
               onRemoveFile={sender.actions.removeFile}
               onClearFiles={sender.actions.clearFiles}
-              connectedPeerId={sender.state.connectedPeerId}
               transferMetrics={sender.state.metrics}
               transferState={sender.state.status}
               pendingPeerId={sender.state.pendingPeerId}
+              isPendingPeerTrusted={sender.state.isPendingPeerTrusted}
               onApprovePeer={sender.actions.approvePeer}
               onRejectPeer={sender.actions.rejectPeer}
               onTogglePause={sender.actions.togglePause}
@@ -117,6 +126,7 @@ export const App: React.FC = () => {
               isNativeFSA={isNativeFSA}
               corruptedFiles={receiver.state.corruptedFiles}
               onReset={receiver.actions.reset}
+              isInvited={receiver.state.isInvited}
             />
           )}
         </div>

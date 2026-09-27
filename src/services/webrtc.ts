@@ -2,15 +2,26 @@ import Peer from 'peerjs';
 import type { DataConnection, PeerOptions } from 'peerjs';
 import type { AppSettings } from '../types/transfer';
 import { getActiveBrand } from '../branding';
+import { parseControlMessage } from './transfer/protocol';
+
+export interface ReceiverGreeting {
+  /** Key from the sender's share link, or null when the room code was typed in */
+  shareKey: string | null;
+}
+
+export interface SenderRoomOptions {
+  preferredRoomId?: string;
+}
 
 export type ConnectionEventHandler = {
-  onIncomingConnection?: (conn: DataConnection) => void;
+  onIncomingConnection?: (conn: DataConnection, greeting: ReceiverGreeting) => void;
   /** peerId identifies which incoming connection closed; absent when the whole session ended */
   onDisconnected?: (peerId?: string) => void;
   onError?: (err: any) => void;
 };
 
 const MAX_ROOM_ID_ATTEMPTS = 4;
+const GREETING_TIMEOUT_MS = 3_000;
 
 /** One signalling session: a sender's room or a receiver's connection to a room. */
 export class WebRtcService {
@@ -37,11 +48,16 @@ export class WebRtcService {
     return `${getActiveBrand().roomPrefix}-${code}`;
   }
 
-  public initSender(settings?: Partial<AppSettings>, attempt = 1): Promise<string> {
+  /** Opens a room, reusing `preferredRoomId` when it is still free (e.g. after a sender reload). */
+  public initSender(settings?: Partial<AppSettings>, { preferredRoomId }: SenderRoomOptions = {}): Promise<string> {
+    return this.openRoom(settings, preferredRoomId ?? this.generateRoomId(), 1);
+  }
+
+  private openRoom(settings: Partial<AppSettings> | undefined, roomId: string, attempt: number): Promise<string> {
     return new Promise((resolve, reject) => {
       this.destroy();
 
-      const peer = new Peer(this.generateRoomId(), this.buildPeerOptions(settings));
+      const peer = new Peer(roomId, this.buildPeerOptions(settings));
       this.peer = peer;
 
       peer.on('open', (id) => {
@@ -56,7 +72,7 @@ export class WebRtcService {
         console.error('PeerJS error:', err);
         if (err.type === 'unavailable-id' && attempt < MAX_ROOM_ID_ATTEMPTS) {
           // Room code already taken on the signalling server; try a fresh one
-          this.initSender(settings, attempt + 1).then(resolve, reject);
+          this.openRoom(settings, this.generateRoomId(), attempt + 1).then(resolve, reject);
         } else {
           this.handlers.onError?.(err);
           reject(err);
@@ -118,14 +134,7 @@ export class WebRtcService {
       return;
     }
     this.activeConn = conn;
-
-    if (conn.open) {
-      this.handlers.onIncomingConnection?.(conn);
-    } else {
-      conn.on('open', () => {
-        this.handlers.onIncomingConnection?.(conn);
-      });
-    }
+    this.awaitGreeting(conn);
 
     conn.on('close', () => {
       if (this.activeConn === conn) {
@@ -138,6 +147,34 @@ export class WebRtcService {
       console.error('DataConnection error:', err);
       this.handlers.onError?.(err);
     });
+  }
+
+  /**
+   * Announces the connection once the receiver's HELLO (carrying any share-link key) arrives.
+   * Listening starts immediately so a HELLO sent right after the channel opens is never missed;
+   * receivers that never greet (older clients) are announced without a key after a timeout.
+   */
+  private awaitGreeting(conn: DataConnection) {
+    let isAnnounced = false;
+    const announce = (shareKey: string | null) => {
+      if (isAnnounced) {
+        return;
+      }
+      isAnnounced = true;
+      clearTimeout(timeout);
+      conn.off('data', onData);
+      if (this.activeConn === conn) {
+        this.handlers.onIncomingConnection?.(conn, { shareKey });
+      }
+    };
+    const onData = (data: unknown) => {
+      const message = typeof data === 'string' ? parseControlMessage(data) : null;
+      if (message?.type === 'HELLO') {
+        announce(message.payload.shareKey);
+      }
+    };
+    const timeout = setTimeout(() => announce(null), GREETING_TIMEOUT_MS);
+    conn.on('data', onData);
   }
 
   private buildPeerOptions(settings?: Partial<AppSettings>): PeerOptions {

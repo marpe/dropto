@@ -19,7 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const brand = getActiveBrand();
   return (
-    <header className="w-full max-w-5xl mx-auto px-4 py-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80">
+    <header className="w-full max-w-3xl mx-auto px-4 py-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800/80">
       <div className="flex items-center gap-3">
         <div className="relative w-10 h-10 rounded-xl bg-zinc-900 border border-brand-500/40 flex items-center justify-center shadow-lg shadow-brand-500/15 group hover:border-brand-500 transition-all">
           <div className="absolute inset-0 bg-brand-500/10 rounded-xl blur-sm group-hover:bg-brand-500/20 transition-all" />

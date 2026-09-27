@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 
 test.describe('DropWave Application End-to-End Tests', () => {
   test('renders homepage, toggles themes, and opens settings', async ({ page }) => {
@@ -49,6 +50,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
       getComputedStyle(document.documentElement).getPropertyValue('--brand-500').trim()
     );
     expect(brand500).toBe('249 115 22');
+    await addFile(page, 'brand.txt', 'orange');
     await expect(page.locator('.font-mono.text-2xl.font-black')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
   });
 
@@ -90,101 +92,73 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(connectBtn).toBeEnabled();
   });
 
-  test('full two-peer connection and transfer initiation flow', async ({ browser }) => {
-    // Context 1: Sender
-    const senderContext = await browser.newContext();
-    const senderPage = await senderContext.newPage();
+  test('typed room code: sender accepts, receiver saves, both verify', async ({ browser }) => {
+    const { senderPage, receiverPage, close } = await openPeers(browser);
 
-    // Context 2: Receiver
-    const receiverContext = await browser.newContext();
-    const receiverPage = await receiverContext.newPage();
-
-    // 1. Sender opens page
     await senderPage.goto('/');
     await expect(senderPage.locator('text=DropWave').first()).toBeVisible();
-
-    // Wait for room code to be generated
-    const roomCodeElement = senderPage.locator('.font-mono.text-2xl.font-black');
-    await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
-    const roomCodeText = (await roomCodeElement.textContent())?.trim();
-
-    // 2. Sender adds a dummy file to the transfer queue
-    const fileContent = 'Simulated 10GB dataset test buffer payload.';
-    const buffer = Buffer.from(fileContent);
-
-    // Set file input
-    const fileChooserPromise = senderPage.waitForEvent('filechooser');
-    await senderPage.locator('button:has-text("Select Files")').click();
-    const fileChooser = await fileChooserPromise;
-    await fileChooser.setFiles([
-      {
-        name: 'sample-dataset.dat',
-        mimeType: 'application/octet-stream',
-        buffer,
-      },
-    ]);
-
-    // Verify file added to queue
-    await expect(senderPage.locator('text=sample-dataset.dat')).toBeVisible();
+    await addFile(senderPage, 'sample-dataset.dat', 'Simulated 10GB dataset test buffer payload.');
     await expect(senderPage.locator('text=Ready to Send (1 file')).toBeVisible();
+    const roomCode = await readRoomCode(senderPage);
 
-    // 3. Receiver navigates to the sender room URL
-    await receiverPage.addInitScript(() => {
-      (window as any).showSaveFilePicker = async () => ({
-        createWritable: async () => ({
-          write: async () => {},
-          close: async () => {},
-          abort: async () => {},
-        }),
-      });
-    });
-    await receiverPage.goto(`/?room=${roomCodeText}`);
+    // No #key: the room code alone must still need the sender's approval
+    await receiverPage.goto(`/?room=${roomCode}`);
     await expect(receiverPage.locator('text=Receive Files via P2P')).toBeVisible();
-
-    // 4. Receiver clicks "Connect & Download"
-    const receiverConnectBtn = receiverPage.locator('button:has-text("Connect & Download")');
-    await receiverConnectBtn.click();
+    await receiverPage.locator('button:has-text("Connect & Download")').click();
     await expect(receiverPage.getByRole('heading', { name: 'Waiting for the Sender to Accept' })).toBeVisible({
       timeout: 15000,
     });
 
-    // 5. Sender receives incoming connection request modal
     await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.getByText('1 file', { exact: true })).toBeVisible();
-
-    // Sender clicks "Accept"
     await senderPage.locator('button:has-text("Accept")').click();
 
-    // 6. Receiver receives manifest and displays "Incoming Files Ready"
     await expect(receiverPage.locator('text=Incoming Files Ready')).toBeVisible({ timeout: 15000 });
     await expect(receiverPage.locator('text=sample-dataset.dat')).toBeVisible();
+    await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
 
-    // 7. Verify the save button is present, active, and clickable!
     const saveButton = receiverPage.locator('button:has-text("Select Save Location & Start Download")');
-    await expect(saveButton).toBeVisible();
     await expect(saveButton).toBeEnabled();
-
-    // 8. Receiver clicks "Select Save Location & Start Download"
     await saveButton.click();
 
-    // 9. Both sides reach a verified completion
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await close();
+  });
 
-    await senderContext.close();
-    await receiverContext.close();
+  test('share link: receiver connects without approval and sees files added later', async ({ browser }) => {
+    const { senderPage, receiverPage, close } = await openPeers(browser);
+
+    await senderPage.goto('/');
+    await expect(senderPage.getByRole('button', { name: 'Copy Link' })).toHaveCount(0);
+    await addFile(senderPage, 'first.txt', 'one');
+    await readRoomCode(senderPage);
+    await senderPage.getByRole('button', { name: 'Copy Link' }).click();
+    const link = await senderPage.evaluate(() => navigator.clipboard.readText());
+    expect(link).toMatch(/\?room=DW-[A-Z0-9]{6}#key=[\w-]{22}$/);
+
+    await receiverPage.goto(link);
+    await expect(receiverPage.locator('text=first.txt')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.locator('text=Receiver Connection Request')).toHaveCount(0);
+    await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
+    // The key must not linger in the address bar or history
+    expect(receiverPage.url()).not.toContain('key=');
+
+    await addFile(senderPage, 'second.txt', 'two');
+    await expect(receiverPage.locator('text=second.txt')).toBeVisible({ timeout: 15000 });
+
+    await receiverPage.locator('button:has-text("Select Download Folder & Start Download")').click();
+    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await close();
   });
 
   test('receiver can stop waiting for approval, which withdraws the request on the sender', async ({ browser }) => {
-    const senderContext = await browser.newContext();
-    const receiverContext = await browser.newContext();
-    const senderPage = await senderContext.newPage();
-    const receiverPage = await receiverContext.newPage();
+    const { senderPage, receiverPage, close } = await openPeers(browser);
 
     await senderPage.goto('/');
-    const roomCodeElement = senderPage.locator('.font-mono.text-2xl.font-black');
-    await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
-    const roomCode = (await roomCodeElement.textContent())?.trim();
+    await addFile(senderPage, 'waiting.txt', 'wait');
+    const roomCode = await readRoomCode(senderPage);
 
     await receiverPage.goto(`/?room=${roomCode}`);
     await receiverPage.locator('button:has-text("Connect & Download")').click();
@@ -197,34 +171,17 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await expect(receiverPage.locator('input[placeholder="DW-XXXXXX"]')).toBeVisible();
     await expect(senderPage.locator('text=Receiver Connection Request')).toHaveCount(0, { timeout: 15000 });
-
-    await senderContext.close();
-    await receiverContext.close();
+    await close();
   });
 
   test('PIN-protected transfer hides files until the correct PIN is entered', async ({ browser }) => {
-    const senderContext = await browser.newContext();
-    const receiverContext = await browser.newContext();
-    const senderPage = await senderContext.newPage();
-    const receiverPage = await receiverContext.newPage();
+    const { senderPage, receiverPage, close } = await openPeers(browser);
 
     await senderPage.goto('/');
-    const roomCodeElement = senderPage.locator('.font-mono.text-2xl.font-black');
-    await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
-    const roomCode = (await roomCodeElement.textContent())?.trim();
-
-    const fileChooserPromise = senderPage.waitForEvent('filechooser');
-    await senderPage.locator('button:has-text("Select Files")').click();
-    await (await fileChooserPromise).setFiles([
-      { name: 'secret-plans.pdf', mimeType: 'application/pdf', buffer: Buffer.from('top secret') },
-    ]);
+    await addFile(senderPage, 'secret-plans.pdf', 'top secret', 'application/pdf');
+    const roomCode = await readRoomCode(senderPage);
     await senderPage.locator('input[placeholder="e.g. 1234"]').fill('2468');
 
-    await receiverPage.addInitScript(() => {
-      (window as any).showSaveFilePicker = async () => ({
-        createWritable: async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} }),
-      });
-    });
     await receiverPage.goto(`/?room=${roomCode}`);
     await receiverPage.locator('button:has-text("Connect & Download")').click();
     await senderPage.locator('button:has-text("Accept")').click({ timeout: 15000 });
@@ -245,8 +202,43 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await receiverPage.locator('button:has-text("Select Save Location & Start Download")').click();
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
-
-    await senderContext.close();
-    await receiverContext.close();
+    await close();
   });
 });
+
+/** Two isolated browser contexts; the receiver's file pickers are stubbed to write nowhere. */
+async function openPeers(browser: Browser) {
+  const senderContext = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const receiverContext = await browser.newContext();
+  const senderPage = await senderContext.newPage();
+  const receiverPage = await receiverContext.newPage();
+  await receiverPage.addInitScript(() => {
+    const createWritable = async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} });
+    const fileHandle = { createWritable };
+    const directoryHandle = {
+      getFileHandle: async () => fileHandle,
+      getDirectoryHandle: async () => directoryHandle,
+    };
+    (window as any).showSaveFilePicker = async () => fileHandle;
+    (window as any).showDirectoryPicker = async () => directoryHandle;
+  });
+  const close = async () => {
+    await senderContext.close();
+    await receiverContext.close();
+  };
+  return { senderPage, receiverPage, close };
+}
+
+async function addFile(page: Page, name: string, content: string, mimeType = 'text/plain') {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.locator('button:has-text("Select Files")').click();
+  await (await fileChooserPromise).setFiles([{ name, mimeType, buffer: Buffer.from(content) }]);
+  await expect(page.locator(`text=${name}`)).toBeVisible();
+}
+
+/** The room code is shown once files are queued. */
+async function readRoomCode(page: Page): Promise<string> {
+  const roomCodeElement = page.locator('.font-mono.text-2xl.font-black');
+  await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
+  return (await roomCodeElement.textContent())?.trim() ?? '';
+}
