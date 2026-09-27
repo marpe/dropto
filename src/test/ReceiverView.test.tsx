@@ -305,4 +305,12 @@ describe('ReceiverView Component UI & Interaction', () => {
 
     expect(onConnect).toHaveBeenCalledTimes(1);
   });
+
+  it('shows that it is reconnecting while the sender is briefly away', () => {
+    const { onCancelTransfer } = renderWaiting('reconnecting', { isInvited: true });
+
+    expect(screen.getByRole('heading', { name: /reconnecting/i })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onCancelTransfer).toHaveBeenCalledTimes(1);
+  });
 });

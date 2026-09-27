@@ -40,7 +40,8 @@ type ReceiverAction =
   | { type: 'PIN_REQUIRED'; prompt: PinPrompt }
   | { type: 'PIN_SUBMITTED' }
   | { type: 'MANIFEST_RECEIVED'; manifest: TransferManifest }
-  | { type: 'PEER_DISCONNECTED' }
+  | { type: 'SENDER_LOST' }
+  | { type: 'RECONNECTING' }
   | { type: 'SAVING_STARTED' }
   | { type: 'SAVING_ABORTED' }
   | { type: 'METRICS'; metrics: TransferMetrics }
@@ -53,7 +54,18 @@ type ReceiverAction =
 const noProgress = { metrics: null, isPaused: false } as const;
 
 // Before a transfer starts, losing the sender means it declined or went away
-const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'pin_required', 'verifying_pin', 'connected'];
+const AWAITING_SENDER: ReceiverStatus[] = [
+  'connecting',
+  'reconnecting',
+  'waiting_approval',
+  'pin_required',
+  'verifying_pin',
+  'connected',
+];
+
+// Link receivers retry for about half a minute: long enough for the sender's page to reload
+const RECONNECT_DELAY_MS = 3_000;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
   switch (action.type) {
@@ -89,7 +101,10 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
       return { ...state, status: 'verifying_pin' };
     case 'MANIFEST_RECEIVED':
       return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null };
-    case 'PEER_DISCONNECTED':
+    case 'SENDER_LOST':
+      if (state.status === 'transferring') {
+        return { ...state, ...noProgress, status: 'error', error: 'The connection to the sender was lost.' };
+      }
       if (!AWAITING_SENDER.includes(state.status)) {
         return state;
       }
@@ -99,6 +114,8 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         manifest: null,
         error: 'The sender declined the connection or went offline.',
       };
+    case 'RECONNECTING':
+      return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null };
     case 'SAVING_STARTED':
       return { ...state, ...noProgress, status: 'transferring' };
     case 'SAVING_ABORTED':
@@ -141,6 +158,7 @@ interface UseReceiverSessionOptions {
   /** From the address the page was opened with: pre-fills the room, and a key connects straight away */
   shareLink?: ShareLink;
   services?: SessionServices;
+  reconnectDelayMs?: number;
 }
 
 export function useReceiverSession({
@@ -148,6 +166,7 @@ export function useReceiverSession({
   settings,
   shareLink = noShareLink,
   services = defaultSessionServices,
+  reconnectDelayMs = RECONNECT_DELAY_MS,
 }: UseReceiverSessionOptions) {
   const [state, dispatch] = useReducer(receiverReducer, {
     ...initialReceiverState,
@@ -158,6 +177,9 @@ export function useReceiverSession({
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
   const isRunningRef = useRef(false);
+  // Once the save location is chosen, a dropped connection is a failed transfer, not a reason to reconnect
+  const hasStartedSavingRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const settingsRef = useRef(settings);
 
   useEffect(() => {
@@ -176,6 +198,7 @@ export function useReceiverSession({
 
   const teardown = useCallback(() => {
     const connection = connectionRef.current;
+    clearTimeout(reconnectTimerRef.current);
     endRun(false);
     connectionRef.current = null;
     engineRef.current = null;
@@ -199,7 +222,7 @@ export function useReceiverSession({
   }, []);
 
   const connectTo = useCallback(
-    async (requestedRoomCode: string, link: ShareLink) => {
+    async function connectToRoom(requestedRoomCode: string, link: ShareLink, reconnectAttempt = 0): Promise<void> {
       const roomCode = requestedRoomCode.trim().toUpperCase();
       if (!roomCode) {
         return;
@@ -207,14 +230,32 @@ export function useReceiverSession({
       // The key belongs to the room it was shared for; never hand it to another sender
       const shareKey = roomCode === link.roomCode ? link.shareKey : null;
       teardown();
-      dispatch({ type: 'CONNECT_REQUESTED' });
+      hasStartedSavingRef.current = false;
+      if (reconnectAttempt === 0) {
+        dispatch({ type: 'CONNECT_REQUESTED' });
+      }
+
+      const scheduleReconnect = (attempt: number) => {
+        teardown();
+        dispatch({ type: 'RECONNECTING' });
+        reconnectTimerRef.current = setTimeout(() => connectToRoom(roomCode, link, attempt), reconnectDelayMs);
+      };
+      // Reached from both the signalling connection closing and the engine losing its data channel
+      const handleSenderGone = () => {
+        if (connectionRef.current !== connection) {
+          return;
+        }
+        if (shareKey !== null && !hasStartedSavingRef.current) {
+          scheduleReconnect(1);
+          return;
+        }
+        endRun(false);
+        leave();
+        dispatch({ type: 'SENDER_LOST' });
+      };
 
       const connection = services.createConnection({
-        onDisconnected: () => {
-          if (connectionRef.current === connection) {
-            dispatch({ type: 'PEER_DISCONNECTED' });
-          }
-        },
+        onDisconnected: handleSenderGone,
         onError: (err) => {
           console.error('WebRTC error:', err);
         },
@@ -253,6 +294,7 @@ export function useReceiverSession({
               leave();
               dispatch({ type: 'FAILED', error });
             }),
+            onConnectionLost: ifCurrent(handleSenderGone),
             onCancelled: ifCurrent(() => {
               endRun(false);
               leave();
@@ -265,16 +307,21 @@ export function useReceiverSession({
         soundService.playConnect();
         dispatch({ type: 'CONNECTED', isInvited: shareKey !== null });
       } catch (err) {
-        if (connectionRef.current === connection) {
-          teardown();
-          dispatch({
-            type: 'CONNECT_FAILED',
-            error: describePeerError(err),
-          });
+        if (connectionRef.current !== connection) {
+          return;
         }
+        if (reconnectAttempt > 0 && reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+          scheduleReconnect(reconnectAttempt + 1);
+          return;
+        }
+        teardown();
+        dispatch({
+          type: 'CONNECT_FAILED',
+          error: reconnectAttempt > 0 ? 'The sender went offline and did not come back.' : describePeerError(err),
+        });
       }
     },
-    [services, teardown, endRun, leave]
+    [services, teardown, endRun, leave, reconnectDelayMs]
   );
 
   // Opening the sender's link connects straight away: its key admits us without the sender having to accept
@@ -289,6 +336,7 @@ export function useReceiverSession({
     if (!engine) {
       return;
     }
+    hasStartedSavingRef.current = true;
     dispatch({ type: 'SAVING_STARTED' });
     const isStarted = await engine.startReceiving();
     if (engineRef.current !== engine) {
@@ -299,11 +347,13 @@ export function useReceiverSession({
       isRunningRef.current = true;
       services.effects.onTransferStarted();
     } else {
+      hasStartedSavingRef.current = false;
       dispatch({ type: 'SAVING_ABORTED' });
     }
   };
 
   const cancel = () => {
+    clearTimeout(reconnectTimerRef.current);
     const engine = engineRef.current;
     engine?.cancel();
     endRun(false);

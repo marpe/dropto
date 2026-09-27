@@ -1,11 +1,11 @@
 import React from 'react';
-import { FilePlus2, Hourglass, KeyRound } from 'lucide-react';
+import { FilePlus2, Hourglass, KeyRound, RefreshCw } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { IconBadge } from './ui/IconBadge';
 import { StatusCard } from './ui/StatusCard';
 
-export type WaitingStage = 'approval' | 'pin' | 'files';
+export type WaitingStage = 'approval' | 'pin' | 'files' | 'reconnecting';
 
 interface WaitingForSenderCardProps {
   stage: WaitingStage;
@@ -23,6 +23,11 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; ico
     title: 'Waiting for the Sender’s Files',
     description: 'You are connected. The files appear here as soon as the sender adds them.',
     icon: FilePlus2,
+  },
+  reconnecting: {
+    title: 'Sender Went Offline — Reconnecting…',
+    description: 'Their page probably reloaded. This reconnects on its own as soon as they are back.',
+    icon: RefreshCw,
   },
   pin: {
     title: 'Checking PIN…',

@@ -448,6 +448,26 @@ describe('backpressure', () => {
 });
 
 describe('connection loss', () => {
+  it('reports a dropped connection separately from errors when the UI wants to handle it', () => {
+    const senderConn = new MockDataConnection();
+    const errors: string[] = [];
+    let losses = 0;
+    const sender = new TransferSender(asConnection(senderConn), {
+      onError: (message) => {
+        errors.push(message);
+      },
+      onConnectionLost: () => {
+        losses++;
+      },
+    });
+
+    sender.start([createTestFile(10 * 1024)]);
+    senderConn.emit('close');
+
+    expect(losses).toBe(1);
+    expect(errors).toEqual([]);
+  });
+
   it('reports an error to the sender when the connection closes mid-transfer', () => {
     const senderConn = new MockDataConnection();
     const errors: string[] = [];

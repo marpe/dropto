@@ -167,6 +167,10 @@ export abstract class TransferPeer<Events extends TransferEvents> {
       return;
     }
     this.stop();
-    this.events.onError?.('Connection to peer lost');
+    if (this.events.onConnectionLost) {
+      this.events.onConnectionLost();
+    } else {
+      this.events.onError?.('Connection to peer lost');
+    }
   }
 }
