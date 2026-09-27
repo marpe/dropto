@@ -11,22 +11,29 @@ export class FileSystemAccessWriter implements StorageWriter {
   public isNativeFSA = true;
 
   public async prepare(filename: string, _size: number): Promise<boolean> {
+    if (typeof window === 'undefined' || !('showSaveFilePicker' in window)) {
+      return false;
+    }
+
     try {
-      if (!('showSaveFilePicker' in window)) {
-        return false;
+      const pickerOptions: any = {
+        suggestedName: filename,
+      };
+
+      const dotIndex = filename.lastIndexOf('.');
+      if (dotIndex > 0) {
+        const ext = filename.substring(dotIndex).toLowerCase();
+        pickerOptions.types = [
+          {
+            description: 'File',
+            accept: {
+              'application/octet-stream': [ext],
+            },
+          },
+        ];
       }
 
-      // Prompt user to pick save location
-      const handle = await (window as any).showSaveFilePicker({
-        suggestedName: filename,
-        types: [
-          {
-            description: 'All Files',
-            accept: { '*/*': [] },
-          },
-        ],
-      });
-
+      const handle = await (window as any).showSaveFilePicker(pickerOptions);
       this.writableStream = await handle.createWritable();
       return true;
     } catch (err: any) {
@@ -34,8 +41,8 @@ export class FileSystemAccessWriter implements StorageWriter {
         console.log('User cancelled save file dialog');
         return false;
       }
-      console.warn('Error opening FileSystemWritableFileStream:', err);
-      return false;
+      console.warn('Error opening FileSystemWritableFileStream, rethrowing for fallback:', err);
+      throw err;
     }
   }
 
@@ -81,16 +88,30 @@ export class MemoryFallbackWriter implements StorageWriter {
   }
 
   public async finalize(): Promise<void> {
-    const blob = new Blob(this.chunks);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = this.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-    this.chunks = [];
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      this.chunks = [];
+      return;
+    }
+    try {
+      const blob = new Blob(this.chunks);
+      if (typeof URL.createObjectURL === 'function') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        if (typeof URL.revokeObjectURL === 'function') {
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+        }
+      }
+    } catch (e) {
+      // In testing environments or restricted sandboxes, createObjectURL may not be available
+      console.warn('Memory download trigger warning:', e);
+    } finally {
+      this.chunks = [];
+    }
   }
 
   public async abort(): Promise<void> {
@@ -98,9 +119,51 @@ export class MemoryFallbackWriter implements StorageWriter {
   }
 }
 
-export function createStorageWriter(): StorageWriter {
-  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
-    return new FileSystemAccessWriter();
+export class AutoStorageWriter implements StorageWriter {
+  private activeWriter: StorageWriter;
+  public isNativeFSA = true;
+
+  constructor() {
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      this.activeWriter = new FileSystemAccessWriter();
+      this.isNativeFSA = true;
+    } else {
+      this.activeWriter = new MemoryFallbackWriter();
+      this.isNativeFSA = false;
+    }
   }
-  return new MemoryFallbackWriter();
+
+  public async prepare(filename: string, size: number): Promise<boolean> {
+    if (this.activeWriter.isNativeFSA) {
+      try {
+        const ok = await this.activeWriter.prepare(filename, size);
+        return ok;
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          return false;
+        }
+        console.warn('File System Access API failed, falling back to memory download:', err);
+        this.activeWriter = new MemoryFallbackWriter();
+        this.isNativeFSA = false;
+        return await this.activeWriter.prepare(filename, size);
+      }
+    }
+    return await this.activeWriter.prepare(filename, size);
+  }
+
+  public async writeChunk(chunk: Uint8Array): Promise<void> {
+    return this.activeWriter.writeChunk(chunk);
+  }
+
+  public async finalize(): Promise<void> {
+    return this.activeWriter.finalize();
+  }
+
+  public async abort(): Promise<void> {
+    return this.activeWriter.abort();
+  }
+}
+
+export function createStorageWriter(): StorageWriter {
+  return new AutoStorageWriter();
 }

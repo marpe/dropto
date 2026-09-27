@@ -38,18 +38,40 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   isNativeFSA,
 }) => {
   const [pinRequiredBySender] = useState(false);
+  const [isPreparingSave, setIsPreparingSave] = useState(false);
+
+  const handleStartSaveClick = async () => {
+    setIsPreparingSave(true);
+    try {
+      await onStartSaving();
+    } finally {
+      setIsPreparingSave(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6 animate-fade-in">
       {/* Active Transfer State */}
-      {connectionState === 'transferring' && transferMetrics ? (
-        <MetricsDashboard
-          metrics={transferMetrics}
-          isSender={false}
-          isPaused={isPaused}
-          onTogglePause={onTogglePause}
-          onCancel={onCancelTransfer}
-        />
+      {connectionState === 'transferring' ? (
+        transferMetrics ? (
+          <MetricsDashboard
+            metrics={transferMetrics}
+            isSender={false}
+            isPaused={isPaused}
+            onTogglePause={onTogglePause}
+            onCancel={onCancelTransfer}
+          />
+        ) : (
+          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-xl">
+            <div className="w-10 h-10 mx-auto mb-4 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+              Preparing Stream to Disk...
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Connecting stream chunks to storage
+            </p>
+          </div>
+        )
       ) : connectionState === 'completed' ? (
         <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-xl">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
@@ -111,11 +133,21 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           </div>
 
           <button
-            onClick={onStartSaving}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-base font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl shadow-indigo-600/25 transition-all"
+            onClick={handleStartSaveClick}
+            disabled={isPreparingSave}
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl text-base font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-75 text-white shadow-xl shadow-indigo-600/25 transition-all"
           >
-            <HardDriveDownload className="w-5 h-5" />
-            <span>Select Save Location & Start Download</span>
+            {isPreparingSave ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Opening File Dialog...</span>
+              </>
+            ) : (
+              <>
+                <HardDriveDownload className="w-5 h-5" />
+                <span>Select Save Location & Start Download</span>
+              </>
+            )}
           </button>
         </div>
       ) : (
