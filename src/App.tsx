@@ -98,6 +98,7 @@ export const App: React.FC = () => {
   // Sync settings
   useEffect(() => {
     soundService.enabled = settings.enableAudioAlerts;
+    wakeLockService.enabled = settings.enableWakeLock;
   }, [settings]);
 
   // Check URL query parameters for ?room=DW-XXXXXX
