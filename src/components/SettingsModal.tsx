@@ -147,7 +147,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <Modal onClose={onClose} size="md">
       <div className="flex items-center gap-2 pb-4 pr-10 border-b border-zinc-100 dark:border-zinc-800">
         <Server className="w-5 h-5 text-brand-500" />
-        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Transfer & Network Settings</h3>
+        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Settings</h3>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5 pt-4">
