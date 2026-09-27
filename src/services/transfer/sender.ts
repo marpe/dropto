@@ -7,7 +7,6 @@ import { CHUNK_SIZE, encodeChunk } from './protocol';
 const HIGH_WATERMARK_BYTES = 1024 * 1024;
 const LOW_WATERMARK_BYTES = 256 * 1024;
 const DRAIN_TIMEOUT_MS = 2_000;
-const PAUSE_POLL_MS = 100;
 const MAX_PIN_ATTEMPTS = 3;
 
 function waitForBufferDrain(channel: RTCDataChannel): Promise<void> {
@@ -152,9 +151,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     const channel = this.conn.dataChannel;
 
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-      while (this.isPaused && !this.isStopped) {
-        await new Promise((resolve) => setTimeout(resolve, PAUSE_POLL_MS));
-      }
+      await this.waitUntilResumed();
       if (this.isStopped) {
         return;
       }

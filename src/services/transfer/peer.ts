@@ -16,8 +16,10 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   protected readonly conn: DataConnection;
   protected readonly events: Events;
   protected metrics: TransferMetricsTracker | null = null;
-  protected isPaused = false;
   protected isStopped = false;
+  private paused = false;
+  // Resolved on resume or stop; waiting on an event (not a timer) keeps throttled background tabs responsive
+  private resumeWaiters: (() => void)[] = [];
   // From transfer start until completion or stop; losing the connection in this window is a failure
   private isActive = false;
   private incomingQueue: Promise<void> = Promise.resolve();
@@ -38,10 +40,9 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   }
 
   public togglePause(): boolean {
-    this.isPaused = !this.isPaused;
-    this.send({ type: this.isPaused ? 'TRANSFER_PAUSE' : 'TRANSFER_RESUME' });
-    this.events.onPaused?.(this.isPaused);
-    return this.isPaused;
+    this.setPaused(!this.paused);
+    this.send({ type: this.paused ? 'TRANSFER_PAUSE' : 'TRANSFER_RESUME' });
+    return this.paused;
   }
 
   public cancel() {
@@ -54,6 +55,14 @@ export abstract class TransferPeer<Events extends TransferEvents> {
 
   /** Stop-time cleanup specific to one side (e.g. discarding a partial file). */
   protected onStop() {}
+
+  /** Resolves at once unless paused; otherwise when either side resumes or the transfer stops. */
+  protected waitUntilResumed(): Promise<void> {
+    if (!this.paused || this.isStopped) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => this.resumeWaiters.push(resolve));
+  }
 
   protected send(message: ControlMessage) {
     if (this.conn.open) {
@@ -99,7 +108,22 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   private stop() {
     this.isActive = false;
     this.isStopped = true;
+    this.releaseResumeWaiters();
     this.onStop();
+  }
+
+  private setPaused(isPaused: boolean) {
+    this.paused = isPaused;
+    this.events.onPaused?.(isPaused);
+    if (!isPaused) {
+      this.releaseResumeWaiters();
+    }
+  }
+
+  private releaseResumeWaiters() {
+    const waiters = this.resumeWaiters;
+    this.resumeWaiters = [];
+    waiters.forEach((resolve) => resolve());
   }
 
   private async receive(data: unknown) {
@@ -126,8 +150,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
         return;
       case 'TRANSFER_PAUSE':
       case 'TRANSFER_RESUME':
-        this.isPaused = message.type === 'TRANSFER_PAUSE';
-        this.events.onPaused?.(this.isPaused);
+        this.setPaused(message.type === 'TRANSFER_PAUSE');
         return;
       case 'TRANSFER_CANCEL':
         // The peer cancelled: stop without echoing the cancel back
