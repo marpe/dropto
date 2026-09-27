@@ -98,6 +98,45 @@ describe('ReceiverView Component UI & Interaction', () => {
     });
   });
 
+  function renderReadyToSave(isNativeFSA: boolean) {
+    render(
+      <ReceiverView
+        roomCode="DW-123456"
+        onRoomCodeChange={() => {}}
+        pin=""
+        onPinChange={() => {}}
+        onConnect={() => {}}
+        connectionState="connected"
+        pinPrompt={null}
+        onSubmitPin={() => {}}
+        manifest={dummyManifest}
+        transferMetrics={null}
+        onStartSaving={() => {}}
+        onTogglePause={() => {}}
+        onCancelTransfer={() => {}}
+        isPaused={false}
+        errorMessage={null}
+        isNativeFSA={isNativeFSA}
+        corruptedFiles={[]}
+        onReset={() => {}}
+      />
+    );
+  }
+
+  it('warns that files are held in memory when the browser cannot stream to disk', () => {
+    renderReadyToSave(false);
+
+    expect(screen.getByText(/held in memory/i)).toBeDefined();
+    expect(screen.queryByText(/stream direct to disk/i)).toBeNull();
+  });
+
+  it('promises disk streaming only when the browser supports it', () => {
+    renderReadyToSave(true);
+
+    expect(screen.queryByText(/held in memory/i)).toBeNull();
+    expect(screen.getByText(/stream direct to disk/i)).toBeDefined();
+  });
+
   function renderPinStep(overrides: { pin?: string; incorrect?: boolean; attemptsLeft?: number } = {}) {
     const onSubmitPin = vi.fn();
     const onPinChange = vi.fn();

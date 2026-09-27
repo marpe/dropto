@@ -1,28 +1,57 @@
 import React, { useState } from 'react';
-import { X, Check, Server, Volume2 } from 'lucide-react';
-import type { AppSettings } from '../types/transfer';
+import { X, Check, Server, Volume2, Plus, Radio } from 'lucide-react';
+import type { AppSettings, IceServerConfig } from '../types/transfer';
+import { IceServerRow } from './IceServerRow';
 
 interface SettingsModalProps {
-  isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onSave: (newSettings: AppSettings) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen,
-  onClose,
-  settings,
-  onSave,
-}) => {
+const RELAY_URL = /^(stun|turns?):\S+$/i;
+
+function relayUrl(server: IceServerConfig): string {
+  return (Array.isArray(server.urls) ? server.urls.join(',') : server.urls).trim();
+}
+
+function relayError(server: IceServerConfig): string | null {
+  const url = relayUrl(server);
+  return url && !RELAY_URL.test(url) ? 'Must start with stun:, turn: or turns:' : null;
+}
+
+/** Drops blank rows and empty credentials so they are not passed to RTCPeerConnection. */
+function cleanRelayServers(servers: IceServerConfig[]): IceServerConfig[] {
+  return servers
+    .filter((server) => relayUrl(server))
+    .map((server) => ({
+      urls: relayUrl(server),
+      ...(server.username?.trim() && { username: server.username.trim() }),
+      ...(server.credential && { credential: server.credential }),
+    }));
+}
+
+/** Mounted fresh on each open, so unsaved edits are discarded on cancel. */
+export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, settings, onSave }) => {
   const [form, setForm] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [showRelayErrors, setShowRelayErrors] = useState(false);
 
-  if (!isOpen) return null;
+  const updateRelay = (index: number, server: IceServerConfig) => {
+    setForm({ ...form, customStunTurn: form.customStunTurn.map((s, i) => (i === index ? server : s)) });
+  };
+
+  const removeRelay = (index: number) => {
+    setForm({ ...form, customStunTurn: form.customStunTurn.filter((_, i) => i !== index) });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(form);
+    if (form.customStunTurn.some(relayError)) {
+      setShowRelayErrors(true);
+      return;
+    }
+    onSave({ ...form, customStunTurn: cleanRelayServers(form.customStunTurn) });
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -149,6 +178,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </label>
               </div>
             )}
+          </div>
+
+          {/* TURN/STUN relays */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+              <Radio className="w-3.5 h-3.5 text-brand-500" /> Relay Servers (TURN/STUN)
+            </h4>
+            <p className="text-xs text-zinc-400">
+              Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers
+              are always included.
+            </p>
+            {form.customStunTurn.map((server, index) => (
+              <IceServerRow
+                key={index}
+                server={server}
+                error={showRelayErrors ? relayError(server) : null}
+                onChange={(next) => updateRelay(index, next)}
+                onRemove={() => removeRelay(index)}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, customStunTurn: [...form.customStunTurn, { urls: '' }] })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-600 dark:text-brand-400 hover:bg-brand-500/10 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add relay server
+            </button>
           </div>
 
           <div className="pt-2 flex items-center justify-end gap-3">
