@@ -63,9 +63,8 @@ export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stag
 
   return (
     <StatusCard badge={<IconBadge icon={icon} isPulsing />} title={title} description={description}>
-      <p className="mb-6">
-        <span className="block text-2xs uppercase font-bold tracking-wider text-text-5">Room code</span>
-        <span className="font-mono text-lg font-bold tracking-widest text-text-2">{roomCode}</span>
+      <p className="mb-6 text-xs text-text-5">
+        Room <span className="font-mono font-semibold tracking-wider text-text-3">{roomCode}</span>
       </p>
       <Button variant="secondary" onClick={onCancel}>
         Cancel

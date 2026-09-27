@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, RotateCw } from 'lucide-react';
+import { IconBadge } from './ui/IconBadge';
 import { Button } from './ui/Button';
 import { LinkButton } from './ui/LinkButton';
 import { Spinner } from './ui/Spinner';
@@ -128,6 +129,23 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           metrics={transferMetrics}
           corruptedFiles={corruptedFiles}
         />
+      ) : connectionState === 'error' && errorMessage ? (
+        // A dead end gets its own screen: the code form would invite retrying something that cannot work
+        <StatusCard
+          badge={<IconBadge icon={AlertCircle} tone="danger" />}
+          title="Couldn’t receive the files"
+          description={errorMessage}
+        >
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button data-testid="retry-connect" onClick={onConnect} className="px-6">
+              <RotateCw className="w-4 h-4" />
+              Try again
+            </Button>
+            <Button data-testid="enter-other-code" variant="secondary" onClick={onReset} className="px-6">
+              Enter a different code
+            </Button>
+          </div>
+        </StatusCard>
       ) : waitingStage ? (
         <WaitingForSenderCard
           stage={waitingStage}
@@ -146,7 +164,6 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             roomCode={roomCode}
             onRoomCodeChange={onRoomCodeChange}
             onConnect={onConnect}
-            errorMessage={errorMessage}
           />
           {onSwitchToSend && (
             <div className="text-center">

@@ -118,11 +118,11 @@ describe('SettingsModal relay servers', () => {
     const { onClose } = renderSettings();
     const dialog = screen.getByRole('dialog', { hidden: true });
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /audio chimes/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /play a sound/i }));
     fireEvent.click(dialog);
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /audio chimes/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /play a sound/i }));
     fireEvent.click(dialog);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

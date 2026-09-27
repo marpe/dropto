@@ -174,7 +174,7 @@ describe('SenderView', () => {
 
     expect(screen.getByText(/choosing where to save/i)).toBeDefined();
     expect(screen.queryByTestId('share-waiting')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
     expect(actions.cancel).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId('edit-files'));
