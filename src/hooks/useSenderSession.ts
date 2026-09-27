@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { DataConnection } from 'peerjs';
 import { soundService } from '../services/sound';
+import { describePeerError } from '../services/peerErrors';
 import type { AppSettings, SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
 import { defaultSessionServices } from './sessionServices';
 import type { SessionConnection, SessionSender, SessionServices } from './sessionServices';
@@ -183,9 +184,9 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       if (connectionRef.current === connection) {
         dispatch({ type: 'ROOM_READY', roomCode });
       }
-    } catch (err: any) {
+    } catch (err) {
       if (connectionRef.current === connection) {
-        dispatch({ type: 'ROOM_FAILED', error: err?.message || 'Could not reach the signaling server' });
+        dispatch({ type: 'ROOM_FAILED', error: describePeerError(err) });
       }
     }
   }, [services]);
