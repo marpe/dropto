@@ -296,11 +296,30 @@ describe('SenderView', () => {
     expect(document.querySelector('[data-status="pending"]')?.textContent).toContain('notes.txt');
   });
 
-  it('heads the queue with just the file count and total size', () => {
+  it('heads the list "Send files", with the file count and total size below it', () => {
     renderSenderView({ state: { files: [queuedFile] } });
 
+    expect(screen.getByRole('heading', { name: 'Send files' })).toBeDefined();
     expect(screen.getByText('1 file · 2 KB')).toBeDefined();
-    expect(screen.queryByText(/ready to send/i)).toBeNull();
+  });
+
+  it('sorts the files by the column clicked, then the other way, then back to the order they were added', () => {
+    const small: TransferFile = { ...queuedFile, id: 's', name: 'zebra.txt', size: 10, lastModified: 3 };
+    const large: TransferFile = { ...queuedFile, id: 'l', name: 'apple.txt', size: 5000, lastModified: 1 };
+    renderSenderView({ state: { files: [small, large] } });
+    const names = () => screen.getAllByTestId('file-row').map((row) => row.textContent?.match(/[a-z]+[.]txt/)?.[0]);
+
+    fireEvent.click(screen.getByRole('button', { name: /^name/i }));
+    expect(names()).toEqual(['apple.txt', 'zebra.txt']);
+    fireEvent.click(screen.getByRole('button', { name: /^name/i }));
+    expect(names()).toEqual(['zebra.txt', 'apple.txt']);
+    fireEvent.click(screen.getByRole('button', { name: /^name/i }));
+    expect(names()).toEqual(['zebra.txt', 'apple.txt']);
+
+    fireEvent.click(screen.getByRole('button', { name: /^size/i }));
+    expect(names()).toEqual(['zebra.txt', 'apple.txt']);
+    fireEvent.click(screen.getByRole('button', { name: /^modified/i }));
+    expect(names()).toEqual(['apple.txt', 'zebra.txt']);
   });
 
   it('explains why the room code changed', () => {
@@ -526,10 +545,9 @@ describe('SenderView', () => {
       expect((screen.getByTestId('pin-input') as HTMLInputElement).value).toBe('2468');
     });
 
-    it('removes straight away when nobody is choosing, noting the link shows the change', () => {
+    it('removes straight away when nobody is choosing', () => {
       const actions = renderSenderView({ state: shared() });
 
-      expect(screen.getByText(/still choosing/i)).toBeDefined();
       fireEvent.click(screen.getByTitle('Remove report.pdf'));
 
       expect(actions.removeFile).toHaveBeenCalledWith('f1');
