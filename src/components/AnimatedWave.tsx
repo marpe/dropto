@@ -20,9 +20,9 @@ export const AnimatedWave: React.FC<AnimatedWaveProps> = ({ active, className = 
         />
         <defs>
           <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#3ECF8E" stopOpacity="0.1" />
-            <stop offset="50%" stopColor="#3ECF8E" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#24B47E" stopOpacity="0.1" />
+            <stop offset="0%" style={{ stopColor: "rgb(var(--brand-500))" }} stopOpacity="0.1" />
+            <stop offset="50%" style={{ stopColor: "rgb(var(--brand-500))" }} stopOpacity="0.4" />
+            <stop offset="100%" style={{ stopColor: "rgb(var(--brand-600))" }} stopOpacity="0.1" />
           </linearGradient>
         </defs>
       </svg>

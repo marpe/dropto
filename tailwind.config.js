@@ -8,19 +8,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#edfcf4',
-          100: '#d5f7e6',
-          200: '#aef0d1',
-          300: '#76e4b4',
-          400: '#52d69b',
-          500: '#3ECF8E', // Supabase primary green
-          600: '#24b47e',
-          700: '#1c8f65',
-          800: '#1a7152',
-          900: '#175c44',
-          950: '#073324',
-        },
+        // Per-domain palette: values are RGB triples defined in src/index.css per `data-brand`
+        brand: Object.fromEntries(
+          [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((shade) => [
+            shade,
+            `rgb(var(--brand-${shade}) / <alpha-value>)`,
+          ])
+        ),
         supabase: {
           bg: '#121212',
           surface: '#181818',

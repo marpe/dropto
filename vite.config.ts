@@ -7,7 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      // dropto.space assets are swapped in by the boot script in index.html
+      includeAssets: ['favicon.svg', 'favicon-dropto.svg', 'manifest-dropto.webmanifest'],
       manifest: {
         name: 'DropWave - 10GB P2P WebRTC Transfer',
         short_name: 'DropWave',

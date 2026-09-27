@@ -62,6 +62,15 @@ describe('WebRtcService.generateRoomId', () => {
     expect(id).toMatch(/^DW-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   });
 
+  it('uses the room-code prefix of the active brand', () => {
+    document.documentElement.dataset.brand = 'dropto';
+    try {
+      expect(new WebRtcService().generateRoomId()).toMatch(/^DT-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+    } finally {
+      delete document.documentElement.dataset.brand;
+    }
+  });
+
   // Room codes are the only barrier to a stranger requesting files, so they must not be predictable
   it('draws room codes from the cryptographic RNG, not Math.random', () => {
     const cryptoSpy = vi.spyOn(crypto, 'getRandomValues');
