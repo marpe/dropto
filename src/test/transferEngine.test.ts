@@ -79,6 +79,10 @@ async function waitFor(condition: () => boolean, timeoutMs = 5000): Promise<bool
   return condition();
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 function countSentMessages(conn: MockDataConnection, type: string): number {
   return (conn.send as ReturnType<typeof vi.fn>).mock.calls.filter(
     ([data]) => typeof data === 'string' && JSON.parse(data).type === type
@@ -405,6 +409,96 @@ describe('TransferEngine storage and read failures', () => {
     expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
     expect(receiverErrors).toHaveLength(1);
     expect(senderErrors).toHaveLength(1);
+  });
+});
+
+describe('TransferEngine receiver input validation', () => {
+  afterEach(() => {
+    clearFilePickers();
+  });
+
+  function makeChunk(fileIndex: number, chunkIndex: number, payload: Uint8Array): ArrayBuffer {
+    const packet = new Uint8Array(16 + payload.length);
+    const view = new DataView(packet.buffer);
+    view.setUint32(0, fileIndex, false);
+    view.setBigUint64(4, BigInt(chunkIndex), false);
+    view.setUint32(12, payload.length, false);
+    packet.set(payload, 16);
+    return packet.buffer;
+  }
+
+  /** Receiver wired to a scripted fake sender that emits raw protocol data. */
+  async function startReceiverWithFakeSender(fileSizes: number[]) {
+    const write = vi.fn().mockResolvedValue(undefined);
+    (window as any).showSaveFilePicker = vi.fn().mockResolvedValue({
+      createWritable: vi.fn().mockResolvedValue({ write, close: vi.fn(), abort: vi.fn().mockResolvedValue(undefined) }),
+    });
+    const receiverConn = new MockDataConnection();
+    const engine = new TransferEngine();
+    const errors: string[] = [];
+    engine.init(receiverConn as any, false, {
+      onError: (err) => {
+        errors.push(err);
+      },
+    });
+    const manifest = {
+      sessionId: 's',
+      pinRequired: false,
+      totalBytes: fileSizes.reduce((a, b) => a + b, 0),
+      files: fileSizes.map((size, i) => ({
+        id: `f${i}`,
+        name: `f${i}.bin`,
+        size,
+        type: 'application/octet-stream',
+        chunkSize: 64 * 1024,
+        totalChunks: 1,
+      })),
+    };
+    receiverConn.emit('data', JSON.stringify({ type: 'MANIFEST', payload: manifest }));
+    await sleep(20);
+    await engine.prepareAndStartReceiverFile(0);
+    const emit = async (data: ArrayBuffer) => {
+      receiverConn.emit('data', data);
+      await sleep(20);
+    };
+    return { emit, write, errors };
+  }
+
+  it('rejects a chunk for a file other than the one being received, without writing it', async () => {
+    const { emit, write, errors } = await startReceiverWithFakeSender([4, 4]);
+
+    await emit(makeChunk(1, 0, new Uint8Array([1, 2, 3, 4])));
+
+    expect(errors).toHaveLength(1);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('rejects data beyond the declared file size', async () => {
+    const { emit, write, errors } = await startReceiverWithFakeSender([4]);
+
+    await emit(makeChunk(0, 0, new Uint8Array(8)));
+
+    expect(errors).toHaveLength(1);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('rejects chunks that arrive out of order', async () => {
+    const { emit, write, errors } = await startReceiverWithFakeSender([200 * 1024]);
+
+    await emit(makeChunk(0, 1, new Uint8Array(1024)));
+
+    expect(errors).toHaveLength(1);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('accepts in-order chunks within the declared size', async () => {
+    const { emit, write, errors } = await startReceiverWithFakeSender([6]);
+
+    await emit(makeChunk(0, 0, new Uint8Array([1, 2, 3])));
+    await emit(makeChunk(0, 1, new Uint8Array([4, 5, 6])));
+
+    expect(errors).toEqual([]);
+    expect(write).toHaveBeenCalledTimes(2);
   });
 });
 
