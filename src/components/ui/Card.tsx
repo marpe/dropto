@@ -17,7 +17,7 @@ const paddingClasses: Record<CardPadding, string> = {
 export const Card: React.FC<CardProps> = ({ padding = 'lg', className, ...props }) => (
   <div
     className={cn(
-      'rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 shadow-xl',
+      'rounded-3xl bg-surface-1 border border-border-2 shadow-xl',
       paddingClasses[padding],
       className
     )}

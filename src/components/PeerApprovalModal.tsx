@@ -21,8 +21,8 @@ interface DetailRowProps {
 
 const DetailRow: React.FC<DetailRowProps> = ({ label, children }) => (
   <div className="flex justify-between gap-3">
-    <span className="text-zinc-500 dark:text-zinc-400">{label}</span>
-    <span className="min-w-0 truncate font-semibold text-zinc-800 dark:text-zinc-200">{children}</span>
+    <span className="text-text-4">{label}</span>
+    <span className="min-w-0 truncate font-semibold text-text-2">{children}</span>
   </div>
 );
 
@@ -41,12 +41,12 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
     <Modal className="text-center">
       <IconBadge icon={ShieldCheck} size="md" className="mx-auto mb-4" />
 
-      <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">Receiver Connection Request</h3>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+      <h3 className="text-lg font-bold text-text-1 mb-1">Receiver Connection Request</h3>
+      <p className="text-xs text-text-4 mb-4">
         Someone typed in your room code and wants to download your files.
       </p>
 
-      <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800 mb-5 text-left text-xs space-y-1.5">
+      <div className="p-3 bg-surface-2 rounded-xl border border-border-2 mb-5 text-left text-xs space-y-1.5">
         <DetailRow label="Peer ID:">
           <span className="font-mono font-normal">{peerId}</span>
         </DetailRow>
@@ -58,7 +58,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
 
       {!hasFiles && (
         <div className="mb-5 space-y-3">
-          <p className="text-xs text-amber-600 dark:text-amber-400">Nothing is queued yet — add files before accepting.</p>
+          <p className="text-xs text-text-warning-1">Nothing is queued yet — add files before accepting.</p>
           <Button variant="secondary" onClick={onSelectFiles} className="w-full">
             <FileUp className="w-4 h-4" />
             <span>Select Files</span>

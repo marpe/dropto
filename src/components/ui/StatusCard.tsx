@@ -15,9 +15,9 @@ interface StatusCardProps {
 export const StatusCard: React.FC<StatusCardProps> = ({ badge, title, description, children, className }) => (
   <Card className={cn('text-center animate-fade-in', className)}>
     <div className="flex justify-center mb-4">{badge}</div>
-    <h2 className="text-xl font-bold text-balance text-zinc-900 dark:text-white mb-2">{title}</h2>
+    <h2 className="text-xl font-bold text-balance text-text-1 mb-2">{title}</h2>
     {description && (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 max-w-md mx-auto wrap-break-word">{description}</p>
+      <p className="text-sm text-text-4 mb-6 max-w-md mx-auto wrap-break-word">{description}</p>
     )}
     {children}
   </Card>

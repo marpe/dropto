@@ -9,15 +9,15 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
 }
 
 const sizeClasses: Record<TextInputSize, string> = {
-  sm: 'px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200',
-  lg: 'py-3 px-4 rounded-xl text-center font-mono text-xl tracking-widest bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-brand-500/50',
+  sm: 'px-3 py-1.5 rounded-lg text-xs bg-surface-1 text-text-2',
+  lg: 'py-3 px-4 rounded-xl text-center font-mono text-xl tracking-widest bg-surface-2 text-text-1 focus:ring-2 focus:ring-brand-500/50',
 };
 
 export const TextInput: React.FC<TextInputProps> = ({ size = 'sm', type = 'text', className, ...props }) => (
   <input
     type={type}
     className={cn(
-      'w-full min-w-0 border border-zinc-200 dark:border-zinc-700 focus:border-brand-500 focus:outline-hidden transition-[border-color,box-shadow]',
+      'w-full min-w-0 border border-border-3 focus:border-brand-500 focus:outline-hidden transition-[border-color,box-shadow]',
       sizeClasses[size],
       className
     )}

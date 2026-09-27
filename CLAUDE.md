@@ -53,7 +53,7 @@ One build serves two brands. `dropto.space` / `www.dropto.space` gets dropto (or
 - The inline boot script in `index.html` is the only brand detector. It runs before first paint, sets `data-brand` on `<html>`, and swaps the title, theme-color, favicon and manifest. `getActiveBrand()` in `src/branding.ts` reads `data-brand`.
 - Brand strings and asset paths are duplicated between `index.html` and `src/branding.ts`. `src/test/branding.test.ts` executes the real boot script to keep them in sync.
 - In dev only, `?brand=dropto` overrides detection (it uses Vite's `%MODE%` HTML replacement).
-- Tailwind `brand-*` colours are `rgb(var(--brand-N) / <alpha-value>)`. The palettes live in `src/index.css` (`:root` for green, `:root[data-brand='dropto']` for orange). Use `brand-*` / `supabase-*` tokens, not hex classes.
+- Tailwind 4 (via `@tailwindcss/vite`; no config file). All colours are CSS-variable tokens in `src/index.css`: `@theme` holds the light theme and green brand, `.dark` overrides the theme, `:root[data-brand='dropto']` overrides the brand with orange. Use token classes (`bg-surface-1`, `text-text-4`, `brand-500`, …) rather than raw colours or `dark:` variants.
 - **If you edit the inline script in `index.html`, update its `sha256-` hash in the `vercel.json` CSP** (it's currently Report-Only). `src/test/csp.test.ts` fails until you do.
 
 ## Conventions

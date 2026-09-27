@@ -35,8 +35,8 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
   return (
     <Card>
       <IconBadge icon={DownloadCloud} className="mx-auto mb-4" iconClassName="motion-safe:animate-float" />
-      <h2 className="text-xl font-bold text-center text-zinc-900 dark:text-white mb-2">Receive Files via P2P</h2>
-      <p className="text-xs text-center text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
+      <h2 className="text-xl font-bold text-center text-text-1 mb-2">Receive Files via P2P</h2>
+      <p className="text-xs text-center text-text-4 mb-6 max-w-sm mx-auto">
         Enter the room code the sender gave you, or paste their link.
       </p>
 
@@ -48,7 +48,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
         <label className="block">
-          <span className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">Room Code</span>
+          <span className="block text-xs font-semibold uppercase tracking-wider text-text-5 mb-1.5">Room Code</span>
           <TextInput
             size="lg"
             autoComplete="off"

@@ -37,7 +37,7 @@ const BuildStamp: React.FC<{ buildInfo: BuildInfo }> = ({ buildInfo }) => {
 
 /** Build stamp and repository link, shown in the settings dialog. */
 export const AboutInfo: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_INFO }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-text-4">
     <span>
       {getActiveBrand().name} · <BuildStamp buildInfo={buildInfo} />
     </span>

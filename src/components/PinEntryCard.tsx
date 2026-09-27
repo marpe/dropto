@@ -26,7 +26,7 @@ export const PinEntryCard: React.FC<PinEntryCardProps> = ({ pin, prompt, onPinCh
       description="Ask the sender for the session PIN to see and download the files."
     >
       {prompt.isIncorrect && (
-        <p className="mb-4 text-xs font-semibold text-red-500">
+        <p className="mb-4 text-xs font-semibold text-text-danger-1">
           Incorrect PIN. {prompt.attemptsLeft} {prompt.attemptsLeft === 1 ? 'attempt' : 'attempts'} left.
         </p>
       )}
