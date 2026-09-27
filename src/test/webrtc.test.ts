@@ -34,15 +34,22 @@ const { FakeConnection, FakePeer, peers, peerBehavior } = vi.hoisted(() => {
   }
 
   const peers: FakePeer[] = [];
-  // openError: every new peer fails with it; takenIds: those room IDs are already in use
-  const peerBehavior: { openError: { type: string } | null; takenIds: Set<string> } = {
+  // openError: every new peer fails with it; takenIds: those room IDs are already in use;
+  // isConnectionStalled: outgoing connections never open (e.g. ICE cannot find a route)
+  const peerBehavior: { openError: { type: string } | null; takenIds: Set<string>; isConnectionStalled: boolean } = {
     openError: null,
     takenIds: new Set(),
+    isConnectionStalled: false,
   };
 
   class FakePeer extends FakeEmitter {
     public id: string;
     public destroy = vi.fn();
+    public connect = vi.fn((targetId: string) => {
+      const conn = new FakeConnection(targetId);
+      conn.open = !peerBehavior.isConnectionStalled;
+      return conn;
+    });
     constructor(id?: string) {
       super();
       this.id = id ?? 'ephemeral';
@@ -143,6 +150,23 @@ describe('WebRtcService incoming connections', () => {
     expect(greetings).toEqual([null]);
   });
 
+  it('announces a silent receiver only once its connection has actually opened', async () => {
+    vi.useFakeTimers();
+    const { incoming, greetings, peer } = await startSender();
+    const conn = new FakeConnection('slow-receiver');
+    conn.open = false;
+
+    peer.emit('connection', conn);
+    vi.advanceTimersByTime(10_000);
+    expect(incoming).toEqual([]);
+
+    conn.open = true;
+    conn.emit('open');
+    vi.advanceTimersByTime(5_000);
+    expect(incoming).toEqual(['slow-receiver']);
+    expect(greetings).toEqual([null]);
+  });
+
   it('announces each receiver only once', async () => {
     const { incoming, peer } = await startSender();
     const conn = connectReceiver(peer, 'receiver-1', 'link-key');
@@ -231,5 +255,29 @@ describe('WebRtcService room creation', () => {
     const attempts = peers.length - peersBefore;
     expect(attempts).toBeGreaterThan(1);
     expect(attempts).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('WebRtcService connecting to a room', () => {
+  afterEach(() => {
+    peerBehavior.isConnectionStalled = false;
+    vi.useRealTimers();
+  });
+
+  it('connects to the room', async () => {
+    const conn = await new WebRtcService().initReceiver('DW-ROOM22');
+
+    expect(conn.peer).toBe('DW-ROOM22');
+  });
+
+  it('gives up when the connection never opens, instead of spinning forever', async () => {
+    vi.useFakeTimers();
+    peerBehavior.isConnectionStalled = true;
+    const connecting = new WebRtcService().initReceiver('DW-ROOM22');
+    const outcome = connecting.catch((err: unknown) => err);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(await outcome).toMatchObject({ type: 'connection-timeout' });
   });
 });

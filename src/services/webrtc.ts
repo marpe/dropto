@@ -22,6 +22,8 @@ export type ConnectionEventHandler = {
 
 const MAX_ROOM_ID_ATTEMPTS = 4;
 const GREETING_TIMEOUT_MS = 3_000;
+// ICE usually settles within a few seconds; past this, no direct route exists (e.g. both sides behind strict NATs)
+const CONNECT_TIMEOUT_MS = 20_000;
 
 /** One signalling session: a sender's room or a receiver's connection to a room. */
 export class WebRtcService {
@@ -98,7 +100,14 @@ export class WebRtcService {
           reliable: true,
         });
 
+        // PeerJS never reports a data channel that simply fails to open; without this the UI spins forever
+        const timeout = setTimeout(() => {
+          const err = Object.assign(new Error('Timed out connecting to the sender'), { type: 'connection-timeout' });
+          this.handlers.onError?.(err);
+          reject(err);
+        }, CONNECT_TIMEOUT_MS);
         const onOpen = () => {
+          clearTimeout(timeout);
           this.activeConn = conn;
           resolve(conn);
         };
@@ -113,6 +122,7 @@ export class WebRtcService {
         });
 
         conn.on('error', (err) => {
+          clearTimeout(timeout);
           console.error('Connection error:', err);
           this.handlers.onError?.(err);
           reject(err);
@@ -156,6 +166,7 @@ export class WebRtcService {
    */
   private awaitGreeting(conn: DataConnection) {
     let isAnnounced = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const announce = (shareKey: string | null) => {
       if (isAnnounced) {
         return;
@@ -163,6 +174,7 @@ export class WebRtcService {
       isAnnounced = true;
       clearTimeout(timeout);
       conn.off('data', onData);
+      conn.off('open', startFallback);
       if (this.activeConn === conn) {
         this.handlers.onIncomingConnection?.(conn, { shareKey });
       }
@@ -173,8 +185,16 @@ export class WebRtcService {
         announce(message.payload.shareKey);
       }
     };
-    const timeout = setTimeout(() => announce(null), GREETING_TIMEOUT_MS);
+    // The fallback clock only starts once the channel is open: a connection that never opens is never offered
+    const startFallback = () => {
+      timeout = setTimeout(() => announce(null), GREETING_TIMEOUT_MS);
+    };
     conn.on('data', onData);
+    if (conn.open) {
+      startFallback();
+    } else {
+      conn.on('open', startFallback);
+    }
   }
 
   private buildPeerOptions(settings?: Partial<AppSettings>): PeerOptions {
