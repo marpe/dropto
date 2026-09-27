@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useReceiverSession } from '../hooks/useReceiverSession';
 import type { AppSettings, TransferManifest } from '../types/transfer';
-import { createFakeServices } from './utils/fakeSessionServices';
+import { createFakeServices, FakeConnection } from './utils/fakeSessionServices';
 
 const settings: AppSettings = {
   useCustomSignaling: false,
@@ -21,11 +21,10 @@ const manifest: TransferManifest = {
   files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain' }],
 };
 
-function renderReceiverSession(roomCode = '', shareKey: string | null = null) {
-  const fakes = createFakeServices();
+function renderReceiverSession(roomCode = '', shareKey: string | null = null, fakes = createFakeServices()) {
   const shareLink = { roomCode, shareKey };
   const hook = renderHook(
-    ({ active }) => useReceiverSession({ active, settings, shareLink, services: fakes.services }),
+    ({ active }) => useReceiverSession({ active, settings, shareLink, services: fakes.services, reconnectDelayMs: 0 }),
     { initialProps: { active: true } }
   );
   return { ...fakes, ...hook };
@@ -410,5 +409,82 @@ describe('useReceiverSession', () => {
 
     expect(session.result.current.state.roomCode).toBe('DW-ABC');
     expect(session.connections).toHaveLength(0);
+  });
+
+  describe('when the sender goes away before the download', () => {
+    async function openLink(fakes = createFakeServices()) {
+      const session = renderReceiverSession('DW-ROOM22', 'link-key', fakes);
+      await waitFor(() => expect(session.result.current.state.status).toBe('waiting_approval'));
+      return session;
+    }
+
+    /** Services whose later connections cannot find the room, as while the sender page reloads. */
+    function senderStaysAway() {
+      const fakes = createFakeServices();
+      const createConnection = fakes.services.createConnection;
+      fakes.services.createConnection = (handlers) => {
+        const connection = createConnection(handlers) as unknown as FakeConnection;
+        if (fakes.connections.length > 1) {
+          connection.initReceiver.mockRejectedValue(Object.assign(new Error('gone'), { type: 'peer-unavailable' }));
+        }
+        return connection;
+      };
+      return fakes;
+    }
+
+    it('reconnects on its own with the link key, e.g. after the sender reloads', async () => {
+      const session = await openLink();
+
+      act(() => {
+        session.connections[0].handlers.onDisconnected?.();
+      });
+
+      await waitFor(() => expect(session.engines).toHaveLength(2));
+      expect(session.connections[0].destroy).toHaveBeenCalled();
+      expect(session.engines[1].options.shareKey).toBe('link-key');
+      await waitFor(() => expect(session.result.current.state.status).toBe('waiting_approval'));
+    });
+
+    it('also reconnects when the connection drops after the files were offered', async () => {
+      const session = await openLink();
+      act(() => {
+        session.engines[0].events.onManifest?.(manifest);
+      });
+
+      act(() => {
+        session.engines[0].events.onConnectionLost?.();
+      });
+
+      await waitFor(() => expect(session.engines).toHaveLength(2));
+    });
+
+    it('gives up after a while and says the sender is gone', async () => {
+      const session = await openLink(senderStaysAway());
+
+      act(() => {
+        session.connections[0].handlers.onDisconnected?.();
+      });
+
+      await waitFor(() => expect(session.result.current.state.status).toBe('error'));
+      expect(session.connections.length).toBeGreaterThan(2);
+      expect(session.result.current.state.error).toBeTruthy();
+    });
+
+    it('does not reconnect once saving has started', async () => {
+      const session = await openLink();
+      act(() => {
+        session.engines[0].events.onManifest?.(manifest);
+      });
+      await act(async () => {
+        await session.result.current.actions.startSaving();
+      });
+
+      act(() => {
+        session.engines[0].events.onConnectionLost?.();
+      });
+
+      expect(session.result.current.state.status).toBe('error');
+      expect(session.connections).toHaveLength(1);
+    });
   });
 });

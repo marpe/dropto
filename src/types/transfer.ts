@@ -25,6 +25,7 @@ export type SenderStatus = 'idle' | 'waiting' | 'awaiting_receiver' | 'transferr
 export type ReceiverStatus =
   | 'idle'
   | 'connecting'
+  | 'reconnecting'
   | 'waiting_approval'
   | 'pin_required'
   | 'verifying_pin'
@@ -84,6 +85,8 @@ export interface TransferEvents {
   onError?: (message: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
+  /** The connection dropped mid-transfer; when provided it replaces the generic onError for that case */
+  onConnectionLost?: () => void;
 }
 
 export interface SenderEvents extends TransferEvents {

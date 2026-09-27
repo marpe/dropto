@@ -45,6 +45,9 @@ function getWaitingStage(
   if (status === 'verifying_pin') {
     return 'pin';
   }
+  if (status === 'reconnecting') {
+    return 'reconnecting';
+  }
   if (status === 'waiting_approval') {
     return isInvited ? 'files' : 'approval';
   }
