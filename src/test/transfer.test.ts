@@ -308,6 +308,17 @@ describe('introduction and live file list', () => {
     expect(places).toEqual([2, 1]);
   });
 
+  it('introduces its device and time zone, so the sender can tell people apart', () => {
+    const receiverConn = new MockDataConnection();
+
+    new TransferReceiver(asConnection(receiverConn), {}, {
+      shareKey: 'k',
+      introduction: { device: 'Chrome on Android', timeZone: 'Europe/Stockholm' },
+    });
+
+    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'k', device: 'Chrome on Android', timeZone: 'Europe/Stockholm' }]);
+  });
+
   it('greets without a key when the room code was typed in', () => {
     const receiverConn = new MockDataConnection();
 

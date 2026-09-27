@@ -2,6 +2,7 @@ import type { DataConnection } from 'peerjs';
 import { TransferReceiver } from '../services/transfer/receiver';
 import type { ReceiverOptions } from '../services/transfer/receiver';
 import { TransferSender } from '../services/transfer/sender';
+import { readRemoteAddress } from '../services/peerAddress';
 import { defaultTransferEffects } from '../services/transferEffects';
 import type { TransferEffects } from '../services/transferEffects';
 import { WebRtcService } from '../services/webrtc';
@@ -19,6 +20,8 @@ export interface SessionServices {
   createConnection(handlers: ConnectionEventHandler): SessionConnection;
   createSender(conn: DataConnection, events: SenderEvents): SessionSender;
   createReceiver(conn: DataConnection, events: ReceiverEvents, options?: ReceiverOptions): SessionReceiver;
+  /** The receiver's IP as the connection sees it, when it can be known */
+  readAddress(conn: DataConnection): Promise<string | null>;
   effects: TransferEffects;
 }
 
@@ -26,5 +29,6 @@ export const defaultSessionServices: SessionServices = {
   createConnection: (handlers) => new WebRtcService(handlers),
   createSender: (conn, events) => new TransferSender(conn, events),
   createReceiver: (conn, events, options) => new TransferReceiver(conn, events, options),
+  readAddress: readRemoteAddress,
   effects: defaultTransferEffects,
 };

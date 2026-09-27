@@ -418,6 +418,7 @@ describe('useReceiverSession', () => {
 
     expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DW-ROOM22', settings);
     expect(session.engines[0].options.shareKey).toBe('link-key');
+    expect(session.engines[0].options.introduction).toEqual(expect.objectContaining({ timeZone: expect.any(String) }));
     expect(session.result.current.state.isInvited).toBe(true);
   });
 

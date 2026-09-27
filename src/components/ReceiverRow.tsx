@@ -6,6 +6,7 @@ import { ProgressBar } from './ui/ProgressBar';
 import type { SenderReceiver } from '../types/sharing';
 import { cn } from '../utils/cn';
 import { formatSpeed } from '../utils/format';
+import { describePeer } from '../utils/deviceInfo';
 
 interface ReceiverRowProps {
   receiver: SenderReceiver;
@@ -56,7 +57,7 @@ const STAGE_TONES = {
 /** One person on a link shared with several people: where they are, and a way to stop them. */
 export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePosition, onStop, onDismiss }) => {
   const [isConfirmingStop, setIsConfirmingStop] = useState(false);
-  const name = `Person ${receiver.number}`;
+  const { name, meta } = describePeer(receiver.details);
   const isFinished = receiver.stage === 'completed' || receiver.stage === 'failed';
   const Icon = receiver.isPaused ? Pause : STAGE_ICONS[receiver.stage];
 
@@ -65,9 +66,10 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
       <Icon className={cn('w-4 h-4 shrink-0', STAGE_TONES[receiver.stage])} />
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-sm font-medium text-text-2">{name}</span>
-          <span className="text-xs text-text-4 tabular-nums truncate">{describeStage(receiver, queuePosition)}</span>
+          <span className="min-w-0 truncate text-sm font-medium text-text-2">{name}</span>
+          <span className="shrink-0 text-xs text-text-4 tabular-nums">{describeStage(receiver, queuePosition)}</span>
         </div>
+        {meta && <p className="text-2xs text-text-5 tabular-nums truncate">{meta}</p>}
         {receiver.stage === 'transferring' && (
           <ProgressBar percent={receiver.metrics?.overallPercent ?? 0} variant="subtle" />
         )}
@@ -77,14 +79,18 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
           <X className="w-4 h-4" />
         </IconButton>
       ) : (
-        <IconButton title={`Stop ${name}`} size="sm" onClick={() => setIsConfirmingStop(true)}>
+        <IconButton
+          title={receiver.stage === 'queued' ? 'Remove from line' : 'Stop download'}
+          size="sm"
+          onClick={() => setIsConfirmingStop(true)}
+        >
           <X className="w-4 h-4" />
         </IconButton>
       )}
 
       {isConfirmingStop && (
         <ConfirmDialog
-          title={receiver.stage === 'queued' ? `Take ${name} out of the line?` : `Stop ${name}’s download?`}
+          title={receiver.stage === 'queued' ? 'Take them out of the line?' : 'Stop this download?'}
           confirmLabel="Stop"
           tone="danger"
           onConfirm={() => {
@@ -93,7 +99,10 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
           }}
           onCancel={() => setIsConfirmingStop(false)}
         >
-          <p>They are disconnected. With the link they can come back and start again.</p>
+          <p>
+            {name}
+            {meta && ` (${meta})`} is disconnected. With the link they can come back and start again.
+          </p>
         </ConfirmDialog>
       )}
     </li>

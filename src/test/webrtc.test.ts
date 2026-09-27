@@ -131,6 +131,22 @@ describe('WebRtcService incoming connections', () => {
     expect(greetings).toEqual(['link-key']);
   });
 
+  it('passes on how the receiver introduced itself', async () => {
+    const introductions: unknown[] = [];
+    const service = new WebRtcService({
+      onIncomingConnection: (_conn, greeting) => {
+        introductions.push(greeting);
+      },
+    });
+    await service.initSender();
+    const conn = new FakeConnection('receiver-1');
+    peers[peers.length - 1].emit('connection', conn);
+
+    conn.emit('data', JSON.stringify({ type: 'HELLO', payload: { shareKey: null, device: 'Firefox on Linux', timeZone: 'Europe/Oslo' } }));
+
+    expect(introductions).toEqual([{ shareKey: null, device: 'Firefox on Linux', timeZone: 'Europe/Oslo' }]);
+  });
+
   it('waits for the greeting before announcing a receiver', async () => {
     const { incoming, peer } = await startSender();
 

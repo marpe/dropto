@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
 import { parseShareUrl } from '../utils/shareLink';
+import { introduceThisDevice } from '../utils/deviceInfo';
 import type { ShareLink } from '../utils/shareLink';
 import type {
   AppSettings,
@@ -320,7 +321,7 @@ export function useReceiverSession({
               dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
             }),
           },
-          { shareKey }
+          { shareKey, introduction: introduceThisDevice() }
         );
         engineRef.current = engine;
         soundService.playConnect();

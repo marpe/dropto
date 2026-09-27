@@ -1,13 +1,11 @@
 import Peer from 'peerjs';
 import type { DataConnection, PeerOptions } from 'peerjs';
-import type { AppSettings } from '../types/transfer';
+import type { AppSettings, HelloPayload } from '../types/transfer';
 import { getActiveBrand } from '../branding';
 import { parseControlMessage } from './transfer/protocol';
 
-export interface ReceiverGreeting {
-  /** Key from the sender's share link, or null when the room code was typed in */
-  shareKey: string | null;
-}
+/** The receiver's HELLO: its link key (null when the room code was typed in) and how it introduced itself. */
+export type ReceiverGreeting = HelloPayload;
 
 export interface SenderRoomOptions {
   preferredRoomId?: string;
@@ -162,7 +160,7 @@ export class WebRtcService {
   private awaitGreeting(conn: DataConnection) {
     let isAnnounced = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const announce = (shareKey: string | null) => {
+    const announce = (greeting: ReceiverGreeting) => {
       if (isAnnounced) {
         return;
       }
@@ -171,18 +169,18 @@ export class WebRtcService {
       conn.off('data', onData);
       conn.off('open', startFallback);
       if (this.connections.has(conn)) {
-        this.handlers.onIncomingConnection?.(conn, { shareKey });
+        this.handlers.onIncomingConnection?.(conn, greeting);
       }
     };
     const onData = (data: unknown) => {
       const message = typeof data === 'string' ? parseControlMessage(data) : null;
       if (message?.type === 'HELLO') {
-        announce(message.payload.shareKey);
+        announce(message.payload);
       }
     };
     // The fallback clock only starts once the channel is open: a connection that never opens is never offered
     const startFallback = () => {
-      timeout = setTimeout(() => announce(null), GREETING_TIMEOUT_MS);
+      timeout = setTimeout(() => announce({ shareKey: null }), GREETING_TIMEOUT_MS);
     };
     conn.on('data', onData);
     if (conn.open) {

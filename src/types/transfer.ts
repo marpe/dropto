@@ -47,9 +47,18 @@ export interface TransferResult {
   corruptedFiles: string[];
 }
 
+/** The receiver's introduction: the link key it holds, plus optional details that label it on the sender's side. */
+export interface HelloPayload {
+  shareKey: string | null;
+  /** e.g. "Chrome on Android" */
+  device?: string;
+  /** IANA time zone, a rough self-reported location */
+  timeZone?: string;
+}
+
 /** JSON control messages; file data travels separately as binary chunks. */
 export type ControlMessage =
-  | { type: 'HELLO'; payload: { shareKey: string | null } }
+  | { type: 'HELLO'; payload: HelloPayload }
   | { type: 'AUTH_REQUEST'; payload: PinPrompt }
   | { type: 'AUTH_RESPONSE'; payload: { pin: string } }
   | { type: 'MANIFEST'; payload: TransferManifest }

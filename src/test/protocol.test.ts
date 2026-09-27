@@ -22,6 +22,7 @@ describe('parseControlMessage', () => {
   it.each([
     [{ type: 'HELLO', payload: { shareKey: 'abc_DEF-123' } }],
     [{ type: 'HELLO', payload: { shareKey: null } }],
+    [{ type: 'HELLO', payload: { shareKey: null, device: 'Chrome on Android', timeZone: 'Europe/Stockholm' } }],
     [{ type: 'AUTH_REQUEST', payload: { attemptsLeft: 3, isIncorrect: false } }],
     [{ type: 'AUTH_RESPONSE', payload: { pin: '1234' } }],
     [{ type: 'MANIFEST', payload: manifest }],
@@ -59,6 +60,14 @@ describe('parseControlMessage', () => {
     ['a greeting with a non-string key', JSON.stringify({ type: 'HELLO', payload: { shareKey: 42 } })],
   ])('rejects %s', (_label, raw) => {
     expect(parseControlMessage(raw)).toBeNull();
+  });
+
+  it('ignores device details that look wrong in a greeting but keeps the greeting itself', () => {
+    const parse = (extra: Record<string, unknown>) =>
+      parseControlMessage(JSON.stringify({ type: 'HELLO', payload: { shareKey: 'k', ...extra } }));
+
+    expect(parse({ device: 42, timeZone: 'Not a zone!' })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
+    expect(parse({ device: 'x'.repeat(200) })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
   });
 
   it('drops fields it does not know about', () => {

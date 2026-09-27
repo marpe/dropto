@@ -152,7 +152,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       {/* Requests only surface once the sender has actually shared; earlier ones wait */}
       {isShared && approvalRequest && (
         <PeerApprovalModal
-          peerId={approvalRequest.peerId}
+          details={approvalRequest.details}
           fileCount={files.length}
           totalBytes={totalSize}
           onApprove={() => actions.approvePeer(approvalRequest.peerId)}
@@ -191,7 +191,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         </Notice>
       )}
 
-      {isAwaitingReceiver && <ReceiverChoosingCard onCancel={actions.cancel} />}
+      {isAwaitingReceiver && focus && <ReceiverChoosingCard details={focus.details} onCancel={actions.cancel} />}
 
       {currentStep === 'share' ? (
         <ShareStep

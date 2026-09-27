@@ -5,12 +5,15 @@ import { chooseWriterFactory } from '../storage';
 import type { StorageWriter, WriterFactory } from '../storage';
 import { TransferPeer } from './peer';
 import { decodeChunk } from './protocol';
+import type { DeviceIntroduction } from '../../utils/deviceInfo';
 
 export interface ReceiverOptions {
   /** Picks where files are written; must run inside a user gesture (file pickers). */
   chooseStorage?: (files: ManifestFile[]) => Promise<WriterFactory | null>;
   /** Key from the sender's share link; lets the sender admit this receiver without asking */
   shareKey?: string | null;
+  /** Device and time zone, so the sender can tell receivers apart */
+  introduction?: DeviceIntroduction;
 }
 
 /** Receives a manifest, then writes each file to the chosen storage while verifying it. */
@@ -29,12 +32,19 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   constructor(
     conn: DataConnection,
     events: ReceiverEvents,
-    { chooseStorage = chooseWriterFactory, shareKey = null }: ReceiverOptions = {}
+    { chooseStorage = chooseWriterFactory, shareKey = null, introduction }: ReceiverOptions = {}
   ) {
     super(conn, events);
     this.chooseStorage = chooseStorage;
     // Always the first message: the sender decides between auto-admitting and asking
-    this.send({ type: 'HELLO', payload: { shareKey } });
+    this.send({
+      type: 'HELLO',
+      payload: {
+        shareKey,
+        ...(introduction?.device && { device: introduction.device }),
+        ...(introduction?.timeZone && { timeZone: introduction.timeZone }),
+      },
+    });
   }
 
   public submitPin(pin: string) {
