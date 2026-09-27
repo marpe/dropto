@@ -83,7 +83,7 @@ const SettingToggle: React.FC<SettingToggleProps> = ({ label, description, isChe
       type="checkbox"
       checked={isChecked}
       onChange={(e) => onChange(e.target.checked)}
-      className="w-4 h-4 shrink-0 rounded accent-brand-500"
+      className="w-4 h-4 shrink-0 rounded-sm accent-brand-500"
     />
   </label>
 );
@@ -220,7 +220,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={form.signalingSecure}
                   onChange={(e) => update({ signalingSecure: e.target.checked })}
-                  className="rounded accent-brand-500"
+                  className="rounded-sm accent-brand-500"
                 />
                 <span className="text-zinc-700 dark:text-zinc-300">Secure (SSL/WSS)</span>
               </label>

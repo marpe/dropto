@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({ children, onClose, size = 'sm', cl
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
       <div
         className={cn(
           'relative w-full max-h-[90vh] overflow-y-auto overscroll-contain rounded-2xl bg-white dark:bg-supabase-surface p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800',

@@ -17,7 +17,7 @@ export const StatusCard: React.FC<StatusCardProps> = ({ badge, title, descriptio
     <div className="flex justify-center mb-4">{badge}</div>
     <h2 className="text-xl font-bold text-balance text-zinc-900 dark:text-white mb-2">{title}</h2>
     {description && (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 max-w-md mx-auto break-words">{description}</p>
+      <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 max-w-md mx-auto wrap-break-word">{description}</p>
     )}
     {children}
   </Card>

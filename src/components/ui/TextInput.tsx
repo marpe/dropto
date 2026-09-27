@@ -17,7 +17,7 @@ export const TextInput: React.FC<TextInputProps> = ({ size = 'sm', type = 'text'
   <input
     type={type}
     className={cn(
-      'w-full min-w-0 border border-zinc-200 dark:border-zinc-700 focus:border-brand-500 focus:outline-none transition-[border-color,box-shadow]',
+      'w-full min-w-0 border border-zinc-200 dark:border-zinc-700 focus:border-brand-500 focus:outline-hidden transition-[border-color,box-shadow]',
       sizeClasses[size],
       className
     )}
