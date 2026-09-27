@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock } from 'lucide-react';
+import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock, AlertCircle } from 'lucide-react';
 import type { TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
@@ -15,13 +15,17 @@ interface SenderViewProps {
   onClearFiles: () => void;
   connectedPeerId: string | null;
   transferMetrics: TransferMetrics | null;
-  transferState: 'idle' | 'waiting' | 'transferring' | 'completed' | 'paused' | 'failed';
+  transferState: 'idle' | 'waiting' | 'transferring' | 'completed' | 'failed';
   pendingPeer: { peerId: string; approve: () => void; reject: () => void } | null;
   onTogglePause: () => void;
   onCancelTransfer: () => void;
   pin: string;
   onPinChange: (newPin: string) => void;
   corruptedFiles: string[];
+  isPaused: boolean;
+  errorMessage: string | null;
+  onDismissError: () => void;
+  onRetryRoom: () => void;
 }
 
 export const SenderView: React.FC<SenderViewProps> = ({
@@ -39,6 +43,10 @@ export const SenderView: React.FC<SenderViewProps> = ({
   pin,
   onPinChange,
   corruptedFiles,
+  isPaused,
+  errorMessage,
+  onDismissError,
+  onRetryRoom,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -106,16 +114,32 @@ export const SenderView: React.FC<SenderViewProps> = ({
       )}
 
       {/* Active Transfer State */}
-      {transferState === 'transferring' || transferState === 'paused' ? (
+      {transferState === 'transferring' ? (
         transferMetrics && (
           <MetricsDashboard
             metrics={transferMetrics}
             isSender={true}
-            isPaused={transferState === 'paused'}
+            isPaused={isPaused}
             onTogglePause={onTogglePause}
             onCancel={onCancelTransfer}
           />
         )
+      ) : transferState === 'failed' ? (
+        <div className="rounded-2xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl animate-fade-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-balance text-zinc-900 dark:text-white mb-2">Transfer Failed</h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 break-words">
+            {errorMessage ?? 'The transfer stopped unexpectedly.'}
+          </p>
+          <button
+            onClick={onDismissError}
+            className="px-6 py-2.5 rounded-xl font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-[transform,background-color] motion-safe:hover:scale-105"
+          >
+            Back to Files
+          </button>
+        </div>
       ) : transferState === 'completed' ? (
         <TransferCompleteCard
           successTitle="Transfer Complete!"
@@ -255,11 +279,23 @@ export const SenderView: React.FC<SenderViewProps> = ({
 
             {/* Room Code Display */}
             <div className="flex flex-col sm:flex-row items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900/80 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-4">
-              <div className="flex-1 text-center sm:text-left">
+              <div className="flex-1 min-w-0 text-center sm:text-left">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 block">Room Code</span>
-                <span className="font-mono text-2xl font-black tracking-widest text-[#3ECF8E]">
-                  {roomCode || 'Generating...'}
-                </span>
+                {!roomCode && errorMessage ? (
+                  <div className="flex items-center justify-center sm:justify-start gap-3">
+                    <span className="text-sm text-red-500 break-words min-w-0">{errorMessage}</span>
+                    <button
+                      onClick={onRetryRoom}
+                      className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <span className="font-mono text-2xl font-black tracking-widest text-[#3ECF8E]">
+                    {roomCode || 'Generating…'}
+                  </span>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
