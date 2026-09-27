@@ -147,12 +147,14 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             {isPreparingSave ? (
               <>
                 <div className="w-5 h-5 border-2 border-[#121212] border-t-transparent rounded-full animate-spin" />
-                <span>Opening File Dialog...</span>
+                <span>{manifest.files.length > 1 ? 'Opening Folder Dialog...' : 'Opening File Dialog...'}</span>
               </>
             ) : (
               <>
                 <HardDriveDownload className="w-5 h-5" />
-                <span>Select Save Location & Start Download</span>
+                <span>
+                  {manifest.files.length > 1 ? 'Select Download Folder' : 'Select Save Location'} & Start Download
+                </span>
               </>
             )}
           </button>

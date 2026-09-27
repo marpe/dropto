@@ -17,8 +17,10 @@ export interface TransferManifest {
   sessionId: string;
   pinRequired: boolean;
   totalBytes: number;
-  files: Omit<TransferFile, 'rawFile' | 'status' | 'bytesTransferred'>[];
+  files: ManifestFile[];
 }
+
+export type ManifestFile = Omit<TransferFile, 'rawFile' | 'status' | 'bytesTransferred'>;
 
 export type PeerApprovalStatus = 'idle' | 'pending' | 'approved' | 'rejected';
 

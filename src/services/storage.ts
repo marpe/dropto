@@ -1,3 +1,5 @@
+import type { ManifestFile } from '../types/transfer';
+
 export interface StorageWriter {
   prepare(filename: string, size: number): Promise<boolean>;
   writeChunk(chunk: Uint8Array): Promise<void>;
@@ -6,10 +8,46 @@ export interface StorageWriter {
   isNativeFSA: boolean;
 }
 
-export class FileSystemAccessWriter implements StorageWriter {
-  private writableStream: FileSystemWritableFileStream | null = null;
+export type WriterFactory = (file: ManifestFile) => StorageWriter;
+
+type DirectoryPickerWindow = Window & {
+  showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>;
+};
+
+/** Streams chunks straight to disk through a File System Access writable. */
+abstract class NativeFileWriter implements StorageWriter {
+  protected writableStream: FileSystemWritableFileStream | null = null;
   public isNativeFSA = true;
 
+  public abstract prepare(filename: string, size: number): Promise<boolean>;
+
+  public async writeChunk(chunk: Uint8Array): Promise<void> {
+    if (!this.writableStream) {
+      throw new Error('Writable stream not initialized');
+    }
+    await this.writableStream.write(chunk as unknown as BufferSource);
+  }
+
+  public async finalize(): Promise<void> {
+    if (this.writableStream) {
+      await this.writableStream.close();
+      this.writableStream = null;
+    }
+  }
+
+  public async abort(): Promise<void> {
+    if (this.writableStream) {
+      try {
+        await this.writableStream.abort();
+      } catch {
+        // Stream already closed or errored; nothing left to clean up
+      }
+      this.writableStream = null;
+    }
+  }
+}
+
+export class FileSystemAccessWriter extends NativeFileWriter {
   public async prepare(filename: string, _size: number): Promise<boolean> {
     if (typeof window === 'undefined' || !('showSaveFilePicker' in window)) {
       return false;
@@ -45,31 +83,36 @@ export class FileSystemAccessWriter implements StorageWriter {
       throw err;
     }
   }
+}
 
-  public async writeChunk(chunk: Uint8Array): Promise<void> {
-    if (!this.writableStream) {
-      throw new Error('Writable stream not initialized');
-    }
-    await this.writableStream.write(chunk as unknown as BufferSource);
+/** Writes a file inside a user-chosen folder, recreating the sender's relative path. */
+export class DirectoryWriter extends NativeFileWriter {
+  private readonly root: FileSystemDirectoryHandle;
+  private readonly relativePath?: string;
+
+  constructor(root: FileSystemDirectoryHandle, relativePath?: string) {
+    super();
+    this.root = root;
+    this.relativePath = relativePath;
   }
 
-  public async finalize(): Promise<void> {
-    if (this.writableStream) {
-      await this.writableStream.close();
-      this.writableStream = null;
-    }
-  }
+  public async prepare(filename: string, _size: number): Promise<boolean> {
+    const segments = toSafePathSegments(this.relativePath || filename);
+    const fileName = segments.pop() ?? 'untitled';
 
-  public async abort(): Promise<void> {
-    if (this.writableStream) {
-      try {
-        await this.writableStream.abort();
-      } catch (e) {
-        // ignore
-      }
-      this.writableStream = null;
+    let directory = this.root;
+    for (const segment of segments) {
+      directory = await directory.getDirectoryHandle(segment, { create: true });
     }
+    const handle = await directory.getFileHandle(fileName, { create: true });
+    this.writableStream = await handle.createWritable();
+    return true;
   }
+}
+
+/** Splits a peer-supplied path, dropping empty, `.` and `..` segments so writes stay inside the chosen folder. */
+function toSafePathSegments(path: string): string[] {
+  return path.split(/[\\/]/).filter((segment) => segment !== '' && segment !== '.' && segment !== '..');
 }
 
 export class MemoryFallbackWriter implements StorageWriter {
@@ -166,4 +209,31 @@ export class AutoStorageWriter implements StorageWriter {
 
 export function createStorageWriter(): StorageWriter {
   return new AutoStorageWriter();
+}
+
+/**
+ * Decides where incoming files go. Must be called from a user gesture: browsers only allow
+ * file pickers during one, so a multi-file transfer picks a folder once up front instead of
+ * opening a save dialog per file.
+ * Returns null if the user cancels the picker.
+ */
+export async function chooseWriterFactory(files: ManifestFile[]): Promise<WriterFactory | null> {
+  if (files.length <= 1) {
+    return () => createStorageWriter();
+  }
+
+  if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) {
+    return () => new MemoryFallbackWriter();
+  }
+
+  try {
+    const root = await (window as DirectoryPickerWindow).showDirectoryPicker({ mode: 'readwrite' });
+    return (file) => new DirectoryWriter(root, file.relativePath);
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return null;
+    }
+    console.warn('Folder picker failed, falling back to in-memory downloads:', err);
+    return () => new MemoryFallbackWriter();
+  }
 }

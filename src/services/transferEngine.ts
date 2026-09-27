@@ -1,8 +1,8 @@
 import type { DataConnection } from 'peerjs';
 import { FastStreamingChecksum } from './checksum';
 import { soundService } from './sound';
-import { createStorageWriter } from './storage';
-import type { StorageWriter } from './storage';
+import { chooseWriterFactory, createStorageWriter } from './storage';
+import type { StorageWriter, WriterFactory } from './storage';
 import type { ProtocolMessage, TransferFile, TransferManifest, TransferMetrics } from '../types/transfer';
 import { wakeLockService } from './wakeLock';
 
@@ -37,6 +37,7 @@ export class TransferEngine {
   // Receiver state
   private manifest: TransferManifest | null = null;
   private currentWriter: StorageWriter | null = null;
+  private createWriter: WriterFactory = () => createStorageWriter();
   private receiverChecksum = new FastStreamingChecksum();
   private receivedBytesForFile: number = 0;
 
@@ -191,6 +192,20 @@ export class TransferEngine {
 
   // =================== RECEIVER LOGIC ===================
 
+  /** Picks the save destination (must run inside a user gesture) and requests the first file. */
+  public async startReceiving(): Promise<boolean> {
+    if (!this.manifest) {
+      return false;
+    }
+
+    const createWriter = await chooseWriterFactory(this.manifest.files);
+    if (!createWriter) {
+      return false;
+    }
+    this.createWriter = createWriter;
+    return this.prepareAndStartReceiverFile(0);
+  }
+
   public async prepareAndStartReceiverFile(fileIndex: number): Promise<boolean> {
     if (!this.manifest || !this.manifest.files[fileIndex]) return false;
 
@@ -203,7 +218,7 @@ export class TransferEngine {
     this.emitMetrics(fileMeta.name, 0);
 
     try {
-      this.currentWriter = createStorageWriter();
+      this.currentWriter = this.createWriter(fileMeta);
       const prepared = await this.currentWriter.prepare(fileMeta.name, fileMeta.size);
       if (!prepared) {
         return false;
