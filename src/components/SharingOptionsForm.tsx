@@ -4,9 +4,10 @@ import { ToggleRow } from './ui/ToggleRow';
 import { TextInput } from './ui/TextInput';
 import { IconButton } from './ui/IconButton';
 import { NumberStepper } from './ui/NumberStepper';
+import { OptionRow } from './ui/OptionRow';
 import type { SharingOptions } from '../types/sharing';
 import { generatePin } from '../utils/pin';
-import { MAX_SIMULTANEOUS, MIN_SIMULTANEOUS } from '../utils/sharingMemory';
+import { MAX_SIMULTANEOUS } from '../utils/sharingMemory';
 
 interface SharingOptionsFormProps {
   options: SharingOptions;
@@ -62,7 +63,7 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
   <div className="space-y-3">
     <ToggleRow
       label="Require a PIN"
-      description="Receivers must enter it before they can see the files"
+      description="Needed before the files are shown"
       isChecked={options.pin !== ''}
       onChange={(isEnabled) => onChange({ ...options, pin: isEnabled ? generatePin() : '' })}
     >
@@ -75,24 +76,27 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
       </div>
     </ToggleRow>
     <ToggleRow
-      label="Ask me before anyone connects"
-      description="Otherwise people with the link join straight away. Anyone typing the room code always needs your OK."
+      label="Require connection approval"
+      description="You accept each person before they connect"
       isChecked={options.requireApproval}
       onChange={(requireApproval) => onChange({ ...options, requireApproval })}
     />
-    <ToggleRow
-      label="Let several people download"
-      description="Otherwise the link works for one download, then stops working."
-      isChecked={options.allowMultiple}
-      onChange={(allowMultiple) => onChange({ ...options, allowMultiple })}
-    >
-      <NumberStepper
-        label="Downloading at the same time (others wait in line)"
-        value={options.maxSimultaneous}
-        min={MIN_SIMULTANEOUS}
-        max={MAX_SIMULTANEOUS}
-        onChange={(maxSimultaneous) => onChange({ ...options, maxSimultaneous })}
-      />
-    </ToggleRow>
+    {/* One number for both: 1 is the one-person link, more lets that many download at once */}
+    <OptionRow
+      label="Allow simultaneous downloads"
+      description={options.allowMultiple ? 'Others wait in line' : 'One download, then the link stops working'}
+      isActive={options.allowMultiple}
+      control={
+        <NumberStepper
+          label="Simultaneous downloads"
+          value={options.allowMultiple ? options.maxSimultaneous : 1}
+          min={1}
+          max={MAX_SIMULTANEOUS}
+          onChange={(count) =>
+            onChange(count > 1 ? { ...options, allowMultiple: true, maxSimultaneous: count } : { ...options, allowMultiple: false })
+          }
+        />
+      }
+    />
   </div>
 );

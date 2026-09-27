@@ -197,22 +197,25 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await close();
   });
 
-  test('several people: one downloads while the next waits in line, then gets their turn', async ({ browser }) => {
+  test('several people: two download at once while the next waits in line, then gets their turn', async ({ browser }) => {
     const { senderPage, receiverPage: first, close } = await openPeers(browser);
     const second = await openReceiver(browser);
+    const third = await openReceiver(browser);
 
     await senderPage.goto('/');
     await addFile(senderPage, 'for-everyone.txt', 'shared with several people');
-    await shareFiles(senderPage, { simultaneous: 1 });
+    await shareFiles(senderPage, { simultaneous: 2 });
     await readRoomCode(senderPage);
     const link = await senderPage.getByLabel('Share link').inputValue();
 
     await first.goto(link);
     await expect(first.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await second.page.goto(link);
-    await expect(second.page.getByRole('heading', { name: /in line/i })).toBeVisible({ timeout: 15000 });
-    await expect(second.page.getByText(/you.re next/i)).toBeVisible();
-    await expect(senderPage.getByTestId('receiver-row')).toHaveCount(2);
+    await expect(second.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
+    await third.page.goto(link);
+    await expect(third.page.getByRole('heading', { name: /in line/i })).toBeVisible({ timeout: 15000 });
+    await expect(third.page.getByText(/you.re next/i)).toBeVisible();
+    await expect(senderPage.getByTestId('receiver-row')).toHaveCount(3);
     // People are told apart by the device they introduced, plus their address once the route is known
     const firstPerson = senderPage.getByTestId('receiver-row').first();
     await expect(firstPerson).toContainText(/Chrome on [A-Za-z]+/);
@@ -222,14 +225,17 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(first.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
 
     // A slot freed up: the next person gets the files without doing anything
-    await expect(second.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
+    await expect(third.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await second.page.getByTestId('start-download').click();
+    await third.page.getByTestId('start-download').click();
     await expect(second.page.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(third.page.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
 
-    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(2);
+    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(3);
     // The link stays on screen for more people
     await expect(senderPage.getByRole('button', { name: /copy link/i })).toBeVisible();
     await second.close();
+    await third.close();
     await close();
   });
 
@@ -326,7 +332,7 @@ async function addFile(page: Page, name: string, content: string, mimeType = 'te
 
 interface ShareOptions {
   pin?: string;
-  /** Let several people download, this many at the same time */
+  /** Let this many people download at the same time (1 is the one-person link) */
   simultaneous?: number;
 }
 
@@ -339,10 +345,9 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
     await page.getByTestId('pin-input').press('Enter');
   }
   if (simultaneous) {
-    await page.getByRole('checkbox', { name: /let several people download/i }).check();
-    const limit = page.getByRole('status', { name: /at the same time/i });
-    while (Number(await limit.textContent()) > simultaneous) {
-      await page.getByTitle('Fewer').click();
+    const limit = page.getByRole('status', { name: /simultaneous downloads/i });
+    while (Number(await limit.textContent()) < simultaneous) {
+      await page.getByTitle('More').click();
     }
   }
 }
