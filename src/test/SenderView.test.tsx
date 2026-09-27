@@ -168,4 +168,11 @@ describe('SenderView', () => {
 
     expect(screen.getByText('This is a new room.')).toBeDefined();
   });
+
+  it('summarises only the files the receiver chose', () => {
+    const second: TransferFile = { ...queuedFile, id: 'f2', name: 'notes.txt', type: 'text/plain' };
+    renderSenderView({ transferState: 'completed', files: [queuedFile, second], receiverFileIndices: [1] });
+
+    expect(screen.getByText(/^1 file · /)).toBeDefined();
+  });
 });

@@ -18,6 +18,8 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   private readonly chooseStorage: (files: ManifestFile[]) => Promise<WriterFactory | null>;
   private manifest: TransferManifest | null = null;
   private createWriter: WriterFactory | null = null;
+  // Manifest indices being received, in order; the whole manifest unless the user picked a subset
+  private selection: number[] = [];
   private writer: StorageWriter | null = null;
   private checksum = new FastStreamingChecksum();
   private fileIndex = 0;
@@ -39,19 +41,40 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.send({ type: 'AUTH_RESPONSE', payload: { pin } });
   }
 
-  /** Picks the save destination once (inside the user's click) and requests the first file. */
-  public async startReceiving(): Promise<boolean> {
+  /**
+   * Picks the save destination once (inside the user's click) and requests the first file.
+   * `fileIndices` limits the download to those manifest entries; omitted, every file is received.
+   */
+  public async startReceiving(fileIndices?: number[]): Promise<boolean> {
     const manifest = this.manifest;
     if (!manifest || manifest.files.length === 0) {
       return false;
     }
-    const createWriter = await this.chooseStorage(manifest.files);
+    const selection = fileIndices
+      ? [...new Set(fileIndices)]
+          .filter((index) => Number.isInteger(index) && index >= 0 && index < manifest.files.length)
+          .sort((a, b) => a - b)
+      : manifest.files.map((_, index) => index);
+    if (selection.length === 0) {
+      return false;
+    }
+    const selectedFiles = selection.map((index) => manifest.files[index]);
+    const createWriter = await this.chooseStorage(selectedFiles);
     // The sender changed the list while the picker was open; the choice may not fit it (e.g. one-file dialog)
     if (!createWriter || this.manifest !== manifest) {
       return false;
     }
     this.createWriter = createWriter;
-    return this.startFile(0);
+    this.selection = selection;
+    this.beginTransfer(
+      selectedFiles.reduce((sum, file) => sum + file.size, 0),
+      selectedFiles.length
+    );
+    // Only a subset needs announcing, so senders without selection support still work for full downloads
+    if (selection.length < manifest.files.length) {
+      this.send({ type: 'FILE_SELECTION', payload: { fileIndices: selection } });
+    }
+    return this.startFile(selection[0]);
   }
 
   protected async handleMessage(message: ControlMessage) {
@@ -100,7 +123,9 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.receivedBytesForFile += payload.length;
 
     this.metrics?.recordBytes(payload.length);
-    this.emitMetrics(this.metrics?.snapshot(fileIndex, file.name, (this.receivedBytesForFile / file.size) * 100));
+    this.emitMetrics(
+      this.metrics?.snapshot(this.selection.indexOf(fileIndex), file.name, (this.receivedBytesForFile / file.size) * 100)
+    );
   }
 
   protected onStop() {
@@ -118,7 +143,7 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.expectedChunkIndex = 0;
     this.checksum = new FastStreamingChecksum();
     // Immediate update so the UI switches to the progress view before the first chunk arrives
-    this.emitMetrics(this.metrics?.snapshot(fileIndex, file.name, 0, { isForced: true }));
+    this.emitMetrics(this.metrics?.snapshot(this.selection.indexOf(fileIndex), file.name, 0, { isForced: true }));
 
     try {
       this.writer = this.createWriter(file);
@@ -146,9 +171,9 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.recordVerification(this.manifest?.files[fileIndex], isVerified);
     this.events.onFileComplete?.(fileIndex, isVerified);
 
-    const hasMoreFiles = this.manifest !== null && fileIndex + 1 < this.manifest.files.length;
-    if (hasMoreFiles) {
-      await this.startFile(fileIndex + 1);
+    const nextIndex = this.selection[this.selection.indexOf(fileIndex) + 1];
+    if (nextIndex !== undefined) {
+      await this.startFile(nextIndex);
     } else {
       this.completeTransfer();
     }

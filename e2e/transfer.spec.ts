@@ -127,11 +127,11 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(senderPage.getByText('1 file', { exact: true })).toBeVisible();
     await senderPage.locator('button:has-text("Accept")').click();
 
-    await expect(receiverPage.locator('text=Incoming Files Ready')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await expect(receiverPage.locator('text=sample-dataset.dat')).toBeVisible();
     await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
 
-    const saveButton = receiverPage.locator('button:has-text("Select Save Location & Start Download")');
+    const saveButton = receiverPage.getByTestId('start-download');
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
@@ -161,9 +161,12 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await addFile(senderPage, 'second.txt', 'two');
     await expect(receiverPage.locator('text=second.txt')).toBeVisible({ timeout: 15000 });
 
-    await receiverPage.locator('button:has-text("Select Download Folder & Start Download")').click();
+    // Only take the second file
+    await receiverPage.getByRole('checkbox', { name: /first.txt/ }).uncheck();
+    await receiverPage.getByTestId('start-download').click();
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.getByText(/^1 file · /)).toBeVisible();
     await close();
   });
 
@@ -213,7 +216,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await receiverPage.locator('button:has-text("Unlock")').click();
     await expect(receiverPage.locator('text=secret-plans.pdf')).toBeVisible({ timeout: 15000 });
 
-    await receiverPage.locator('button:has-text("Select Save Location & Start Download")').click();
+    await receiverPage.getByTestId('start-download').click();
     await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
     await close();

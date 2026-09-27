@@ -385,6 +385,80 @@ describe('introduction and live file list', () => {
   });
 });
 
+describe('choosing which files to receive', () => {
+  async function offerThreeFiles(senderEvents: SenderEvents = {}, receiverEvents: ReceiverEvents = {}) {
+    const storage = fakeStorage();
+    let hasManifest = false;
+    const pair = createTransferPair({
+      isAutoReceiving: false,
+      senderEvents,
+      receiverEvents: {
+        ...receiverEvents,
+        onManifest: () => {
+          hasManifest = true;
+        },
+      },
+      receiverOptions: { chooseStorage: storage.chooseStorage },
+    });
+    pair.sender.start([createTestFile(1024, 'a.bin'), createTestFile(2048, 'b.bin'), createTestFile(4096, 'c.bin')]);
+    await waitFor(() => hasManifest);
+    return { ...pair, storage };
+  }
+
+  it('transfers only the selected files and completes on both sides', async () => {
+    let receiverStartedWith: number[] = [];
+    const session = await offerThreeFiles({
+      onReceiverStarted: (fileIndices) => {
+        receiverStartedWith = fileIndices;
+      },
+    });
+
+    expect(await session.receiver.startReceiving([0, 2])).toBe(true);
+
+    expect(await waitFor(session.isComplete)).toBe(true);
+    expect(session.storage.writers.map((writer) => vi.mocked(writer.prepare).mock.calls[0][0])).toEqual([
+      'a.bin',
+      'c.bin',
+    ]);
+    expect(receiverStartedWith).toEqual([0, 2]);
+    expect(session.record.senderErrors).toEqual([]);
+  });
+
+  it('sizes progress to the selection, counting positions within it', async () => {
+    const snapshots: TransferMetrics[] = [];
+    const session = await offerThreeFiles({}, { onMetrics: (metrics) => snapshots.push(metrics) });
+
+    await session.receiver.startReceiving([2]);
+    await waitFor(session.isComplete);
+
+    const last = snapshots[snapshots.length - 1];
+    expect(last).toMatchObject({ totalBytes: 4096, totalFiles: 1, currentFileIndex: 0, currentFileName: 'c.bin' });
+  });
+
+  it('receives everything when no selection is given', async () => {
+    let receiverStartedWith: number[] = [];
+    const session = await offerThreeFiles({
+      onReceiverStarted: (fileIndices) => {
+        receiverStartedWith = fileIndices;
+      },
+    });
+
+    await session.receiver.startReceiving();
+
+    expect(await waitFor(session.isComplete)).toBe(true);
+    expect(receiverStartedWith).toEqual([0, 1, 2]);
+    expect(session.storage.writers).toHaveLength(3);
+  });
+
+  it('refuses a selection that names files the sender never offered', async () => {
+    const session = await offerThreeFiles();
+
+    session.receiverConn.send(JSON.stringify({ type: 'FILE_SELECTION', payload: { fileIndices: [7] } }));
+
+    expect(await waitFor(() => session.record.senderErrors.length > 0)).toBe(true);
+  });
+});
+
 describe('pause and resume', () => {
   const fileChunksSent = (conn: MockDataConnection) => conn.sent.filter((data) => typeof data !== 'string').length;
 

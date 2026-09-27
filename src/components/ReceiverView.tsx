@@ -11,6 +11,7 @@ import { WaitingForSenderCard } from './WaitingForSenderCard';
 import type { WaitingStage } from './WaitingForSenderCard';
 import { IncomingFilesCard } from './IncomingFilesCard';
 import { RoomCodeForm } from './RoomCodeForm';
+import { pickFiles } from '../utils/fileSelection';
 import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
@@ -24,7 +25,7 @@ interface ReceiverViewProps {
   onSubmitPin: () => void;
   manifest: TransferManifest | null;
   transferMetrics: TransferMetrics | null;
-  onStartSaving: () => void | Promise<void>;
+  onStartSaving: (fileIndices?: number[]) => void | Promise<void>;
   onTogglePause: () => void;
   onCancelTransfer: () => void;
   isPaused: boolean;
@@ -35,6 +36,8 @@ interface ReceiverViewProps {
   /** Connected through the sender's link, so there is no approval to wait for */
   isInvited?: boolean;
   onSwitchToSend?: () => void;
+  /** Manifest indices being downloaded; null means all of them */
+  selectedFileIndices?: number[] | null;
 }
 
 function getWaitingStage(
@@ -78,8 +81,10 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   onReset,
   isInvited = false,
   onSwitchToSend,
+  selectedFileIndices = null,
 }) => {
   const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
+  const transferFiles = pickFiles(manifest?.files ?? [], selectedFileIndices);
 
   return (
     <div className="w-full space-y-6 animate-fade-in">
@@ -88,7 +93,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         transferMetrics ? (
           <MetricsDashboard
             metrics={transferMetrics}
-            files={manifest?.files ?? []}
+            files={transferFiles}
             isSender={false}
             isPaused={isPaused}
             onTogglePause={onTogglePause}
@@ -106,7 +111,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           title="Download Complete & Verified!"
           actionLabel="Receive More Files"
           onAction={onReset}
-          files={manifest?.files ?? []}
+          files={transferFiles}
           metrics={transferMetrics}
           corruptedFiles={corruptedFiles}
         />

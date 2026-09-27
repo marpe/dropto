@@ -21,6 +21,8 @@ export interface ReceiverSessionState {
   link: ShareLink;
   /** Connected with the sender's link key, so no approval is needed (only files may still be missing) */
   isInvited: boolean;
+  /** Manifest indices being downloaded; null until saving starts */
+  selectedFileIndices: number[] | null;
   pin: string;
   pinPrompt: PinPrompt | null;
   manifest: TransferManifest | null;
@@ -42,7 +44,7 @@ type ReceiverAction =
   | { type: 'MANIFEST_RECEIVED'; manifest: TransferManifest }
   | { type: 'SENDER_LOST' }
   | { type: 'RECONNECTING' }
-  | { type: 'SAVING_STARTED' }
+  | { type: 'SAVING_STARTED'; fileIndices: number[] | null }
   | { type: 'SAVING_ABORTED' }
   | { type: 'METRICS'; metrics: TransferMetrics }
   | { type: 'PAUSED'; isPaused: boolean }
@@ -117,7 +119,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
     case 'RECONNECTING':
       return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null };
     case 'SAVING_STARTED':
-      return { ...state, ...noProgress, status: 'transferring' };
+      return { ...state, ...noProgress, status: 'transferring', selectedFileIndices: action.fileIndices };
     case 'SAVING_ABORTED':
       return { ...state, status: 'connected' };
     case 'METRICS':
@@ -140,6 +142,7 @@ export const initialReceiverState: ReceiverSessionState = {
   roomCode: '',
   link: { roomCode: '', shareKey: null },
   isInvited: false,
+  selectedFileIndices: null,
   pin: '',
   pinPrompt: null,
   manifest: null,
@@ -331,14 +334,15 @@ export function useReceiverSession({
     }
   }, [active, connectTo, shareLink]);
 
-  const startSaving = async () => {
+  /** `fileIndices` picks a subset of the offered files; omitted, everything is downloaded. */
+  const startSaving = async (fileIndices?: number[]) => {
     const engine = engineRef.current;
     if (!engine) {
       return;
     }
     hasStartedSavingRef.current = true;
-    dispatch({ type: 'SAVING_STARTED' });
-    const isStarted = await engine.startReceiving();
+    dispatch({ type: 'SAVING_STARTED', fileIndices: fileIndices ?? null });
+    const isStarted = await engine.startReceiving(fileIndices);
     if (engineRef.current !== engine) {
       // A storage failure already moved the session to 'error' via onError
       return;
