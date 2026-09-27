@@ -47,16 +47,6 @@ class SoundService {
     this.playTone(1046.50, now + 0.36, 0.35, 'triangle'); // C6
   }
 
-  public playError() {
-    if (!this.enabled) return;
-    this.initCtx();
-    if (!this.ctx) return;
-
-    const now = this.ctx.currentTime;
-    this.playTone(330, now, 0.12, 'sawtooth');
-    this.playTone(277.18, now + 0.1, 0.2, 'sawtooth');
-  }
-
   private playTone(freq: number, startTime: number, duration: number, type: OscillatorType) {
     if (!this.ctx) return;
     try {
@@ -75,8 +65,8 @@ class SoundService {
 
       osc.start(startTime);
       osc.stop(startTime + duration + 0.05);
-    } catch (e) {
-      // Audio autoplay policy or background context error safe catch
+    } catch {
+      // Autoplay policy or a suspended background context; chimes are optional
     }
   }
 }

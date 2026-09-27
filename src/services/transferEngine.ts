@@ -6,7 +6,7 @@ import type { StorageWriter, WriterFactory } from './storage';
 import type { ProtocolMessage, TransferFile, TransferManifest, TransferMetrics } from '../types/transfer';
 import { wakeLockService } from './wakeLock';
 
-const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KB
+export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KB
 const HIGH_WATERMARK = 1024 * 1024; // 1 MB
 const LOW_WATERMARK = 256 * 1024; // 256 KB
 const HEADER_SIZE = 16; // 4 + 8 + 4 bytes
@@ -153,16 +153,14 @@ export class TransferEngine {
       // Backpressure Check: wait if buffer exceeds high watermark
       if (rawChannel && rawChannel.bufferedAmount > HIGH_WATERMARK) {
         await new Promise<void>((resolve) => {
-          const onLow = () => {
-            rawChannel.removeEventListener('bufferedamountlow', onLow);
+          const done = () => {
+            clearTimeout(safetyTimer);
+            rawChannel.removeEventListener('bufferedamountlow', done);
             resolve();
           };
-          rawChannel.addEventListener('bufferedamountlow', onLow);
+          rawChannel.addEventListener('bufferedamountlow', done);
           // Safety timeout in case event is missed
-          setTimeout(() => {
-            rawChannel.removeEventListener('bufferedamountlow', onLow);
-            resolve();
-          }, 2000);
+          const safetyTimer = setTimeout(done, 2000);
         });
       }
 

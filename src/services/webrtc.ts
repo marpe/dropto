@@ -172,13 +172,17 @@ export class WebRtcService {
     if (this.activeConn) {
       try {
         this.activeConn.close();
-      } catch (e) {}
+      } catch {
+        // Already closed
+      }
       this.activeConn = null;
     }
     if (this.peer) {
       try {
         this.peer.destroy();
-      } catch (e) {}
+      } catch {
+        // Already destroyed
+      }
       this.peer = null;
     }
     this.roomId = null;
