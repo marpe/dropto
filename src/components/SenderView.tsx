@@ -104,6 +104,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
           totalBytes={totalSize}
           onApprove={onApprovePeer}
           onReject={onRejectPeer}
+          onSelectFiles={() => fileInputRef.current?.click()}
         />
       )}
 

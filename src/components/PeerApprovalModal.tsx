@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, UserCheck, X } from 'lucide-react';
+import { FileUp, ShieldCheck, UserCheck, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { formatBytes } from '../utils/format';
 
@@ -10,6 +10,7 @@ interface PeerApprovalModalProps {
   totalBytes: number;
   onApprove: () => void;
   onReject: () => void;
+  onSelectFiles: () => void;
 }
 
 export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
@@ -19,10 +20,12 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
   totalBytes,
   onApprove,
   onReject,
+  onSelectFiles,
 }) => {
   if (!isOpen) {
     return null;
   }
+  const hasFiles = fileCount > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -45,13 +48,25 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-zinc-500 dark:text-zinc-400">Queued Files:</span>
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">{fileCount} files</span>
+            <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+              {fileCount} {fileCount === 1 ? 'file' : 'files'}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-zinc-500 dark:text-zinc-400">Total Size:</span>
             <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatBytes(totalBytes)}</span>
           </div>
         </div>
+
+        {!hasFiles && (
+          <div className="mb-5 space-y-3">
+            <p className="text-xs text-amber-600 dark:text-amber-400">Nothing is queued yet — add files before accepting.</p>
+            <Button variant="secondary" onClick={onSelectFiles} className="w-full">
+              <FileUp className="w-4 h-4" />
+              <span>Select Files</span>
+            </Button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Button
@@ -62,7 +77,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
             <X className="w-4 h-4" />
             <span>Decline</span>
           </Button>
-          <Button onClick={onApprove} className="px-4">
+          <Button onClick={onApprove} disabled={!hasFiles} className="px-4">
             <UserCheck className="w-4 h-4" />
             <span>Accept</span>
           </Button>

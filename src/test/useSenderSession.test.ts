@@ -97,6 +97,21 @@ describe('useSenderSession', () => {
     expect(session.result.current.state.connectedPeerId).toBe('receiver-1');
   });
 
+  it('does not start a transfer when a receiver is accepted with nothing queued', async () => {
+    const session = await renderSenderSession();
+    act(() => {
+      session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('receiver-1'));
+    });
+
+    act(() => {
+      session.result.current.actions.approvePeer();
+    });
+
+    expect(session.engines).toHaveLength(0);
+    expect(session.result.current.state.status).toBe('waiting');
+    expect(session.result.current.state.pendingPeerId).toBe('receiver-1');
+  });
+
   it('closes a rejected receiver without starting a transfer', async () => {
     const session = await renderSenderSession();
     const peerConn = createFakePeerConnection('receiver-1');
@@ -128,6 +143,9 @@ describe('useSenderSession', () => {
 
   it('keeps a newer approval request when an earlier receiver closes late', async () => {
     const session = await renderSenderSession();
+    act(() => {
+      session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+    });
     act(() => {
       session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('receiver-2'));
     });
