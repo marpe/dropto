@@ -6,57 +6,108 @@ import { Card } from './ui/Card';
 import { IconBadge } from './ui/IconBadge';
 import { Notice } from './ui/Notice';
 import { FileTypeIcon } from './ui/FileTypeIcon';
-import type { TransferManifest } from '../types/transfer';
+import { LinkButton } from './ui/LinkButton';
+import type { ManifestFile, TransferManifest } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { displayPath } from '../utils/filePath';
+import { cn } from '../utils/cn';
 
 interface IncomingFilesCardProps {
   manifest: TransferManifest;
   isNativeFSA: boolean;
-  onStartSaving: () => void | Promise<void>;
+  /** Called with the ticked manifest indices, or undefined when every file is wanted */
+  onStartSaving: (fileIndices?: number[]) => void | Promise<void>;
 }
 
-/** The sender's offer: what is coming, where it will be stored, and the button that opens the save picker. */
+interface IncomingFileRowProps {
+  file: ManifestFile;
+  isSelectable: boolean;
+  isSelected: boolean;
+  onToggle: () => void;
+}
+
+const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, isSelected, onToggle }) => (
+  <li className="[content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]">
+    <label
+      className={cn(
+        'flex items-center gap-3 text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 transition-[border-color,opacity]',
+        isSelectable && 'cursor-pointer hover:border-brand-500/30',
+        !isSelected && 'opacity-50'
+      )}
+    >
+      {isSelectable && (
+        <input type="checkbox" checked={isSelected} onChange={onToggle} className="w-4 h-4 shrink-0 accent-brand-500" />
+      )}
+      <FileTypeIcon name={file.name} mimeType={file.type} />
+      <span className="flex-1 min-w-0 font-semibold text-zinc-800 dark:text-zinc-200 truncate">{displayPath(file)}</span>
+      <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">{formatBytes(file.size)}</span>
+    </label>
+  </li>
+);
+
+/** The sender's offer: what is coming, which of it to take, and the button that opens the save picker. */
 export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, isNativeFSA, onStartSaving }) => {
   const [isPreparingSave, setIsPreparingSave] = useState(false);
-  const isMultiFile = manifest.files.length > 1;
+  // Unticked files are remembered (not ticked ones) so files the sender adds later arrive ticked
+  const [excludedIds, setExcludedIds] = useState<ReadonlySet<string>>(new Set());
+
+  const isSelectable = manifest.files.length > 1;
+  const selectedIndices = manifest.files.flatMap((file, index) => (excludedIds.has(file.id) ? [] : [index]));
+  const selectedBytes = selectedIndices.reduce((sum, index) => sum + manifest.files[index].size, 0);
+  const isEverythingSelected = selectedIndices.length === manifest.files.length;
+  const isMultiFile = selectedIndices.length > 1;
+
+  const toggle = (fileId: string) => {
+    setExcludedIds((current) => {
+      const next = new Set(current);
+      if (!next.delete(fileId)) {
+        next.add(fileId);
+      }
+      return next;
+    });
+  };
 
   const handleStartSaveClick = async () => {
     setIsPreparingSave(true);
     try {
-      await onStartSaving();
+      await onStartSaving(isEverythingSelected ? undefined : selectedIndices);
     } finally {
       setIsPreparingSave(false);
     }
   };
 
   return (
-    <Card>
+    <Card data-testid="incoming-files">
       <div className="flex items-center gap-3 mb-6">
         <IconBadge icon={DownloadCloud} size="md" iconClassName="motion-safe:animate-float" />
-        <div className="min-w-0">
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-            Incoming Files Ready ({manifest.files.length} {isMultiFile ? 'files' : 'file'})
-          </h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Total transfer size:{' '}
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">{formatBytes(manifest.totalBytes)}</span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Incoming Files</h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
+            {isEverythingSelected
+              ? `${manifest.files.length} ${isMultiFile ? 'files' : 'file'}`
+              : `${selectedIndices.length} of ${manifest.files.length} files`}{' '}
+            · {formatBytes(selectedBytes)}
           </p>
         </div>
+        {isSelectable && (
+          <LinkButton
+            onClick={() => setExcludedIds(isEverythingSelected ? new Set(manifest.files.map((file) => file.id)) : new Set())}
+            className="text-xs shrink-0"
+          >
+            {isEverythingSelected ? 'Select none' : 'Select all'}
+          </LinkButton>
+        )}
       </div>
 
-      <ul className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 max-h-56 overflow-y-auto space-y-2">
+      <ul className="p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-zinc-200 dark:border-zinc-800 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2">
         {manifest.files.map((file) => (
-          <li
+          <IncomingFileRow
             key={file.id}
-            className="flex items-center gap-3 text-xs p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700/60 hover:border-brand-500/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]"
-          >
-            <FileTypeIcon name={file.name} mimeType={file.type} />
-            <span className="flex-1 min-w-0 font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-              {displayPath(file)}
-            </span>
-            <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">{formatBytes(file.size)}</span>
-          </li>
+            file={file}
+            isSelectable={isSelectable}
+            isSelected={!excludedIds.has(file.id)}
+            onToggle={() => toggle(file.id)}
+          />
         ))}
       </ul>
 
@@ -74,9 +125,10 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
       )}
 
       <Button
+        data-testid="start-download"
         size="lg"
         onClick={handleStartSaveClick}
-        disabled={isPreparingSave}
+        disabled={isPreparingSave || selectedIndices.length === 0}
         className="w-full rounded-2xl shadow-xl disabled:opacity-75 motion-safe:hover:scale-[1.02]"
       >
         {isPreparingSave ? (

@@ -51,6 +51,7 @@ export type ControlMessage =
   | { type: 'AUTH_REQUEST'; payload: PinPrompt }
   | { type: 'AUTH_RESPONSE'; payload: { pin: string } }
   | { type: 'MANIFEST'; payload: TransferManifest }
+  | { type: 'FILE_SELECTION'; payload: { fileIndices: number[] } }
   | { type: 'FILE_START'; payload: { fileIndex: number } }
   | { type: 'FILE_COMPLETE'; payload: { fileIndex: number; checksum: string } }
   | { type: 'FILE_ACK'; payload: { fileIndex: number; isVerified: boolean } }
@@ -91,7 +92,7 @@ export interface TransferEvents {
 
 export interface SenderEvents extends TransferEvents {
   /** The receiver chose a destination and requested the first file; the file list is now fixed */
-  onReceiverStarted?: () => void;
+  onReceiverStarted?: (fileIndices: number[]) => void;
   /** A receiver used up its PIN attempts; the transfer then fails as usual */
   onPinLockout?: () => void;
 }

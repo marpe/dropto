@@ -313,4 +313,48 @@ describe('ReceiverView Component UI & Interaction', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onCancelTransfer).toHaveBeenCalledTimes(1);
   });
+
+  describe('choosing which files to download', () => {
+    const twoFiles: TransferManifest = {
+      totalBytes: 3072,
+      files: [
+        { id: 'f1', name: 'archive.zip', size: 1024, type: 'application/zip' },
+        { id: 'f2', name: 'photo.jpg', size: 2048, type: 'image/jpeg' },
+      ],
+    };
+
+    it('downloads only the ticked files', () => {
+      const onStartSaving = vi.fn();
+      renderWaiting('connected', { manifest: twoFiles, onStartSaving });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /archive.zip/ }));
+      fireEvent.click(screen.getByTestId('start-download'));
+
+      expect(onStartSaving).toHaveBeenCalledWith([1]);
+    });
+
+    it('downloads everything when nothing was unticked', () => {
+      const onStartSaving = vi.fn();
+      renderWaiting('connected', { manifest: twoFiles, onStartSaving });
+
+      fireEvent.click(screen.getByTestId('start-download'));
+
+      expect(onStartSaving).toHaveBeenCalledWith(undefined);
+    });
+
+    it('cannot start with nothing ticked', () => {
+      renderWaiting('connected', { manifest: twoFiles });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /archive.zip/ }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /photo.jpg/ }));
+
+      expect((screen.getByTestId('start-download') as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('shows progress and results for the chosen files only', () => {
+      renderWaiting('completed', { manifest: twoFiles, selectedFileIndices: [1], corruptedFiles: [] });
+
+      expect(screen.getByText(/^1 file · /)).toBeDefined();
+    });
+  });
 });

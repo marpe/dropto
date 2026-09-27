@@ -45,6 +45,8 @@ export class TransferSender extends TransferPeer<SenderEvents> {
   private hasSentManifest = false;
   // Once the receiver requests the first file, the file list can no longer change
   private hasReceiverStarted = false;
+  // Indices the receiver chose to download; null means every file
+  private selection: number[] | null = null;
 
   constructor(conn: DataConnection, events: SenderEvents) {
     super(conn, events);
@@ -59,6 +61,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     this.pin = pin;
     this.pinAttemptsLeft = MAX_PIN_ATTEMPTS;
     this.hasSentManifest = false;
+    this.selection = null;
     this.beginTransfer(toManifest(files).totalBytes, files.length);
 
     if (pin) {
@@ -86,13 +89,19 @@ export class TransferSender extends TransferPeer<SenderEvents> {
       case 'AUTH_RESPONSE':
         this.handlePinResponse(message.payload.pin);
         return;
+      case 'FILE_SELECTION':
+        this.applySelection(message.payload.fileIndices);
+        return;
       case 'FILE_START':
         if (!this.hasSentManifest) {
           throw new Error('Receiver requested files before authenticating');
         }
+        if (!this.transferIndices().includes(message.payload.fileIndex)) {
+          throw new Error('Receiver requested a file it did not select');
+        }
         if (!this.hasReceiverStarted) {
           this.hasReceiverStarted = true;
-          this.events.onReceiverStarted?.();
+          this.events.onReceiverStarted?.(this.transferIndices());
         }
         // Not awaited: streaming a file must not block pause/cancel messages in the queue
         this.streamFile(message.payload.fileIndex).catch((err) => this.failTransfer(err));
@@ -107,6 +116,22 @@ export class TransferSender extends TransferPeer<SenderEvents> {
 
   protected async handleChunk(): Promise<void> {
     throw new Error('Unexpected file data from the receiver');
+  }
+
+  private transferIndices(): number[] {
+    return this.selection ?? this.files.map((_, index) => index);
+  }
+
+  private applySelection(fileIndices: number[]) {
+    if (!this.hasSentManifest || this.hasReceiverStarted) {
+      throw new Error('Receiver changed its file selection at an unexpected time');
+    }
+    if (fileIndices.some((index) => index >= this.files.length)) {
+      throw new Error('Receiver selected a file that was not offered');
+    }
+    this.selection = fileIndices;
+    const selected = fileIndices.map((index) => this.files[index]);
+    this.beginTransfer(toManifest(selected).totalBytes, selected.length);
   }
 
   private sendManifest() {
@@ -137,7 +162,8 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     }
     this.recordVerification(file, isVerified);
     this.events.onFileComplete?.(fileIndex, isVerified);
-    if (fileIndex === this.files.length - 1) {
+    const indices = this.transferIndices();
+    if (fileIndex === indices[indices.length - 1]) {
       this.completeTransfer();
     }
   }
@@ -149,6 +175,8 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     }
     const checksum = new FastStreamingChecksum();
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    // Progress counts files within the selection, not manifest indices
+    const position = this.transferIndices().indexOf(fileIndex);
     const channel = this.conn.dataChannel;
 
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -167,7 +195,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
       this.conn.send(encodeChunk(fileIndex, chunkIndex, payload));
 
       this.metrics?.recordBytes(payload.length);
-      this.emitMetrics(this.metrics?.snapshot(fileIndex, file.name, (end / file.size) * 100));
+      this.emitMetrics(this.metrics?.snapshot(position, file.name, (end / file.size) * 100));
     }
 
     if (!this.isStopped) {

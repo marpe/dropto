@@ -247,6 +247,18 @@ describe('useReceiverSession', () => {
     expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
   });
 
+  it('downloads only the files the user picked', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+
+    await act(async () => {
+      await session.result.current.actions.startSaving([0]);
+    });
+
+    expect(engine.startReceiving).toHaveBeenCalledWith([0]);
+    expect(session.result.current.state.selectedFileIndices).toEqual([0]);
+  });
+
   it('shows the transfer while saving', async () => {
     const session = renderReceiverSession();
     await connectWithManifest(session);

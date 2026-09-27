@@ -24,6 +24,8 @@ export interface SenderSessionState {
   isPaused: boolean;
   error: string | null;
   corruptedFiles: string[];
+  /** Files the receiver chose to download (indices into `files`); null until it starts */
+  receiverFileIndices: number[] | null;
   /** Receivers locked out by wrong PINs in the current room */
   pinLockouts: number;
   /** Why the room code changed, shown with the new code */
@@ -44,7 +46,7 @@ type SenderAction =
   | { type: 'PEER_REJECTED' }
   | { type: 'PEER_DISCONNECTED'; peerId?: string }
   | { type: 'TRANSFER_STARTED'; peerId: string }
-  | { type: 'RECEIVER_STARTED' }
+  | { type: 'RECEIVER_STARTED'; fileIndices: number[] }
   | { type: 'PIN_LOCKOUT' }
   | { type: 'METRICS'; metrics: TransferMetrics }
   | { type: 'PAUSED'; isPaused: boolean }
@@ -66,6 +68,7 @@ export const initialSenderState: SenderSessionState = {
   isPaused: false,
   error: null,
   corruptedFiles: [],
+  receiverFileIndices: null,
   pinLockouts: 0,
   roomNotice: null,
 };
@@ -136,6 +139,7 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
         ...state,
         ...noProgress,
         status: 'awaiting_receiver',
+        receiverFileIndices: null,
         connectedPeerId: action.peerId,
         pendingPeerId: null,
         isPendingPeerTrusted: false,
@@ -145,7 +149,9 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
     case 'PIN_LOCKOUT':
       return { ...state, pinLockouts: state.pinLockouts + 1 };
     case 'RECEIVER_STARTED':
-      return state.status === 'awaiting_receiver' ? { ...state, status: 'transferring' } : state;
+      return state.status === 'awaiting_receiver'
+        ? { ...state, status: 'transferring', receiverFileIndices: action.fileIndices }
+        : state;
     case 'METRICS':
       return { ...state, metrics: action.metrics };
     case 'PAUSED':
@@ -227,9 +233,9 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
 
       const engine = services.createSender(conn, {
         onPinLockout: ifCurrent(() => dispatch({ type: 'PIN_LOCKOUT' })),
-        onReceiverStarted: ifCurrent(() => {
+        onReceiverStarted: ifCurrent((fileIndices) => {
           hasReceiverStarted = true;
-          dispatch({ type: 'RECEIVER_STARTED' });
+          dispatch({ type: 'RECEIVER_STARTED', fileIndices });
         }),
         onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
         onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),

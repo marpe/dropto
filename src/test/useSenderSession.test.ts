@@ -288,14 +288,15 @@ describe('useSenderSession', () => {
     expect(connection.disconnectPeer).toHaveBeenCalled();
   });
 
-  it('shows the transfer once the receiver starts downloading', async () => {
+  it('shows the transfer once the receiver starts downloading, with the files it chose', async () => {
     const { engine, result } = await startTransfer();
 
     act(() => {
-      engine.events.onReceiverStarted?.();
+      engine.events.onReceiverStarted?.([0]);
     });
 
     expect(result.current.state.status).toBe('transferring');
+    expect(result.current.state.receiverFileIndices).toEqual([0]);
   });
 
   it('admits a receiver holding the link key without asking', async () => {

@@ -7,6 +7,18 @@ const manifest = {
 };
 
 describe('parseControlMessage', () => {
+  it('accepts a file selection only as increasing, unique file indices', () => {
+    const parse = (fileIndices: unknown) =>
+      parseControlMessage(JSON.stringify({ type: 'FILE_SELECTION', payload: { fileIndices } }));
+
+    expect(parse([0, 2, 5])).toEqual({ type: 'FILE_SELECTION', payload: { fileIndices: [0, 2, 5] } });
+    expect(parse([])).toBeNull();
+    expect(parse([2, 1])).toBeNull();
+    expect(parse([1, 1])).toBeNull();
+    expect(parse([-1])).toBeNull();
+    expect(parse('0,1')).toBeNull();
+  });
+
   it.each([
     [{ type: 'HELLO', payload: { shareKey: 'abc_DEF-123' } }],
     [{ type: 'HELLO', payload: { shareKey: null } }],

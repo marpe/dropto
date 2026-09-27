@@ -108,6 +108,7 @@ export const App: React.FC = () => {
             onDismissError={sender.actions.dismissError}
             onRetryRoom={sender.actions.retryRoom}
             roomNotice={sender.state.roomNotice}
+            receiverFileIndices={sender.state.receiverFileIndices}
             onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')}
           />
         ) : (
@@ -132,6 +133,7 @@ export const App: React.FC = () => {
             onReset={receiver.actions.reset}
             isInvited={receiver.state.isInvited}
             onSwitchToSend={() => setMode('send')}
+            selectedFileIndices={receiver.state.selectedFileIndices}
           />
         )}
       </main>

@@ -7,6 +7,7 @@ import { Notice } from './ui/Notice';
 import { StatusCard } from './ui/StatusCard';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 import { buildShareUrl } from '../utils/shareLink';
+import { pickFiles } from '../utils/fileSelection';
 import { MetricsDashboard } from './MetricsDashboard';
 import { PeerApprovalModal } from './PeerApprovalModal';
 import { TransferCompleteCard } from './TransferCompleteCard';
@@ -38,6 +39,8 @@ interface SenderViewProps {
   onDismissError: () => void;
   onRetryRoom: () => void;
   roomNotice?: string | null;
+  /** The files the receiver chose; null means all of them */
+  receiverFileIndices?: number[] | null;
   /** Offered on the landing page, for when the sender can only read out a room code */
   onSwitchToReceive?: () => void;
 }
@@ -65,12 +68,14 @@ export const SenderView: React.FC<SenderViewProps> = ({
   onDismissError,
   onRetryRoom,
   roomNotice = null,
+  receiverFileIndices = null,
   onSwitchToReceive,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   const shareUrl = roomCode && shareKey ? buildShareUrl(window.location.href, roomCode, shareKey) : '';
   const isAwaitingReceiver = transferState === 'awaiting_receiver';
+  const transferFiles = pickFiles(files, receiverFileIndices);
   const hasRoomError = !roomCode && !!errorMessage;
   const isLanding = files.length === 0 && !isAwaitingReceiver && !pendingPeerId;
 
@@ -80,7 +85,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
         {transferMetrics && (
           <MetricsDashboard
             metrics={transferMetrics}
-            files={files}
+            files={transferFiles}
             isSender={true}
             isPaused={isPaused}
             onTogglePause={onTogglePause}
@@ -111,7 +116,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
         title="Transfer Complete!"
         actionLabel="Send More Files"
         onAction={onClearFiles}
-        files={files}
+        files={transferFiles}
         metrics={transferMetrics}
         corruptedFiles={corruptedFiles}
       />

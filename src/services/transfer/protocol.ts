@@ -60,6 +60,15 @@ function isIndex(value: unknown): value is number {
   return Number.isInteger(value) && (value as number) >= 0;
 }
 
+/** Non-empty, strictly increasing file indices: the order files are transferred in. */
+function isSelection(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((index, position) => isIndex(index) && (position === 0 || index > value[position - 1]))
+  );
+}
+
 function isByteCount(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
@@ -129,6 +138,10 @@ export function parseControlMessage(raw: string): ControlMessage | null {
       const manifest = parseManifest(message.payload);
       return manifest ? { type: 'MANIFEST', payload: manifest } : null;
     }
+    case 'FILE_SELECTION':
+      return isSelection(payload.fileIndices)
+        ? { type: 'FILE_SELECTION', payload: { fileIndices: [...payload.fileIndices] } }
+        : null;
     case 'FILE_START':
       return isIndex(payload.fileIndex) ? { type: 'FILE_START', payload: { fileIndex: payload.fileIndex } } : null;
     case 'FILE_COMPLETE':
