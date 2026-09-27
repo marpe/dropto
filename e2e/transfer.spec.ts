@@ -192,11 +192,11 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     const pinInput = receiverPage.locator('input[placeholder="Session PIN…"]');
     await pinInput.fill('1111');
-    await receiverPage.locator('button:has-text("Unlock Files")').click();
+    await receiverPage.locator('button:has-text("Unlock")').click();
     await expect(receiverPage.locator('text=Incorrect PIN. 2 attempts left.')).toBeVisible({ timeout: 15000 });
 
     await pinInput.fill('2468');
-    await receiverPage.locator('button:has-text("Unlock Files")').click();
+    await receiverPage.locator('button:has-text("Unlock")').click();
     await expect(receiverPage.locator('text=secret-plans.pdf')).toBeVisible({ timeout: 15000 });
 
     await receiverPage.locator('button:has-text("Select Save Location & Start Download")').click();

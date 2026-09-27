@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { QrCode, Copy, Check, Lock, Share2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { TextInput } from './ui/TextInput';
 import { QrModal } from './QrModal';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { getActiveBrand } from '../branding';
@@ -40,8 +42,8 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
   const [copiedCode, copyCode] = useCopyToClipboard();
 
   return (
-    <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl">
-      <QrModal isOpen={isQrOpen} onClose={() => setIsQrOpen(false)} roomCode={roomCode} url={shareUrl} />
+    <Card padding="md">
+      {isQrOpen && <QrModal onClose={() => setIsQrOpen(false)} roomCode={roomCode} url={shareUrl} />}
 
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="min-w-0">
@@ -107,17 +109,16 @@ export const ShareBox: React.FC<ShareBoxProps> = ({
           <Lock className="w-4 h-4 shrink-0 text-zinc-400" />
           <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Require PIN (optional)</span>
         </div>
-        <input
-          type="text"
+        <TextInput
           inputMode="numeric"
           autoComplete="off"
           maxLength={6}
           placeholder="e.g. 1234"
           value={pin}
           onChange={(e) => onPinChange(e.target.value)}
-          className="w-24 text-center font-mono text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:border-brand-500 focus:outline-none"
+          className="w-24 text-center font-mono bg-zinc-50"
         />
       </div>
-    </div>
+    </Card>
   );
 };

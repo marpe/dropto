@@ -4,6 +4,8 @@ import { Footer } from './components/Footer';
 import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
+import { ModeSwitch } from './components/ModeSwitch';
+import type { Mode } from './components/ModeSwitch';
 import { useDarkMode } from './hooks/useDarkMode';
 import { useSettings } from './hooks/useSettings';
 import { useSenderSession } from './hooks/useSenderSession';
@@ -13,7 +15,6 @@ import { useProgressTitle } from './hooks/useProgressTitle';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
 import type { ShareLink } from './utils/shareLink';
 
-type Mode = 'send' | 'receive';
 
 /** Reads the link the page was opened with, then hides its key from the address bar, history and screenshots. */
 function readShareLink(): ShareLink {
@@ -63,21 +64,7 @@ export const App: React.FC = () => {
         {/* Switching modes tears down the other session, so it is hidden mid-transfer */}
         {!isSessionBusy && (
           <div className="flex justify-center mb-8">
-            <div className="inline-flex p-1 rounded-2xl bg-zinc-200/80 dark:bg-supabase-surface border border-zinc-300/60 dark:border-zinc-800">
-              {(['send', 'receive'] as const).map((option) => (
-                <button
-                  key={option}
-                  onClick={() => setMode(option)}
-                  className={`py-2 px-6 rounded-xl text-sm font-bold transition-[color,background-color,box-shadow] ${
-                    mode === option
-                      ? 'bg-brand-500 text-supabase-bg shadow-md shadow-brand-500/20'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                  }`}
-                >
-                  {option === 'send' ? 'Send Files' : 'Receive Files'}
-                </button>
-              ))}
-            </div>
+            <ModeSwitch mode={mode} onChange={setMode} />
           </div>
         )}
 

@@ -1,8 +1,6 @@
 import React from 'react';
-import { DownloadCloud, ArrowRight, AlertCircle } from 'lucide-react';
-import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
-import { getActiveBrand } from '../branding';
+import { StatusCard } from './ui/StatusCard';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
@@ -10,6 +8,7 @@ import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
 import type { WaitingStage } from './WaitingForSenderCard';
 import { IncomingFilesCard } from './IncomingFilesCard';
+import { RoomCodeForm } from './RoomCodeForm';
 import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
@@ -88,15 +87,11 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
             onCancel={onCancelTransfer}
           />
         ) : (
-          <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl">
-            <Spinner className="w-10 h-10 mx-auto mb-4 border-[3px] text-brand-500" />
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-1">
-              Preparing Stream to Disk…
-            </h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Connecting stream chunks to storage
-            </p>
-          </div>
+          <StatusCard
+            badge={<Spinner className="w-10 h-10 border-[3px] text-brand-500" />}
+            title="Preparing Stream to Disk…"
+            description="Waiting for you to pick a save location, then for the first data to arrive."
+          />
         )
       ) : connectionState === 'completed' ? (
         <TransferCompleteCard
@@ -113,60 +108,13 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
       ) : manifest ? (
         <IncomingFilesCard manifest={manifest} isNativeFSA={isNativeFSA} onStartSaving={onStartSaving} />
       ) : (
-        /* Room Code Entry Card */
-        <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center shadow-inner">
-            <DownloadCloud className="w-8 h-8 animate-float" />
-          </div>
-
-          <h3 className="text-xl font-bold text-center text-zinc-900 dark:text-white mb-2">
-            Receive Files via P2P
-          </h3>
-          <p className="text-xs text-center text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto">
-            Enter the 6-digit room code provided by the sender to connect directly over WebRTC.
-          </p>
-
-          {errorMessage && (
-            <div className="p-3 mb-5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          <div className="space-y-4 max-w-md mx-auto">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                Room Code
-              </label>
-              <input
-                type="text"
-                placeholder={`${getActiveBrand().roomPrefix}-XXXXXX`}
-                value={roomCode}
-                onChange={(e) => onRoomCodeChange(e.target.value.toUpperCase())}
-                className="w-full text-center font-mono text-xl sm:text-2xl font-bold tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 focus:outline-none transition-all"
-              />
-            </div>
-
-            <Button
-              size="lg"
-              onClick={onConnect}
-              disabled={!roomCode.trim() || connectionState === 'connecting'}
-              className="w-full py-3 motion-safe:hover:scale-[1.02]"
-            >
-              {connectionState === 'connecting' ? (
-                <>
-                  <Spinner />
-                  <span>Connecting to Peer…</span>
-                </>
-              ) : (
-                <>
-                  <span>Connect & Download</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+        <RoomCodeForm
+          roomCode={roomCode}
+          onRoomCodeChange={onRoomCodeChange}
+          onConnect={onConnect}
+          isConnecting={connectionState === 'connecting'}
+          errorMessage={errorMessage}
+        />
       )}
     </div>
   );

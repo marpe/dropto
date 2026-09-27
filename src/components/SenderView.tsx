@@ -1,6 +1,9 @@
 import React, { useRef } from 'react';
 import { AlertCircle, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { IconBadge } from './ui/IconBadge';
+import { Notice } from './ui/Notice';
+import { StatusCard } from './ui/StatusCard';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { buildShareUrl } from '../utils/shareLink';
@@ -83,18 +86,15 @@ export const SenderView: React.FC<SenderViewProps> = ({
 
   if (transferState === 'failed') {
     return (
-      <div className="w-full rounded-2xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 text-center shadow-xl animate-fade-in">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-500 flex items-center justify-center">
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-balance text-zinc-900 dark:text-white mb-2">Transfer Failed</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 break-words">
-          {errorMessage ?? 'The transfer stopped unexpectedly.'}
-        </p>
+      <StatusCard
+        badge={<IconBadge icon={AlertCircle} tone="danger" />}
+        title="Transfer Failed"
+        description={errorMessage ?? 'The transfer stopped unexpectedly.'}
+      >
         <Button onClick={onDismissError} className="px-6">
           Back to Files
         </Button>
-      </div>
+      </StatusCard>
     );
   }
 
@@ -114,7 +114,6 @@ export const SenderView: React.FC<SenderViewProps> = ({
     <div className="w-full space-y-6 animate-fade-in">
       {pendingPeerId && !isPendingPeerTrusted && (
         <PeerApprovalModal
-          isOpen={true}
           peerId={pendingPeerId}
           fileCount={files.length}
           totalBytes={totalSize}
@@ -127,10 +126,9 @@ export const SenderView: React.FC<SenderViewProps> = ({
       {isAwaitingReceiver && <ReceiverChoosingCard onCancel={onCancelTransfer} />}
 
       {pendingPeerId && isPendingPeerTrusted && (
-        <div className="flex items-center gap-3 rounded-2xl border border-brand-500/30 bg-brand-500/10 px-4 py-3 text-sm text-zinc-800 dark:text-zinc-200">
-          <Link2 className="w-4 h-4 shrink-0 text-brand-500" />
-          <span>A receiver opened your link. Add files and they are offered to them straight away.</span>
-        </div>
+        <Notice tone="brand" icon={Link2}>
+          A receiver opened your link. Add files and they are offered to them straight away.
+        </Notice>
       )}
 
       <FileDropZone onAddFiles={onAddFiles} fileInputRef={fileInputRef} isCompact={files.length > 0} />

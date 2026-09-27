@@ -6,9 +6,10 @@ import type { AppSettings } from '../types/transfer';
 
 function renderSettings(settings: AppSettings = DEFAULT_SETTINGS) {
   const onSave = vi.fn();
-  render(<SettingsModal onClose={() => {}} settings={settings} onSave={onSave} />);
-  const save = () => fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
-  return { onSave, save };
+  const onClose = vi.fn();
+  render(<SettingsModal onClose={onClose} settings={settings} onSave={onSave} />);
+  const save = () => fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+  return { onSave, onClose, save };
 }
 
 describe('SettingsModal relay servers', () => {
@@ -59,5 +60,14 @@ describe('SettingsModal relay servers', () => {
 
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText(/must start with stun:, turn: or turns:/i)).toBeDefined();
+  });
+
+  it('closes as soon as the settings are saved', () => {
+    const { onSave, onClose, save } = renderSettings();
+
+    save();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

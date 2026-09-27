@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { DownloadCloud, ShieldCheck, AlertTriangle, HardDriveDownload } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
+import { Card } from './ui/Card';
+import { IconBadge } from './ui/IconBadge';
+import { Notice } from './ui/Notice';
 import { FileTypeIcon } from './ui/FileTypeIcon';
 import type { TransferManifest } from '../types/transfer';
 import { formatBytes } from '../utils/format';
@@ -27,11 +30,9 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
   };
 
   return (
-    <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
+    <Card>
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 shrink-0 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center">
-          <DownloadCloud className="w-6 h-6 motion-safe:animate-float" />
-        </div>
+        <IconBadge icon={DownloadCloud} size="md" iconClassName="motion-safe:animate-float" />
         <div className="min-w-0">
           <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
             Incoming Files Ready ({manifest.files.length} {isMultiFile ? 'files' : 'file'})
@@ -60,25 +61,15 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
 
       {/* Only Chromium can stream to disk; elsewhere files are buffered in RAM */}
       {isNativeFSA ? (
-        <div className="p-3.5 mb-6 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
-          <div className="text-xs text-zinc-700 dark:text-zinc-300">
-            <span className="font-semibold block text-zinc-900 dark:text-white">
-              Zero-RAM Native Disk Streaming Supported
-            </span>
-            Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream direct to
-            disk to prevent memory overflows.
-          </div>
-        </div>
+        <Notice tone="brand" icon={ShieldCheck} title="Zero-RAM Native Disk Streaming Supported" className="mb-6">
+          Clicking below will prompt you to select the save destination. Incoming 64KB chunks will stream direct to
+          disk to prevent memory overflows.
+        </Notice>
       ) : (
-        <div className="p-3.5 mb-6 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-xs text-zinc-700 dark:text-zinc-300">
-            <span className="font-semibold block text-zinc-900 dark:text-white">This Browser Can’t Stream to Disk</span>
-            Each file is held in memory until its download finishes. Files larger than about 1&nbsp;GB may crash this
-            tab — use Chrome or Edge for large transfers.
-          </div>
-        </div>
+        <Notice tone="warning" icon={AlertTriangle} title="This Browser Can’t Stream to Disk" className="mb-6">
+          Each file is held in memory until its download finishes. Files larger than about 1&nbsp;GB may crash this
+          tab — use Chrome or Edge for large transfers.
+        </Notice>
       )}
 
       <Button
@@ -99,6 +90,6 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
           </>
         )}
       </Button>
-    </div>
+    </Card>
   );
 };
