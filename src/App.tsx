@@ -8,6 +8,7 @@ import { useDarkMode } from './hooks/useDarkMode';
 import { useSettings } from './hooks/useSettings';
 import { useSenderSession } from './hooks/useSenderSession';
 import { useReceiverSession } from './hooks/useReceiverSession';
+import { useLeaveGuard } from './hooks/useLeaveGuard';
 
 type Mode = 'send' | 'receive';
 
@@ -29,6 +30,7 @@ export const App: React.FC = () => {
   const receiver = useReceiverSession({ active: mode === 'receive', settings, initialRoomCode: sharedRoomCode });
 
   const isTransferring = sender.state.status === 'transferring' || receiver.state.status === 'transferring';
+  useLeaveGuard(isTransferring);
   const isConnected =
     !!sender.state.connectedPeerId || ['waiting_approval', 'pin_required', 'verifying_pin', 'connected', 'transferring'].includes(receiver.state.status);
 
