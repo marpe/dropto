@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DownloadCloud, ArrowRight, ShieldCheck, AlertCircle, HardDriveDownload } from 'lucide-react';
-import type { TransferManifest, TransferMetrics } from '../types/transfer';
+import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
@@ -11,7 +11,7 @@ interface ReceiverViewProps {
   pin: string;
   onPinChange: (pin: string) => void;
   onConnect: () => void;
-  connectionState: 'idle' | 'connecting' | 'waiting_approval' | 'connected' | 'transferring' | 'completed' | 'error';
+  connectionState: ReceiverStatus;
   manifest: TransferManifest | null;
   transferMetrics: TransferMetrics | null;
   onStartSaving: () => void;
@@ -21,6 +21,7 @@ interface ReceiverViewProps {
   errorMessage: string | null;
   isNativeFSA: boolean;
   corruptedFiles: string[];
+  onReset: () => void;
 }
 
 export const ReceiverView: React.FC<ReceiverViewProps> = ({
@@ -39,6 +40,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   errorMessage,
   isNativeFSA,
   corruptedFiles,
+  onReset,
 }) => {
   const [pinRequiredBySender] = useState(false);
   const [isPreparingSave, setIsPreparingSave] = useState(false);
@@ -80,7 +82,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           successTitle="Download Complete & Verified!"
           successDescription="All files were written directly to disk and verified with CRC-32 checksums."
           actionLabel="Receive More Files"
-          onAction={() => window.location.reload()}
+          onAction={onReset}
           corruptedFiles={corruptedFiles}
         />
       ) : manifest ? (

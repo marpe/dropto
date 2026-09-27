@@ -19,6 +19,7 @@ export type TransferResult = {
 
 export type EngineEventCallback = {
   onMetrics?: (metrics: TransferMetrics) => void;
+  onManifest?: (manifest: TransferManifest) => void;
   onFileStart?: (file: TransferFile, fileIndex: number) => void;
   onFileProgress?: (fileIndex: number, percent: number, bytesTransferred: number) => void;
   onFileComplete?: (fileIndex: number, verified: boolean) => void;
@@ -361,15 +362,8 @@ export class TransferEngine {
         this.isActive = true;
         wakeLockService.acquire();
         soundService.playStart();
-        // Notify UI to display manifest & request user save action
-        this.callbacks.onFileStart?.(
-          {
-            ...this.manifest.files[0],
-            status: 'pending',
-            bytesTransferred: 0,
-          },
-          0
-        );
+        // UI shows the file list and asks the user where to save
+        this.callbacks.onManifest?.(this.manifest);
         break;
       }
 

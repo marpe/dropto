@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TransferEngine } from '../services/transferEngine';
 import type { EngineEventCallback, TransferResult } from '../services/transferEngine';
 import { FastStreamingChecksum } from '../services/checksum';
-import type { TransferFile, TransferMetrics } from '../types/transfer';
+import type { TransferFile, TransferManifest, TransferMetrics } from '../types/transfer';
 import { clearFilePickers, createMockDirectoryTree } from './utils/mockFileSystem';
 
 class MockDataConnection {
@@ -158,7 +158,7 @@ describe('TransferEngine Full Protocol Flow', () => {
 
     // Init Receiver
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: async () => {
+      onManifest: async () => {
         manifestReceived = true;
         // Simulates clicking "Select save location & start download"
         const started = await receiverEngine.prepareAndStartReceiverFile(0);
@@ -187,13 +187,38 @@ describe('TransferEngine Full Protocol Flow', () => {
     expect(verifiedResult).toBe(true);
   });
 
+  it('announces the incoming manifest to the receiver', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    let received: TransferManifest | null = null;
+    receiverEngine.init(receiverConn as any, false, {
+      onManifest: (manifest) => {
+        received = manifest;
+      },
+    });
+    senderEngine.init(senderConn as any, true, {});
+
+    await senderEngine.startSenderTransfer(
+      [createTestFile(1024, 'a.bin'), { ...createTestFile(2048, 'b.bin'), relativePath: 'dir/b.bin' }],
+      false
+    );
+
+    expect(await waitFor(() => received !== null)).toBe(true);
+    expect(received!.totalBytes).toBe(3072);
+    expect(received!.files.map((f) => [f.name, f.size, f.relativePath])).toEqual([
+      ['a.bin', 1024, undefined],
+      ['b.bin', 2048, 'dir/b.bin'],
+    ]);
+  });
+
   it('notifies the sender once the receiver has verified the last file', async () => {
     const { senderConn, receiverConn } = createConnectedPair();
     const senderEngine = new TransferEngine();
     const receiverEngine = new TransferEngine();
 
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
     });
@@ -221,7 +246,7 @@ describe('TransferEngine Full Protocol Flow', () => {
     const receiverEngine = new TransferEngine();
 
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
     });
@@ -270,7 +295,7 @@ describe('TransferEngine connection loss', () => {
     let manifestReceived = false;
     const errors: string[] = [];
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         manifestReceived = true;
       },
       onError: (err) => {
@@ -293,7 +318,7 @@ describe('TransferEngine connection loss', () => {
     const errors: string[] = [];
     let senderCompleted = false;
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
       onError: (err) => {
@@ -357,7 +382,7 @@ describe('TransferEngine storage and read failures', () => {
     const receiverEngine = new TransferEngine();
     let receiverCompleted = false;
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
       onAllCompleted: () => {
@@ -424,7 +449,7 @@ describe('TransferEngine storage and read failures', () => {
     const receiverErrors: string[] = [];
     const senderErrors: string[] = [];
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.startReceiving();
       },
       onError: (err) => {
@@ -475,7 +500,7 @@ describe('TransferEngine progress reporting', () => {
     let receiverCompleted = false;
     let senderCompleted = false;
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
       onMetrics: (m) => {
@@ -583,7 +608,7 @@ describe('TransferEngine multi-file receive', () => {
 
     let receiverCompleted = false;
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.startReceiving();
       },
       onAllCompleted: () => {
@@ -632,7 +657,7 @@ describe('TransferEngine integrity verification', () => {
     let receiverResult: TransferResult | null = null;
     let senderResult: TransferResult | null = null;
     receiverEngine.init(receiverConn as any, false, {
-      onFileStart: () => {
+      onManifest: () => {
         receiverEngine.prepareAndStartReceiverFile(0);
       },
       onAllCompleted: (result) => {
