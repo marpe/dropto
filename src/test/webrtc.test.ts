@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { WebRtcService } from '../services/webrtc';
 
 // Hoisted so the vi.mock factory below can reference the fakes
-const { FakeConnection, FakePeer, peers } = vi.hoisted(() => {
+const { FakeConnection, FakePeer, peers, peerBehavior } = vi.hoisted(() => {
   type Handler = (...args: any[]) => void;
 
   class FakeEmitter {
@@ -31,6 +31,8 @@ const { FakeConnection, FakePeer, peers } = vi.hoisted(() => {
   }
 
   const peers: FakePeer[] = [];
+  // When set, new peers fail to open with this PeerJS error instead of opening
+  const peerBehavior: { openError: { type: string } | null } = { openError: null };
 
   class FakePeer extends FakeEmitter {
     public id: string;
@@ -39,11 +41,12 @@ const { FakeConnection, FakePeer, peers } = vi.hoisted(() => {
       super();
       this.id = id ?? 'ephemeral';
       peers.push(this);
-      queueMicrotask(() => this.emit('open', this.id));
+      const openError = peerBehavior.openError;
+      queueMicrotask(() => (openError ? this.emit('error', openError) : this.emit('open', this.id)));
     }
   }
 
-  return { FakeConnection, FakePeer, peers };
+  return { FakeConnection, FakePeer, peers, peerBehavior };
 });
 
 vi.mock('peerjs', () => ({ default: FakePeer }));
@@ -73,9 +76,8 @@ describe('WebRtcService.generateRoomId', () => {
 
 describe('WebRtcService incoming connections', () => {
   async function startSender() {
-    const service = new WebRtcService();
     const incoming: string[] = [];
-    service.setHandlers({
+    const service = new WebRtcService({
       onIncomingConnection: (conn) => {
         incoming.push(conn.peer);
       },
@@ -83,6 +85,35 @@ describe('WebRtcService incoming connections', () => {
     await service.initSender();
     return { service, incoming, peer: peers[peers.length - 1] };
   }
+
+  it('reports which receiver disconnected', async () => {
+    const disconnected: (string | undefined)[] = [];
+    const service = new WebRtcService({
+      onDisconnected: (peerId) => {
+        disconnected.push(peerId);
+      },
+    });
+    await service.initSender();
+    const conn = new FakeConnection('receiver-1');
+    peers[peers.length - 1].emit('connection', conn);
+
+    conn.close();
+
+    expect(disconnected).toEqual(['receiver-1']);
+  });
+
+  it('frees the room for the next receiver after disconnecting the current peer', async () => {
+    const { service, incoming, peer } = await startSender();
+    const first = new FakeConnection('receiver-1');
+    peer.emit('connection', first);
+
+    service.disconnectPeer();
+    peer.emit('connection', new FakeConnection('receiver-2'));
+
+    // flush: messages sent just before (e.g. TRANSFER_CANCEL) must still reach the peer
+    expect(first.close).toHaveBeenCalledWith({ flush: true });
+    expect(incoming).toEqual(['receiver-1', 'receiver-2']);
+  });
 
   it('turns away a second receiver while the first is still connected', async () => {
     const { incoming, peer } = await startSender();
@@ -106,5 +137,22 @@ describe('WebRtcService incoming connections', () => {
     peer.emit('connection', new FakeConnection('receiver-2'));
 
     expect(incoming).toEqual(['receiver-1', 'receiver-2']);
+  });
+});
+
+describe('WebRtcService room creation', () => {
+  afterEach(() => {
+    peerBehavior.openError = null;
+  });
+
+  it('gives up after a few room-code collisions instead of retrying forever', async () => {
+    peerBehavior.openError = { type: 'unavailable-id' };
+    const peersBefore = peers.length;
+
+    await expect(new WebRtcService().initSender()).rejects.toBeDefined();
+
+    const attempts = peers.length - peersBefore;
+    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBeLessThanOrEqual(5);
   });
 });

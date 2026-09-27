@@ -129,6 +129,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // 4. Receiver clicks "Connect & Download"
     const receiverConnectBtn = receiverPage.locator('button:has-text("Connect & Download")');
     await receiverConnectBtn.click();
+    await expect(receiverPage.locator('text=Waiting for Sender Approval')).toBeVisible({ timeout: 15000 });
 
     // 5. Sender receives incoming connection request modal
     await expect(senderPage.locator('text=Receiver Connection Request')).toBeVisible({ timeout: 15000 });
@@ -149,10 +150,9 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // 8. Receiver clicks "Select Save Location & Start Download"
     await saveButton.click();
 
-    // Verify transition into transferring / completing state
-    await expect(
-      receiverPage.locator('text=Receiving Direct to Disk').or(receiverPage.locator('text=Download Complete & Verified!'))
-    ).toBeVisible({ timeout: 15000 });
+    // 9. Both sides reach a verified completion
+    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
 
     await senderContext.close();
     await receiverContext.close();

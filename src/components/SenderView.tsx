@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { UploadCloud, FolderUp, FileUp, X, QrCode, Copy, Check, Lock, AlertCircle } from 'lucide-react';
-import type { TransferFile, TransferMetrics } from '../types/transfer';
+import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { QrModal } from './QrModal';
@@ -15,8 +15,10 @@ interface SenderViewProps {
   onClearFiles: () => void;
   connectedPeerId: string | null;
   transferMetrics: TransferMetrics | null;
-  transferState: 'idle' | 'waiting' | 'transferring' | 'completed' | 'failed';
-  pendingPeer: { peerId: string; approve: () => void; reject: () => void } | null;
+  transferState: SenderStatus;
+  pendingPeerId: string | null;
+  onApprovePeer: () => void;
+  onRejectPeer: () => void;
   onTogglePause: () => void;
   onCancelTransfer: () => void;
   pin: string;
@@ -37,7 +39,9 @@ export const SenderView: React.FC<SenderViewProps> = ({
   connectedPeerId,
   transferMetrics,
   transferState,
-  pendingPeer,
+  pendingPeerId,
+  onApprovePeer,
+  onRejectPeer,
   onTogglePause,
   onCancelTransfer,
   pin,
@@ -102,14 +106,14 @@ export const SenderView: React.FC<SenderViewProps> = ({
       />
 
       {/* Peer Approval Modal */}
-      {pendingPeer && (
+      {pendingPeerId && (
         <PeerApprovalModal
           isOpen={true}
-          peerId={pendingPeer.peerId}
+          peerId={pendingPeerId}
           fileCount={files.length}
           totalBytes={totalSize}
-          onApprove={pendingPeer.approve}
-          onReject={pendingPeer.reject}
+          onApprove={onApprovePeer}
+          onReject={onRejectPeer}
         />
       )}
 

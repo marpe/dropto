@@ -39,6 +39,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         errorMessage={null}
         isNativeFSA={true}
         corruptedFiles={[]}
+        onReset={() => {}}
       />
     );
 
@@ -73,6 +74,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         errorMessage={null}
         isNativeFSA={true}
         corruptedFiles={[]}
+        onReset={() => {}}
       />
     );
 
@@ -124,6 +126,7 @@ describe('ReceiverView Component UI & Interaction', () => {
         errorMessage={null}
         isNativeFSA={true}
         corruptedFiles={[]}
+        onReset={() => {}}
       />
     );
 

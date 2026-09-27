@@ -3,18 +3,19 @@ import type { DataConnection, PeerOptions } from 'peerjs';
 import type { AppSettings } from '../types/transfer';
 
 export type ConnectionEventHandler = {
-  onRoomReady?: (roomId: string) => void;
   onIncomingConnection?: (conn: DataConnection) => void;
-  onConnected?: (conn: DataConnection) => void;
-  onDisconnected?: () => void;
+  /** peerId identifies which incoming connection closed; absent when the whole session ended */
+  onDisconnected?: (peerId?: string) => void;
   onError?: (err: any) => void;
 };
 
+const MAX_ROOM_ID_ATTEMPTS = 4;
+
+/** One signalling session: a sender's room or a receiver's connection to a room. */
 export class WebRtcService {
   private peer: Peer | null = null;
-  public activeConn: DataConnection | null = null;
-  public roomId: string | null = null;
-  private handlers: ConnectionEventHandler = {};
+  private activeConn: DataConnection | null = null;
+  private readonly handlers: ConnectionEventHandler;
 
   // Standard Google public STUN servers for reliable direct NAT traversal
   private defaultIceServers = [
@@ -22,6 +23,10 @@ export class WebRtcService {
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
   ];
+
+  constructor(handlers: ConnectionEventHandler = {}) {
+    this.handlers = handlers;
+  }
 
   public generateRoomId(): string {
     // 32 symbols divide 256 evenly, so `byte % 32` is unbiased
@@ -31,46 +36,35 @@ export class WebRtcService {
     return `DW-${code}`;
   }
 
-  public initSender(settings?: Partial<AppSettings>, customRoomId?: string): Promise<string> {
+  public initSender(settings?: Partial<AppSettings>, attempt = 1): Promise<string> {
     return new Promise((resolve, reject) => {
       this.destroy();
 
-      const roomId = customRoomId || this.generateRoomId();
-      this.roomId = roomId;
+      const peer = new Peer(this.generateRoomId(), this.buildPeerOptions(settings));
+      this.peer = peer;
 
-      const peerOptions = this.buildPeerOptions(settings);
+      peer.on('open', (id) => {
+        resolve(id);
+      });
 
-      try {
-        const peer = new Peer(roomId, peerOptions);
-        this.peer = peer;
+      peer.on('connection', (conn) => {
+        this.handleIncomingConnection(conn);
+      });
 
-        peer.on('open', (id) => {
-          this.roomId = id;
-          this.handlers.onRoomReady?.(id);
-          resolve(id);
-        });
+      peer.on('error', (err) => {
+        console.error('PeerJS error:', err);
+        if (err.type === 'unavailable-id' && attempt < MAX_ROOM_ID_ATTEMPTS) {
+          // Room code already taken on the signalling server; try a fresh one
+          this.initSender(settings, attempt + 1).then(resolve, reject);
+        } else {
+          this.handlers.onError?.(err);
+          reject(err);
+        }
+      });
 
-        peer.on('connection', (conn) => {
-          this.handleIncomingConnection(conn);
-        });
-
-        peer.on('error', (err) => {
-          console.error('PeerJS error:', err);
-          if (err.type === 'unavailable-id') {
-            // ID collided, retry with new ID
-            this.initSender(settings).then(resolve).catch(reject);
-          } else {
-            this.handlers.onError?.(err);
-            reject(err);
-          }
-        });
-
-        peer.on('close', () => {
-          this.handlers.onDisconnected?.();
-        });
-      } catch (err) {
-        reject(err);
-      }
+      peer.on('close', () => {
+        this.handlers.onDisconnected?.();
+      });
     });
   }
 
@@ -78,26 +72,23 @@ export class WebRtcService {
     return new Promise((resolve, reject) => {
       this.destroy();
 
-      const peerOptions = this.buildPeerOptions(settings);
       // Receiver gets an ephemeral random ID
-      const peer = new Peer(peerOptions);
+      const peer = new Peer(this.buildPeerOptions(settings));
       this.peer = peer;
 
-      peer.on('open', (_id) => {
+      peer.on('open', () => {
         const conn = peer.connect(targetRoomId, {
           reliable: true,
         });
 
-        if (conn.open) {
+        const onOpen = () => {
           this.activeConn = conn;
-          this.handlers.onConnected?.(conn);
           resolve(conn);
+        };
+        if (conn.open) {
+          onOpen();
         } else {
-          conn.on('open', () => {
-            this.activeConn = conn;
-            this.handlers.onConnected?.(conn);
-            resolve(conn);
-          });
+          conn.on('open', onOpen);
         }
 
         conn.on('close', () => {
@@ -117,10 +108,6 @@ export class WebRtcService {
         reject(err);
       });
     });
-  }
-
-  public setHandlers(handlers: ConnectionEventHandler) {
-    this.handlers = handlers;
   }
 
   private handleIncomingConnection(conn: DataConnection) {
@@ -143,7 +130,7 @@ export class WebRtcService {
       if (this.activeConn === conn) {
         this.activeConn = null;
       }
-      this.handlers.onDisconnected?.();
+      this.handlers.onDisconnected?.(conn.peer);
     });
 
     conn.on('error', (err) => {
@@ -175,15 +162,24 @@ export class WebRtcService {
     return baseOptions;
   }
 
-  public destroy() {
+  /**
+   * Gracefully closes the current peer connection (after queued messages are delivered)
+   * but keeps the room open for the next receiver.
+   */
+  public disconnectPeer() {
     if (this.activeConn) {
+      const conn = this.activeConn;
+      this.activeConn = null;
       try {
-        this.activeConn.close();
+        conn.close({ flush: true });
       } catch {
         // Already closed
       }
-      this.activeConn = null;
     }
+  }
+
+  public destroy() {
+    this.activeConn = null;
     if (this.peer) {
       try {
         this.peer.destroy();
@@ -192,8 +188,5 @@ export class WebRtcService {
       }
       this.peer = null;
     }
-    this.roomId = null;
   }
 }
-
-export const webrtcService = new WebRtcService();

@@ -22,7 +22,16 @@ export interface TransferManifest {
 
 export type ManifestFile = Omit<TransferFile, 'rawFile' | 'status' | 'bytesTransferred'>;
 
-export type PeerApprovalStatus = 'idle' | 'pending' | 'approved' | 'rejected';
+export type SenderStatus = 'idle' | 'waiting' | 'transferring' | 'completed' | 'failed';
+
+export type ReceiverStatus =
+  | 'idle'
+  | 'connecting'
+  | 'waiting_approval'
+  | 'connected'
+  | 'transferring'
+  | 'completed'
+  | 'error';
 
 export type ProtocolMessageType =
   | 'HELLO'
