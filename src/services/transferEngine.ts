@@ -105,7 +105,7 @@ export class TransferEngine {
 
     // 1. Send Manifest to Receiver
     const manifest: TransferManifest = {
-      sessionId: Math.random().toString(36).substring(2, 9),
+      sessionId: crypto.randomUUID(),
       pinRequired,
       totalBytes: this.totalBytes,
       files: files.map((f) => ({

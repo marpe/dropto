@@ -190,7 +190,7 @@ export const App: React.FC = () => {
   // Handle adding files to sender queue
   const handleAddFiles = (newFiles: File[]) => {
     const formatted: TransferFile[] = newFiles.map((file) => ({
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID(),
       name: file.name,
       size: file.size,
       type: file.type || 'application/octet-stream',
