@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TransferEngine } from '../services/transferEngine';
-import type { TransferResult } from '../services/transferEngine';
-import type { TransferFile } from '../types/transfer';
+import type { EngineEventCallback, TransferResult } from '../services/transferEngine';
+import { FastStreamingChecksum } from '../services/checksum';
+import type { TransferFile, TransferMetrics } from '../types/transfer';
 import { clearFilePickers, createMockDirectoryTree } from './utils/mockFileSystem';
 
 class MockDataConnection {
@@ -81,6 +82,55 @@ async function waitFor(condition: () => boolean, timeoutMs = 5000): Promise<bool
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function makeChunk(fileIndex: number, chunkIndex: number, payload: Uint8Array): ArrayBuffer {
+  const packet = new Uint8Array(16 + payload.length);
+  const view = new DataView(packet.buffer);
+  view.setUint32(0, fileIndex, false);
+  view.setBigUint64(4, BigInt(chunkIndex), false);
+  view.setUint32(12, payload.length, false);
+  packet.set(payload, 16);
+  return packet.buffer;
+}
+
+/** Receiver wired to a scripted fake sender that emits raw protocol data. Installs a save-file picker mock. */
+async function startReceiverWithFakeSender(fileSizes: number[], callbacks: EngineEventCallback = {}) {
+  const write = vi.fn().mockResolvedValue(undefined);
+  (window as any).showSaveFilePicker = vi.fn().mockResolvedValue({
+    createWritable: vi.fn().mockResolvedValue({ write, close: vi.fn(), abort: vi.fn().mockResolvedValue(undefined) }),
+  });
+  const receiverConn = new MockDataConnection();
+  const engine = new TransferEngine();
+  const errors: string[] = [];
+  engine.init(receiverConn as any, false, {
+    ...callbacks,
+    onError: (err) => {
+      errors.push(err);
+      callbacks.onError?.(err);
+    },
+  });
+  const manifest = {
+    sessionId: 's',
+    pinRequired: false,
+    totalBytes: fileSizes.reduce((a, b) => a + b, 0),
+    files: fileSizes.map((size, i) => ({
+      id: `f${i}`,
+      name: `f${i}.bin`,
+      size,
+      type: 'application/octet-stream',
+      chunkSize: 64 * 1024,
+      totalChunks: 1,
+    })),
+  };
+  receiverConn.emit('data', JSON.stringify({ type: 'MANIFEST', payload: manifest }));
+  await sleep(20);
+  await engine.prepareAndStartReceiverFile(0);
+  const emit = async (data: ArrayBuffer | string) => {
+    receiverConn.emit('data', data);
+    await sleep(20);
+  };
+  return { emit, write, errors };
 }
 
 function countSentMessages(conn: MockDataConnection, type: string): number {
@@ -412,57 +462,69 @@ describe('TransferEngine storage and read failures', () => {
   });
 });
 
-describe('TransferEngine receiver input validation', () => {
+describe('TransferEngine progress reporting', () => {
   afterEach(() => {
     clearFilePickers();
   });
 
-  function makeChunk(fileIndex: number, chunkIndex: number, payload: Uint8Array): ArrayBuffer {
-    const packet = new Uint8Array(16 + payload.length);
-    const view = new DataView(packet.buffer);
-    view.setUint32(0, fileIndex, false);
-    view.setBigUint64(4, BigInt(chunkIndex), false);
-    view.setUint32(12, payload.length, false);
-    packet.set(payload, 16);
-    return packet.buffer;
-  }
-
-  /** Receiver wired to a scripted fake sender that emits raw protocol data. */
-  async function startReceiverWithFakeSender(fileSizes: number[]) {
-    const write = vi.fn().mockResolvedValue(undefined);
-    (window as any).showSaveFilePicker = vi.fn().mockResolvedValue({
-      createWritable: vi.fn().mockResolvedValue({ write, close: vi.fn(), abort: vi.fn().mockResolvedValue(undefined) }),
-    });
-    const receiverConn = new MockDataConnection();
-    const engine = new TransferEngine();
-    const errors: string[] = [];
-    engine.init(receiverConn as any, false, {
-      onError: (err) => {
-        errors.push(err);
+  it('throttles metrics updates but always reports each file reaching 100%', async () => {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    const receiverMetrics: TransferMetrics[] = [];
+    let receiverCompleted = false;
+    let senderCompleted = false;
+    receiverEngine.init(receiverConn as any, false, {
+      onFileStart: () => {
+        receiverEngine.prepareAndStartReceiverFile(0);
+      },
+      onMetrics: (m) => {
+        receiverMetrics.push(m);
+      },
+      onAllCompleted: () => {
+        receiverCompleted = true;
       },
     });
-    const manifest = {
-      sessionId: 's',
-      pinRequired: false,
-      totalBytes: fileSizes.reduce((a, b) => a + b, 0),
-      files: fileSizes.map((size, i) => ({
-        id: `f${i}`,
-        name: `f${i}.bin`,
-        size,
-        type: 'application/octet-stream',
-        chunkSize: 64 * 1024,
-        totalChunks: 1,
-      })),
-    };
-    receiverConn.emit('data', JSON.stringify({ type: 'MANIFEST', payload: manifest }));
-    await sleep(20);
-    await engine.prepareAndStartReceiverFile(0);
-    const emit = async (data: ArrayBuffer) => {
-      receiverConn.emit('data', data);
-      await sleep(20);
-    };
-    return { emit, write, errors };
-  }
+    senderEngine.init(senderConn as any, true, {
+      onAllCompleted: () => {
+        senderCompleted = true;
+      },
+    });
+    const chunkCount = 40;
+
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * chunkCount)], false);
+    // Wait for both sides so no engine is still writing document.title when later tests run
+    expect(await waitFor(() => receiverCompleted && senderCompleted)).toBe(true);
+
+    expect(receiverMetrics.length).toBeLessThan(chunkCount / 2);
+    expect(receiverMetrics[receiverMetrics.length - 1].currentFilePercent).toBe(100);
+  });
+
+  it('restores the page title once the transfer completes', async () => {
+    // A single engine: two engines in one test would share and overwrite document.title
+    document.title = 'DropWave';
+    let completed = false;
+    const { emit } = await startReceiverWithFakeSender([3], {
+      onAllCompleted: () => {
+        completed = true;
+      },
+    });
+    const payload = new Uint8Array([1, 2, 3]);
+    const checksum = new FastStreamingChecksum();
+    checksum.update(payload);
+
+    await emit(makeChunk(0, 0, payload));
+    await emit(JSON.stringify({ type: 'FILE_COMPLETE', payload: { fileIndex: 0, checksum: checksum.digest() } }));
+
+    expect(completed).toBe(true);
+    expect(document.title).toBe('DropWave');
+  });
+});
+
+describe('TransferEngine receiver input validation', () => {
+  afterEach(() => {
+    clearFilePickers();
+  });
 
   it('rejects a chunk for a file other than the one being received, without writing it', async () => {
     const { emit, write, errors } = await startReceiverWithFakeSender([4, 4]);
