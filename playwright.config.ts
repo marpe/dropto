@@ -19,7 +19,12 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Both peers run on this machine: plain host ICE candidates instead of mDNS .local names,
+        // whose resolution is slow or flaky (notably on Windows) and made connections intermittently never open
+        launchOptions: { args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] },
+      },
     },
   ],
   // Signalling runs on a local PeerServer, so tests need no internet and never flake on the public one
