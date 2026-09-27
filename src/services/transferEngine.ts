@@ -180,11 +180,15 @@ export class TransferEngine {
 
 
   public async proceedWithFileSend(fileIndex: number, resumeFromChunk = 0) {
-    if (this.isCancelled || !this.conn) return;
+    if (this.isCancelled || !this.conn) {
+      return;
+    }
 
     this.currentFileIdx = fileIndex;
     const fileItem = this.files[fileIndex];
-    if (!fileItem || !fileItem.rawFile) return;
+    if (!fileItem || !fileItem.rawFile) {
+      return;
+    }
 
     const rawFile = fileItem.rawFile;
     const totalChunks = Math.ceil(rawFile.size / DEFAULT_CHUNK_SIZE);
@@ -196,11 +200,15 @@ export class TransferEngine {
     const rawChannel = (this.conn as any).dataChannel as RTCDataChannel;
 
     for (let chunkIdx = resumeFromChunk; chunkIdx < totalChunks; chunkIdx++) {
-      if (this.isCancelled) break;
+      if (this.isCancelled) {
+        break;
+      }
 
       while (this.isPaused) {
         await new Promise((r) => setTimeout(r, 100));
-        if (this.isCancelled) break;
+        if (this.isCancelled) {
+          break;
+        }
       }
 
       // Backpressure Check: wait if buffer exceeds high watermark
@@ -287,7 +295,9 @@ export class TransferEngine {
   }
 
   public async prepareAndStartReceiverFile(fileIndex: number): Promise<boolean> {
-    if (!this.manifest || !this.manifest.files[fileIndex]) return false;
+    if (!this.manifest || !this.manifest.files[fileIndex]) {
+      return false;
+    }
 
     const fileMeta = this.manifest.files[fileIndex];
     this.currentFileIdx = fileIndex;
@@ -322,7 +332,9 @@ export class TransferEngine {
   }
 
   private async handleBinaryChunk(buffer: ArrayBuffer) {
-    if (!this.currentWriter || !this.manifest) return;
+    if (!this.currentWriter || !this.manifest) {
+      return;
+    }
 
     if (buffer.byteLength < HEADER_SIZE) {
       throw new Error('Received a malformed data chunk');
@@ -595,9 +607,13 @@ export class TransferEngine {
   }
 
   private calculateCurrentSpeed(): number {
-    if (this.speedWindow.length < 2) return 0;
+    if (this.speedWindow.length < 2) {
+      return 0;
+    }
     const duration = (this.speedWindow[this.speedWindow.length - 1].time - this.speedWindow[0].time) / 1000;
-    if (duration <= 0) return 0;
+    if (duration <= 0) {
+      return 0;
+    }
     const windowBytes = this.speedWindow.reduce((acc, item) => acc + item.bytes, 0);
     return windowBytes / duration;
   }

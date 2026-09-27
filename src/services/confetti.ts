@@ -1,7 +1,9 @@
 import confetti from 'canvas-confetti';
 
 export function fireCelebration() {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') {
+    return;
+  }
 
   const count = 150;
   const defaults = {

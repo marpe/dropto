@@ -21,7 +21,9 @@ class MockDataConnection {
   public tamper: ((data: any) => any) | null = null;
 
   public on(event: string, callback: (data: any) => void) {
-    if (!this.listeners[event]) this.listeners[event] = [];
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
     this.listeners[event].push(callback);
   }
 

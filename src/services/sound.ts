@@ -15,9 +15,13 @@ class SoundService {
   }
 
   public playConnect() {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      return;
+    }
 
     const now = this.ctx.currentTime;
     this.playTone(523.25, now, 0.12, 'sine'); // C5
@@ -25,9 +29,13 @@ class SoundService {
   }
 
   public playStart() {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      return;
+    }
 
     const now = this.ctx.currentTime;
     this.playTone(440, now, 0.1, 'sine'); // A4
@@ -36,9 +44,13 @@ class SoundService {
   }
 
   public playComplete() {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
     this.initCtx();
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      return;
+    }
 
     const now = this.ctx.currentTime;
     this.playTone(523.25, now, 0.15, 'triangle'); // C5
@@ -48,7 +60,9 @@ class SoundService {
   }
 
   private playTone(freq: number, startTime: number, duration: number, type: OscillatorType) {
-    if (!this.ctx) return;
+    if (!this.ctx) {
+      return;
+    }
     try {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
