@@ -229,6 +229,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     const dummyMetrics: TransferMetrics = {
       currentSpeed: 1048576 * 15, // 15 MB/s
       averageSpeed: 1048576 * 14,
+      elapsedSeconds: 1,
       etaSeconds: 5,
       bytesTransferred: 524288,
       totalBytes: 1048576,

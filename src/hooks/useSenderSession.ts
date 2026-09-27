@@ -4,6 +4,7 @@ import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
 import type { AppSettings, SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
 import { generateShareKey } from '../utils/shareLink';
+import { displayPath } from '../utils/filePath';
 import { recallRoom, rememberRoom } from '../utils/roomMemory';
 import { defaultSessionServices } from './sessionServices';
 import type { SessionConnection, SessionSender, SessionServices } from './sessionServices';
@@ -152,7 +153,7 @@ function toTransferFile(file: File): TransferFile {
 
 /** Same path, size and modification time: the same file picked or dropped twice. */
 function fileIdentity(file: TransferFile): string {
-  return `${file.relativePath || file.name}|${file.size}|${file.lastModified}`;
+  return `${displayPath(file)}|${file.size}|${file.lastModified}`;
 }
 
 interface UseSenderSessionOptions {

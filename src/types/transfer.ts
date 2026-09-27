@@ -12,6 +12,9 @@ export interface TransferFile {
 /** What the receiver learns about each file (no file contents). */
 export type ManifestFile = Omit<TransferFile, 'rawFile'>;
 
+/** Enough of a file to name it in the UI or in a corruption report. */
+export type NamedFile = Pick<ManifestFile, 'name' | 'relativePath'>;
+
 export interface TransferManifest {
   totalBytes: number;
   files: ManifestFile[];
@@ -61,6 +64,8 @@ export interface TransferMetrics {
   /** Bytes per second over the recent window */
   currentSpeed: number;
   averageSpeed: number;
+  /** Since the first byte moved */
+  elapsedSeconds: number;
   etaSeconds: number;
   bytesTransferred: number;
   totalBytes: number;

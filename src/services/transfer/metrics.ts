@@ -18,7 +18,8 @@ export class TransferMetricsTracker {
   private readonly totalBytes: number;
   private readonly totalFiles: number;
   private readonly now: () => number;
-  private readonly startedTimestampMs: number;
+  // Set by the first byte: time spent before that (PIN entry, the save dialog) is not transfer time
+  private startedTimestampMs: number | null = null;
   private bytesTransferred = 0;
   private samples: SpeedSample[] = [];
   private lastSnapshotTimestampMs: number | null = null;
@@ -27,11 +28,11 @@ export class TransferMetricsTracker {
     this.totalBytes = totalBytes;
     this.totalFiles = totalFiles;
     this.now = now;
-    this.startedTimestampMs = now();
   }
 
   public recordBytes(bytes: number) {
     const timestampMs = this.now();
+    this.startedTimestampMs ??= timestampMs;
     this.bytesTransferred += bytes;
     this.samples.push({ timestampMs, bytes });
     const cutoffMs = timestampMs - SPEED_WINDOW_MS;
@@ -57,11 +58,12 @@ export class TransferMetricsTracker {
     this.lastSnapshotTimestampMs = nowMs;
 
     const currentSpeed = this.currentSpeed();
-    const elapsedSeconds = Math.max((nowMs - this.startedTimestampMs) / 1000, 1);
+    const elapsedSeconds = this.startedTimestampMs === null ? 0 : (nowMs - this.startedTimestampMs) / 1000;
     const remainingBytes = Math.max(this.totalBytes - this.bytesTransferred, 0);
     return {
       currentSpeed,
-      averageSpeed: this.bytesTransferred / elapsedSeconds,
+      averageSpeed: elapsedSeconds > 0 ? this.bytesTransferred / elapsedSeconds : 0,
+      elapsedSeconds,
       etaSeconds: currentSpeed > 0 ? Math.round(remainingBytes / currentSpeed) : 0,
       bytesTransferred: this.bytesTransferred,
       totalBytes: this.totalBytes,

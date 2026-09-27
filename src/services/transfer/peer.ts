@@ -1,12 +1,8 @@
 import type { DataConnection } from 'peerjs';
-import type { ControlMessage, TransferEvents, TransferMetrics } from '../../types/transfer';
+import type { ControlMessage, NamedFile, TransferEvents, TransferMetrics } from '../../types/transfer';
+import { displayPath } from '../../utils/filePath';
 import { TransferMetricsTracker } from './metrics';
 import { parseControlMessage, toArrayBuffer } from './protocol';
-
-interface NamedFile {
-  name: string;
-  relativePath?: string;
-}
 
 /**
  * Protocol plumbing shared by both ends of one transfer over one connection: ordered message
@@ -78,7 +74,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
 
   protected recordVerification(file: NamedFile | undefined, isVerified: boolean) {
     if (!isVerified && file) {
-      this.corruptedFiles.push(file.relativePath || file.name);
+      this.corruptedFiles.push(displayPath(file));
     }
   }
 
