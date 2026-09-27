@@ -4,6 +4,8 @@ import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types
 import { formatBytes } from '../utils/format';
 import { MetricsDashboard } from './MetricsDashboard';
 import { TransferCompleteCard } from './TransferCompleteCard';
+import { PinEntryCard } from './PinEntryCard';
+import type { PinPrompt } from '../services/transferEngine';
 
 interface ReceiverViewProps {
   roomCode: string;
@@ -12,6 +14,8 @@ interface ReceiverViewProps {
   onPinChange: (pin: string) => void;
   onConnect: () => void;
   connectionState: ReceiverStatus;
+  pinPrompt: PinPrompt | null;
+  onSubmitPin: () => void;
   manifest: TransferManifest | null;
   transferMetrics: TransferMetrics | null;
   onStartSaving: () => void;
@@ -31,6 +35,8 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   onPinChange,
   onConnect,
   connectionState,
+  pinPrompt,
+  onSubmitPin,
   manifest,
   transferMetrics,
   onStartSaving,
@@ -42,7 +48,6 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   corruptedFiles,
   onReset,
 }) => {
-  const [pinRequiredBySender] = useState(false);
   const [isPreparingSave, setIsPreparingSave] = useState(false);
 
   const handleStartSaveClick = async () => {
@@ -85,6 +90,8 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           onAction={onReset}
           corruptedFiles={corruptedFiles}
         />
+      ) : connectionState === 'pin_required' && pinPrompt ? (
+        <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
       ) : manifest ? (
         /* Manifest Received - Ready to Choose Save Location */
         <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-8 shadow-xl">
@@ -181,21 +188,6 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
                 className="w-full text-center font-mono text-xl sm:text-2xl font-bold tracking-widest py-3 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:ring-2 focus:ring-[#3ECF8E]/50 focus:border-[#3ECF8E] focus:outline-none transition-all"
               />
             </div>
-
-            {pinRequiredBySender && (
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
-                  Room PIN
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter PIN"
-                  value={pin}
-                  onChange={(e) => onPinChange(e.target.value)}
-                  className="w-full text-center font-mono text-sm py-2 px-4 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-white focus:border-[#3ECF8E] focus:outline-none"
-                />
-              </div>
-            )}
 
             <button
               onClick={onConnect}

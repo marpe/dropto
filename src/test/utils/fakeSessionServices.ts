@@ -25,6 +25,7 @@ export class FakeEngine {
   public startReceiving = vi.fn().mockResolvedValue(true);
   public togglePause = vi.fn().mockReturnValue(true);
   public cancel = vi.fn();
+  public submitPin = vi.fn();
 }
 
 export function createFakePeerConnection(peer: string): DataConnection {

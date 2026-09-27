@@ -17,7 +17,6 @@ const settings: AppSettings = {
 
 const manifest: TransferManifest = {
   sessionId: 's',
-  pinRequired: false,
   totalBytes: 5,
   files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain', chunkSize: 65536, totalChunks: 1 }],
 };
@@ -78,6 +77,65 @@ describe('useReceiverSession', () => {
 
     expect(session.result.current.state.status).toBe('connected');
     expect(session.result.current.state.manifest).toEqual(manifest);
+  });
+
+  it('asks for the PIN when the sender requires one', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connect(session);
+
+    act(() => {
+      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+    });
+
+    expect(session.result.current.state.status).toBe('pin_required');
+    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 3, incorrect: false });
+  });
+
+  it('submits the entered PIN and waits for the sender', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connect(session);
+    act(() => {
+      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+    });
+    act(() => {
+      session.result.current.actions.setPin('1234');
+    });
+
+    act(() => {
+      session.result.current.actions.submitPin();
+    });
+
+    expect(engine.submitPin).toHaveBeenCalledWith('1234');
+    expect(session.result.current.state.status).toBe('waiting_approval');
+  });
+
+  it('clears the PIN field and shows remaining attempts after a wrong PIN', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connect(session);
+    act(() => {
+      session.result.current.actions.setPin('0000');
+    });
+
+    act(() => {
+      engine.callbacks.onPinRequired?.({ attemptsLeft: 2, incorrect: true });
+    });
+
+    expect(session.result.current.state.pin).toBe('');
+    expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 2, incorrect: true });
+  });
+
+  it('reports a sender that goes away while the PIN is being entered', async () => {
+    const session = renderReceiverSession();
+    const { engine, connection } = await connect(session);
+    act(() => {
+      engine.callbacks.onPinRequired?.({ attemptsLeft: 3, incorrect: false });
+    });
+
+    act(() => {
+      connection.handlers.onDisconnected?.();
+    });
+
+    expect(session.result.current.state.status).toBe('error');
   });
 
   it('reports a sender that declines or goes away before approving', async () => {

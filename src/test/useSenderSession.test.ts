@@ -91,7 +91,7 @@ describe('useSenderSession', () => {
 
     const engine = session.engines[0];
     expect(engine.init).toHaveBeenCalledWith(peerConn, true, expect.any(Object));
-    expect(engine.startSenderTransfer).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt', size: 5 })], true);
+    expect(engine.startSenderTransfer).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt', size: 5 })], '4321');
     expect(session.result.current.state.status).toBe('transferring');
     expect(session.result.current.state.pendingPeerId).toBeNull();
     expect(session.result.current.state.connectedPeerId).toBe('receiver-1');

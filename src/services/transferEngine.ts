@@ -11,6 +11,13 @@ const HIGH_WATERMARK = 1024 * 1024; // 1 MB
 const LOW_WATERMARK = 256 * 1024; // 256 KB
 const HEADER_SIZE = 16; // 4 + 8 + 4 bytes
 const METRICS_INTERVAL_MS = 200;
+const MAX_PIN_ATTEMPTS = 3;
+
+export type PinPrompt = {
+  attemptsLeft: number;
+  /** True when the previous attempt was wrong */
+  incorrect: boolean;
+};
 
 export type TransferResult = {
   /** Paths of files whose end-to-end checksum did not match */
@@ -27,6 +34,7 @@ export type EngineEventCallback = {
   onError?: (err: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
+  onPinRequired?: (prompt: PinPrompt) => void;
 };
 
 export class TransferEngine {
@@ -44,6 +52,10 @@ export class TransferEngine {
   private isPaused: boolean = false;
   private isCancelled: boolean = false;
   private senderChecksum = new FastStreamingChecksum();
+  private pin: string = '';
+  private pinAttemptsLeft: number = 0;
+  // The manifest is only sent after any PIN check passes; file requests before that are refused
+  private manifestSent: boolean = false;
 
   // Receiver state
   private manifest: TransferManifest | null = null;
@@ -93,10 +105,16 @@ export class TransferEngine {
 
   // =================== SENDER LOGIC ===================
 
-  public async startSenderTransfer(files: TransferFile[], pinRequired = false) {
-    if (!this.conn) throw new Error('No active WebRTC connection');
+  /** Starts a session; with a PIN, the receiver must authenticate before seeing any file details. */
+  public async startSenderTransfer(files: TransferFile[], pin = '') {
+    if (!this.conn) {
+      throw new Error('No active WebRTC connection');
+    }
 
     this.files = files;
+    this.pin = pin;
+    this.pinAttemptsLeft = MAX_PIN_ATTEMPTS;
+    this.manifestSent = false;
     this.currentFileIdx = 0;
     this.totalBytes = files.reduce((acc, f) => acc + f.size, 0);
     this.totalBytesTransferred = 0;
@@ -108,12 +126,21 @@ export class TransferEngine {
     wakeLockService.acquire();
     soundService.playStart();
 
-    // 1. Send Manifest to Receiver
+    if (pin) {
+      this.sendControlMessage({
+        type: 'AUTH_REQUEST',
+        payload: { attemptsLeft: MAX_PIN_ATTEMPTS, incorrect: false } satisfies PinPrompt,
+      });
+    } else {
+      this.sendManifest();
+    }
+  }
+
+  private sendManifest() {
     const manifest: TransferManifest = {
       sessionId: crypto.randomUUID(),
-      pinRequired,
       totalBytes: this.totalBytes,
-      files: files.map((f) => ({
+      files: this.files.map((f) => ({
         id: f.id,
         name: f.name,
         size: f.size,
@@ -125,11 +152,32 @@ export class TransferEngine {
       })),
     };
 
+    this.manifestSent = true;
     this.sendControlMessage({
       type: 'MANIFEST',
       payload: manifest,
     });
   }
+
+  private handlePinResponse(pin: unknown) {
+    if (!this.isSender || this.manifestSent || !this.pin) {
+      return;
+    }
+    if (pin === this.pin) {
+      this.sendManifest();
+      return;
+    }
+    this.pinAttemptsLeft--;
+    if (this.pinAttemptsLeft > 0) {
+      this.sendControlMessage({
+        type: 'AUTH_REQUEST',
+        payload: { attemptsLeft: this.pinAttemptsLeft, incorrect: true } satisfies PinPrompt,
+      });
+    } else {
+      this.failTransfer(new Error('Too many incorrect PIN attempts'));
+    }
+  }
+
 
   public async proceedWithFileSend(fileIndex: number, resumeFromChunk = 0) {
     if (this.isCancelled || !this.conn) return;
@@ -216,6 +264,13 @@ export class TransferEngine {
   }
 
   // =================== RECEIVER LOGIC ===================
+
+  public submitPin(pin: string) {
+    this.sendControlMessage({
+      type: 'AUTH_RESPONSE',
+      payload: { pin },
+    });
+  }
 
   /** Picks the save destination (must run inside a user gesture) and requests the first file. */
   public async startReceiving(): Promise<boolean> {
@@ -367,8 +422,22 @@ export class TransferEngine {
         break;
       }
 
+      case 'AUTH_REQUEST': {
+        this.callbacks.onPinRequired?.(msg.payload as PinPrompt);
+        break;
+      }
+
+      case 'AUTH_RESPONSE': {
+        this.handlePinResponse(msg.payload?.pin);
+        break;
+      }
+
       case 'FILE_START': {
-        // Sender received confirmation from receiver to begin streaming file
+        // Only a receiver that was shown the manifest (i.e. passed any PIN check) may pull files
+        if (!this.isSender || !this.manifestSent) {
+          this.failTransfer(new Error('Receiver requested files before authenticating'));
+          break;
+        }
         // Not awaited: streaming a file must not block pause/cancel messages in the queue
         const { fileIndex, resumeFromChunk } = msg.payload;
         this.proceedWithFileSend(fileIndex, resumeFromChunk || 0).catch((err) => this.failTransfer(err));

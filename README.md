@@ -27,7 +27,7 @@ Standard web apps fail when transferring files larger than 1–2 GB in a browser
 - 🔒 **Direct P2P & DTLS Encrypted**: Files travel straight from device to device. Zero intermediate servers, zero uploads, zero cloud storage.
 - 📱 **QR Code Mobile Pairing**: Instant camera scan from phone to connect PC and mobile devices.
 - 🛡️ **Sender Connection Approval**: Sender explicitly reviews and accepts/declines incoming peer requests before any file metadata or chunks are sent.
-- 🔑 **Optional Session PIN**: Restrict transfer authorization with a custom 4–6 digit room PIN.
+- 🔑 **Optional Session PIN**: The receiver must enter the sender's PIN (up to 6 characters, 3 attempts) before any file names or data are shared.
 - 📂 **Multi-File & Folder Queue**: Drag-and-drop multiple files or entire folder hierarchies with sequential transfers.
 - 📊 **Real-time Transfer Dashboard**: Live speedometer (MB/s gauge), dynamic ETA calculator, per-file and total progress bars, and dynamic tab title percentage.
 - 🔔 **Audio Chimes & Notifications**: Pleasant Web Audio synth chimes on peer connect and transfer completion (zero external media assets required).
