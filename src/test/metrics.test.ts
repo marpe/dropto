@@ -58,4 +58,18 @@ describe('TransferMetricsTracker', () => {
 
     expect(tracker.snapshot(0, 'a.bin', 0)).toMatchObject({ currentSpeed: 0, etaSeconds: 0, overallPercent: 0 });
   });
+
+  // The receiver may spend a minute in the save dialog; that is not transfer time
+  it('times the transfer from its first byte, not from when it was offered', () => {
+    const { tracker, clock } = createTracker(10_000);
+    clock.nowMs = 60_000;
+    tracker.recordBytes(5_000);
+    clock.nowMs = 62_000;
+    tracker.recordBytes(5_000);
+
+    const metrics = tracker.snapshot(0, 'a.bin', 100);
+
+    expect(metrics?.elapsedSeconds).toBe(2);
+    expect(metrics?.averageSpeed).toBe(5_000);
+  });
 });

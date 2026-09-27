@@ -5,6 +5,7 @@ import { FileTypeIcon } from './ui/FileTypeIcon';
 import { IconButton } from './ui/IconButton';
 import type { TransferFile } from '../types/transfer';
 import { formatBytes } from '../utils/format';
+import { displayPath } from '../utils/filePath';
 
 interface FileQueueProps {
   files: TransferFile[];
@@ -22,7 +23,7 @@ const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
     <FileTypeIcon name={file.name} mimeType={file.type} />
     <div className="min-w-0 flex-1">
       <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">
-        {file.relativePath || file.name}
+        {displayPath(file)}
       </span>
       <span className="text-zinc-400 font-mono">{formatBytes(file.size)}</span>
     </div>

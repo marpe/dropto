@@ -15,6 +15,7 @@ const queuedFile: TransferFile = {
 const metrics: TransferMetrics = {
   currentSpeed: 1048576,
   averageSpeed: 1048576,
+  elapsedSeconds: 1,
   etaSeconds: 10,
   bytesTransferred: 524288,
   totalBytes: 1048576,
@@ -147,5 +148,13 @@ describe('SenderView', () => {
 
     expect(screen.queryByText(/no account/i)).toBeNull();
     expect(screen.queryByRole('button', { name: /receive files/i })).toBeNull();
+  });
+
+  it('lists every file with its progress while a multi-file transfer runs', () => {
+    const second: TransferFile = { ...queuedFile, id: 'f2', name: 'notes.txt', type: 'text/plain' };
+    renderSenderView({ transferState: 'transferring', transferMetrics: metrics, files: [queuedFile, second] });
+
+    expect(document.querySelector('[data-status="active"]')?.textContent).toContain('report.pdf');
+    expect(document.querySelector('[data-status="pending"]')?.textContent).toContain('notes.txt');
   });
 });

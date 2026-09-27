@@ -85,6 +85,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         transferMetrics ? (
           <MetricsDashboard
             metrics={transferMetrics}
+            files={manifest?.files ?? []}
             isSender={false}
             isPaused={isPaused}
             onTogglePause={onTogglePause}
@@ -99,10 +100,11 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         )
       ) : connectionState === 'completed' ? (
         <TransferCompleteCard
-          successTitle="Download Complete & Verified!"
-          successDescription="All files were written directly to disk and verified with CRC-32 checksums."
+          title="Download Complete & Verified!"
           actionLabel="Receive More Files"
           onAction={onReset}
+          files={manifest?.files ?? []}
+          metrics={transferMetrics}
           corruptedFiles={corruptedFiles}
         />
       ) : waitingStage ? (

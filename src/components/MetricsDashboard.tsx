@@ -5,13 +5,17 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { Pill } from './ui/Pill';
 import { ProgressBar } from './ui/ProgressBar';
-import type { TransferMetrics } from '../types/transfer';
+import type { ManifestFile, TransferMetrics } from '../types/transfer';
+import { getFileProgress } from '../utils/transferProgress';
+import { TransferFileList } from './TransferFileList';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
 import { cn } from '../utils/cn';
 import { AnimatedWave } from './AnimatedWave';
 
 interface MetricsDashboardProps {
   metrics: TransferMetrics;
+  /** Listed with per-file progress when there is more than one */
+  files: ManifestFile[];
   isSender: boolean;
   isPaused: boolean;
   onTogglePause: () => void;
@@ -42,6 +46,7 @@ const StatTile: React.FC<StatTileProps> = ({ icon: Icon, label, value, isWarning
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   metrics,
+  files,
   isSender,
   isPaused,
   onTogglePause,
@@ -111,6 +116,14 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
           <ProgressBar percent={filePercentRounded} variant="subtle" />
         </div>
       </div>
+
+      {files.length > 1 && (
+        <TransferFileList
+          files={files}
+          progress={getFileProgress(files, metrics, [], false)}
+          className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800/80"
+        />
+      )}
     </Card>
   );
 };

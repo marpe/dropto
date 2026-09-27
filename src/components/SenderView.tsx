@@ -6,7 +6,6 @@ import { LinkButton } from './ui/LinkButton';
 import { Notice } from './ui/Notice';
 import { StatusCard } from './ui/StatusCard';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
-import { formatBytes } from '../utils/format';
 import { buildShareUrl } from '../utils/shareLink';
 import { MetricsDashboard } from './MetricsDashboard';
 import { PeerApprovalModal } from './PeerApprovalModal';
@@ -79,6 +78,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
         {transferMetrics && (
           <MetricsDashboard
             metrics={transferMetrics}
+            files={files}
             isSender={true}
             isPaused={isPaused}
             onTogglePause={onTogglePause}
@@ -106,10 +106,11 @@ export const SenderView: React.FC<SenderViewProps> = ({
   if (transferState === 'completed') {
     return (
       <TransferCompleteCard
-        successTitle="Transfer Complete!"
-        successDescription={`All ${files.length} files (${formatBytes(totalSize)}) transferred and verified successfully.`}
+        title="Transfer Complete!"
         actionLabel="Send More Files"
         onAction={onClearFiles}
+        files={files}
+        metrics={transferMetrics}
         corruptedFiles={corruptedFiles}
       />
     );

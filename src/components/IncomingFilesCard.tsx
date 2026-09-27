@@ -8,6 +8,7 @@ import { Notice } from './ui/Notice';
 import { FileTypeIcon } from './ui/FileTypeIcon';
 import type { TransferManifest } from '../types/transfer';
 import { formatBytes } from '../utils/format';
+import { displayPath } from '../utils/filePath';
 
 interface IncomingFilesCardProps {
   manifest: TransferManifest;
@@ -52,7 +53,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
           >
             <FileTypeIcon name={file.name} mimeType={file.type} />
             <span className="flex-1 min-w-0 font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-              {file.relativePath || file.name}
+              {displayPath(file)}
             </span>
             <span className="font-mono text-zinc-500 dark:text-zinc-400 shrink-0">{formatBytes(file.size)}</span>
           </li>
