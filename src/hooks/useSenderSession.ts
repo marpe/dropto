@@ -213,7 +213,8 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
 
   const approvePeer = () => {
     const conn = pendingConnRef.current;
-    if (!conn) {
+    // An empty manifest would leave both peers stuck; the request stays pending until files are added
+    if (!conn || state.files.length === 0) {
       return;
     }
     pendingConnRef.current = null;
