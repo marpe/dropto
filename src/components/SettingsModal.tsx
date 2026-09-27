@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { TextInput } from './ui/TextInput';
+import { ToggleRow } from './ui/ToggleRow';
 import { SegmentedControl } from './ui/SegmentedControl';
 import type { SegmentOption } from './ui/SegmentedControl';
 import { AboutInfo } from './AboutInfo';
@@ -67,28 +68,6 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ icon: Icon, title, ch
     </h4>
     {children}
   </section>
-);
-
-interface SettingToggleProps {
-  label: string;
-  description?: string;
-  isChecked: boolean;
-  onChange: (isChecked: boolean) => void;
-}
-
-const SettingToggle: React.FC<SettingToggleProps> = ({ label, description, isChecked, onChange }) => (
-  <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border-2 hover:bg-surface-2 cursor-pointer transition-colors">
-    <div className="min-w-0">
-      <span className="text-sm font-medium text-text-2 block">{label}</span>
-      {description && <span className="text-xs text-text-5">{description}</span>}
-    </div>
-    <input
-      type="checkbox"
-      checked={isChecked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="w-4 h-4 shrink-0 rounded-sm accent-brand-500"
-    />
-  </label>
 );
 
 interface LabeledFieldProps {
@@ -172,18 +151,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </SettingsSection>
 
         <SettingsSection icon={Volume2} title="General">
-          <SettingToggle
+          <ToggleRow
             label="Audio Chimes on Completion"
             isChecked={form.enableAudioAlerts}
             onChange={(enableAudioAlerts) => update({ enableAudioAlerts })}
           />
-          <SettingToggle
+          <ToggleRow
             label="Screen Wake Lock"
             description="Prevents device sleep during 10GB transfers"
             isChecked={form.enableWakeLock}
             onChange={(enableWakeLock) => update({ enableWakeLock })}
           />
-          <SettingToggle
+          <ToggleRow
             label="Notify When Done"
             description={
               isNotificationBlocked
@@ -196,7 +175,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </SettingsSection>
 
         <SettingsSection icon={Server} title="Signaling Server">
-          <SettingToggle
+          <ToggleRow
             label="Use Custom PeerServer"
             description="Default is free public 0.peerjs.com"
             isChecked={form.useCustomSignaling}
