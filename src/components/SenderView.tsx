@@ -161,11 +161,11 @@ export const SenderView: React.FC<SenderViewProps> = ({
             onDrop={handleDrop}
             className={`group border-2 border-dashed rounded-3xl p-8 text-center transition-all ${
               isDragging
-                ? 'border-[#3ECF8E] bg-[#3ECF8E]/10 scale-[1.01] shadow-xl shadow-[#3ECF8E]/10'
-                : 'border-zinc-200 dark:border-zinc-800 hover:border-[#3ECF8E]/60 bg-white dark:bg-[#181818]'
+                ? 'border-brand-500 bg-brand-500/10 scale-[1.01] shadow-xl shadow-brand-500/10'
+                : 'border-zinc-200 dark:border-zinc-800 hover:border-brand-500/60 bg-white dark:bg-supabase-surface'
             }`}
           >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-[#3ECF8E] flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
               <UploadCloud className="w-8 h-8 animate-float" />
             </div>
 
@@ -191,7 +191,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-lg shadow-[#3ECF8E]/25 transition-all hover:scale-105"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-lg shadow-brand-500/25 transition-all hover:scale-105"
               >
                 <FileUp className="w-4 h-4" />
                 <span>Select Files</span>
@@ -224,7 +224,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
 
           {/* Queued Files List */}
           {files.length > 0 && (
-            <div className="rounded-2xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
+            <div className="rounded-2xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm">
               <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800 mb-3">
                 <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
                   Ready to Send ({files.length} {files.length === 1 ? 'file' : 'files'} • {formatBytes(totalSize)})
@@ -241,7 +241,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 text-xs hover:border-[#3ECF8E]/30 transition-colors"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 text-xs hover:border-brand-500/30 transition-colors"
                   >
                     <div className="truncate mr-3">
                       <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">
@@ -262,7 +262,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
           )}
 
           {/* Share & Pair Box */}
-          <div className="rounded-3xl bg-white dark:bg-[#181818] border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl relative overflow-hidden">
+          <div className="rounded-3xl bg-white dark:bg-supabase-surface border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl relative overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h4 className="font-bold text-zinc-900 dark:text-white">
@@ -274,7 +274,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
               </div>
               <button
                 onClick={() => setIsQrOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#3ECF8E]/10 text-[#3ECF8E] hover:bg-[#3ECF8E]/20 transition-all hover:scale-105"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand-500/10 text-brand-500 hover:bg-brand-500/20 transition-all hover:scale-105"
               >
                 <QrCode className="w-4 h-4" />
                 <span>Show QR</span>
@@ -296,7 +296,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <span className="font-mono text-2xl font-black tracking-widest text-[#3ECF8E]">
+                  <span className="font-mono text-2xl font-black tracking-widest text-brand-500">
                     {roomCode || 'Generating…'}
                   </span>
                 )}
@@ -306,12 +306,12 @@ export const SenderView: React.FC<SenderViewProps> = ({
                   onClick={handleCopyCode}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 transition-colors shadow-sm"
                 >
-                  {copiedCode ? <Check className="w-3.5 h-3.5 text-[#3ECF8E]" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-brand-500" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
                 </button>
                 <button
                   onClick={handleCopyLink}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#3ECF8E] hover:bg-[#24b47e] text-[#121212] shadow-sm transition-all hover:scale-105"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-brand-500 hover:bg-brand-600 text-supabase-bg shadow-sm transition-all hover:scale-105"
                 >
                   {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedLink ? 'Link Copied' : 'Copy Link'}</span>
@@ -333,7 +333,7 @@ export const SenderView: React.FC<SenderViewProps> = ({
                 placeholder="e.g. 1234"
                 value={pin}
                 onChange={(e) => onPinChange(e.target.value)}
-                className="w-24 text-center font-mono text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:border-[#3ECF8E] focus:outline-none"
+                className="w-24 text-center font-mono text-xs px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 focus:border-brand-500 focus:outline-none"
               />
             </div>
           </div>

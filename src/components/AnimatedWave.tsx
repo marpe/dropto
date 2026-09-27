@@ -9,7 +9,7 @@ export const AnimatedWave: React.FC<AnimatedWaveProps> = ({ active, className = 
   return (
     <div className={`relative w-full h-8 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 ${className}`}>
       <svg
-        className={`w-[200%] h-full text-[#3ECF8E] opacity-75 ${active ? 'animate-[wave_3s_linear_infinite]' : ''}`}
+        className={`w-[200%] h-full text-brand-500 opacity-75 ${active ? 'animate-[wave_3s_linear_infinite]' : ''}`}
         viewBox="0 0 1200 120"
         preserveAspectRatio="none"
         fill="none"

@@ -22,7 +22,7 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, isOpen, onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-[#181818] p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-center">
+      <div className="relative w-full max-w-sm rounded-2xl bg-white dark:bg-supabase-surface p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-center">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
@@ -43,7 +43,7 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, isOpen, onClose
 
         <div className="mb-4">
           <span className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block mb-1">Room Code</span>
-          <span className="font-mono text-2xl font-black tracking-widest text-[#3ECF8E]">
+          <span className="font-mono text-2xl font-black tracking-widest text-brand-500">
             {roomCode}
           </span>
         </div>
@@ -52,7 +52,7 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, isOpen, onClose
           onClick={handleCopy}
           className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-all hover:scale-105"
         >
-          {copied ? <Check className="w-4 h-4 text-[#3ECF8E]" /> : <Copy className="w-4 h-4" />}
+          {copied ? <Check className="w-4 h-4 text-brand-500" /> : <Copy className="w-4 h-4" />}
           <span>{copied ? 'Link Copied!' : 'Copy Share Link'}</span>
         </button>
       </div>
