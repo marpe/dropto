@@ -1,5 +1,6 @@
 import React from 'react';
-import { File as FileIcon, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { FileTypeIcon } from './ui/FileTypeIcon';
 import type { TransferFile } from '../types/transfer';
 import { formatBytes } from '../utils/format';
 
@@ -16,7 +17,7 @@ interface FileQueueRowProps {
 
 const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
   <li className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/60 dark:border-zinc-800/80 text-xs hover:border-brand-500/30 transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_3.25rem]">
-    <FileIcon className="w-4 h-4 shrink-0 text-zinc-400" />
+    <FileTypeIcon name={file.name} mimeType={file.type} />
     <div className="min-w-0 flex-1">
       <span className="font-semibold text-zinc-800 dark:text-zinc-200 block truncate">
         {file.relativePath || file.name}

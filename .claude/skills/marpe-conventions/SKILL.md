@@ -37,6 +37,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 3 code
 - `components/ui/Button` — `variant`: `primary` | `secondary`; `size`: `sm` | `md` | `lg`. Per-site tweaks go via `className` (merged by `cn`). Add a variant rather than restyling a raw `<button>`.
 - `components/ui/Spinner` — colour comes from `text-*` (it draws in `currentColor`), size from `w-/h-`.
 - `components/ui/GitHubIcon`.
+- `components/ui/FileTypeIcon` — lucide glyph + Catppuccin colour for a file name/MIME type (`utils/fileKind.ts`).
 - Icons: `lucide-react` first. A custom SVG becomes a component in `components/ui/` accepting `className`. No inline `<svg>` blocks in views (the header logo is a known leftover).
 
 ---
@@ -60,6 +61,7 @@ The app supports **light and dark** themes (`useDarkMode`, `dark:` variants). Ev
 | Neutrals | Tailwind `zinc-*` | always paired with `dark:` |
 | Danger / warning / success | Tailwind `red-*` / `amber-*` / `brand-*` | |
 | Micro-labels | `text-2xs` | the only size below `text-xs` |
+| File-type accents | `ctp-*` (Catppuccin: `red`, `mauve`, `blue`, …, `overlay1`) | Latte in light, Mocha under `.dark` (`src/index.css`); pick via `components/ui/FileTypeIcon`, not ad hoc |
 
 - **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'rgb(var(--brand-500))' }}`.
 - **Never hardcode the brand.** The name, room-code prefix and brand colours come from `getActiveBrand()` / `brand-*`, because the same build is DropWave and dropto.space.
