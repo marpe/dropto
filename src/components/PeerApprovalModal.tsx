@@ -3,9 +3,11 @@ import { FileUp, ShieldCheck, UserCheck, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { formatBytes } from '../utils/format';
+import { describePeer, placeFromTimeZone } from '../utils/deviceInfo';
+import type { PeerDetails } from '../types/sharing';
 
 interface PeerApprovalModalProps {
-  peerId: string;
+  details: PeerDetails;
   fileCount: number;
   totalBytes: number;
   onApprove: () => void;
@@ -27,7 +29,7 @@ const DetailRow: React.FC<DetailRowProps> = ({ label, children }) => (
 
 /** No close button: the sender must accept or decline, otherwise the receiver would wait forever. */
 export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
-  peerId,
+  details,
   fileCount,
   totalBytes,
   onApprove,
@@ -62,10 +64,15 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
           {fileCount} {fileCount === 1 ? 'file' : 'files'}
         </DetailRow>
         <DetailRow label="Size">{formatBytes(totalBytes)}</DetailRow>
-        {/* Tells two requests apart; the full id means nothing to people */}
-        <DetailRow label="Device">
-          <span className="font-mono font-normal">{peerId.slice(0, 8)}</span>
-        </DetailRow>
+        <DetailRow label="Device">{describePeer(details).name}</DetailRow>
+        {details.ip && (
+          <DetailRow label="Address">
+            <span className="font-mono font-normal">{details.ip}</span>
+          </DetailRow>
+        )}
+        {placeFromTimeZone(details.timeZone) && (
+          <DetailRow label="Location">{placeFromTimeZone(details.timeZone)}</DetailRow>
+        )}
       </div>
 
       {!hasFiles && (

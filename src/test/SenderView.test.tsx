@@ -28,10 +28,12 @@ const metrics: TransferMetrics = {
   currentFilePercent: 50,
 };
 
+const noDetails = { device: null, timeZone: null, ip: null };
+
 function makeReceiver(overrides: Partial<SenderReceiver> = {}): SenderReceiver {
   return {
     peerId: 'receiver-1',
-    number: 1,
+    details: noDetails,
     stage: 'choosing',
     fileIndices: null,
     metrics: null,
@@ -183,7 +185,7 @@ describe('SenderView', () => {
   });
 
   it('asks for files, not approval, when a receiver opened the link early', () => {
-    renderSenderView({ state: { pendingPeers: [{ peerId: 'receiver-1', isTrusted: true }] } });
+    renderSenderView({ state: { pendingPeers: [{ peerId: 'receiver-1', isTrusted: true, details: noDetails }] } });
 
     expect(screen.getByText(/opened your link/i)).toBeDefined();
     expect(screen.queryByRole('button', { name: /accept/i })).toBeNull();
@@ -193,8 +195,8 @@ describe('SenderView', () => {
     const actions = renderSenderView({
       state: shared({
         pendingPeers: [
-          { peerId: 'early', isTrusted: true },
-          { peerId: 'typed-code', isTrusted: false },
+          { peerId: 'early', isTrusted: true, details: noDetails },
+          { peerId: 'typed-code', isTrusted: false, details: noDetails },
         ],
       }),
     });
@@ -202,6 +204,20 @@ describe('SenderView', () => {
     fireEvent.click(screen.getByRole('button', { name: /accept/i }));
 
     expect(actions.approvePeer).toHaveBeenCalledWith('typed-code');
+  });
+
+  it('says which device is asking to connect', () => {
+    renderSenderView({
+      state: shared({
+        pendingPeers: [
+          { peerId: 'p', isTrusted: false, details: { device: 'Firefox on Linux', timeZone: 'Europe/Oslo', ip: '198.51.100.4' } },
+        ],
+      }),
+    });
+
+    expect(screen.getByText('Firefox on Linux')).toBeDefined();
+    expect(screen.getByText('198.51.100.4')).toBeDefined();
+    expect(screen.getByText('Oslo')).toBeDefined();
   });
 
   it('marks queued files with an icon for their type', () => {
@@ -318,10 +334,10 @@ describe('SenderView', () => {
     it('lists everyone with where they are, keeping the link on screen', () => {
       renderSenderView({
         state: several([
-          makeReceiver({ peerId: 'a', number: 1, stage: 'transferring', metrics }),
-          makeReceiver({ peerId: 'b', number: 2, stage: 'choosing' }),
-          makeReceiver({ peerId: 'c', number: 3, stage: 'queued' }),
-          makeReceiver({ peerId: 'd', number: 4, stage: 'queued' }),
+          makeReceiver({ peerId: 'a', stage: 'transferring', metrics }),
+          makeReceiver({ peerId: 'b', stage: 'choosing' }),
+          makeReceiver({ peerId: 'c', stage: 'queued' }),
+          makeReceiver({ peerId: 'd', stage: 'queued' }),
         ]),
       });
 
@@ -336,11 +352,28 @@ describe('SenderView', () => {
     it('stops one person after confirming', () => {
       const actions = renderSenderView({ state: several([makeReceiver({ peerId: 'a', stage: 'transferring', metrics })]) });
 
-      fireEvent.click(screen.getByTitle('Stop Person 1'));
+      fireEvent.click(screen.getByTitle('Stop download'));
       expect(actions.stopReceiver).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId('confirm'));
 
       expect(actions.stopReceiver).toHaveBeenCalledWith('a');
+    });
+
+    it('names people by their device, with their address and place', () => {
+      renderSenderView({
+        state: several([
+          makeReceiver({
+            peerId: 'a',
+            stage: 'transferring',
+            metrics,
+            details: { device: 'Chrome on Android', timeZone: 'Europe/Stockholm', ip: '203.0.113.7' },
+          }),
+        ]),
+      });
+
+      const row = screen.getByTestId('receiver-row');
+      expect(within(row).getByText('Chrome on Android')).toBeDefined();
+      expect(within(row).getByText('203.0.113.7 · Stockholm')).toBeDefined();
     });
 
     it('removes finished people from the list without asking', () => {

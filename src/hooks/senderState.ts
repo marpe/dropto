@@ -1,5 +1,5 @@
 import type { SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
-import type { PendingPeer, ReceiverStage, SenderReceiver, SharingOptions } from '../types/sharing';
+import type { PeerDetails, PendingPeer, ReceiverStage, SenderReceiver, SharingOptions } from '../types/sharing';
 import { recallMaxSimultaneous } from '../utils/sharingMemory';
 
 export interface SenderSessionState {
@@ -18,8 +18,6 @@ export interface SenderSessionState {
   pendingPeers: PendingPeer[];
   /** Everyone let in during this share: waiting in line, downloading or finished */
   receivers: SenderReceiver[];
-  /** Receivers let in so far in this share, for numbering them */
-  arrivals: number;
 }
 
 export type SenderAction =
@@ -35,11 +33,12 @@ export type SenderAction =
   | { type: 'OPTIONS_CHANGED'; options: Partial<SharingOptions> }
   | { type: 'LINK_CREATED' }
   | { type: 'SHARE_ENDED' }
-  | { type: 'PEER_REQUESTED'; peerId: string; isTrusted: boolean }
+  | { type: 'PEER_REQUESTED'; peerId: string; isTrusted: boolean; details: PeerDetails }
+  | { type: 'PEER_ADDRESS'; peerId: string; ip: string }
   | { type: 'PEER_ANSWERED'; peerId: string }
   | { type: 'PEER_DISCONNECTED'; peerId?: string }
-  | { type: 'RECEIVER_QUEUED'; peerId: string }
-  | { type: 'RECEIVER_ADMITTED'; peerId: string }
+  | { type: 'RECEIVER_QUEUED'; peerId: string; details: PeerDetails }
+  | { type: 'RECEIVER_ADMITTED'; peerId: string; details: PeerDetails }
   | { type: 'RECEIVER_STARTED'; peerId: string; fileIndices: number[] }
   | { type: 'METRICS'; peerId: string; metrics: TransferMetrics }
   | { type: 'PAUSED'; peerId: string; isPaused: boolean }
@@ -59,14 +58,13 @@ export function createInitialSenderState(): SenderSessionState {
     isShared: false,
     pendingPeers: [],
     receivers: [],
-    arrivals: 0,
   };
 }
 
 const FINISHED: ReceiverStage[] = ['completed', 'failed'];
 
-function newReceiver(peerId: string, number: number, stage: ReceiverStage): SenderReceiver {
-  return { peerId, number, stage, fileIndices: null, metrics: null, isPaused: false, error: null, corruptedFiles: [] };
+function newReceiver(peerId: string, details: PeerDetails, stage: ReceiverStage): SenderReceiver {
+  return { peerId, details, stage, fileIndices: null, metrics: null, isPaused: false, error: null, corruptedFiles: [] };
 }
 
 function updateReceiver(
@@ -80,7 +78,7 @@ function updateReceiver(
   };
 }
 
-function admitReceiver(state: SenderSessionState, peerId: string): SenderSessionState {
+function admitReceiver(state: SenderSessionState, peerId: string, details: PeerDetails): SenderSessionState {
   if (state.receivers.some((receiver) => receiver.peerId === peerId)) {
     return updateReceiver(state, peerId, (receiver) => ({ ...receiver, stage: 'choosing' }));
   }
@@ -88,19 +86,11 @@ function admitReceiver(state: SenderSessionState, peerId: string): SenderSession
   const kept = state.options.allowMultiple
     ? state.receivers
     : state.receivers.filter((receiver) => receiver.stage !== 'failed');
-  return {
-    ...state,
-    receivers: [...kept, newReceiver(peerId, state.arrivals + 1, 'choosing')],
-    arrivals: state.arrivals + 1,
-  };
+  return { ...state, receivers: [...kept, newReceiver(peerId, details, 'choosing')] };
 }
 
 // Leaving the room forgets everyone in it; the next room starts counting again
-const emptyRoom: Pick<SenderSessionState, 'pendingPeers' | 'receivers' | 'arrivals'> = {
-  pendingPeers: [],
-  receivers: [],
-  arrivals: 0,
-};
+const emptyRoom: Pick<SenderSessionState, 'pendingPeers' | 'receivers'> = { pendingPeers: [], receivers: [] };
 
 export function senderReducer(state: SenderSessionState, action: SenderAction): SenderSessionState {
   switch (action.type) {
@@ -121,15 +111,23 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
     case 'QUEUE_EMPTIED':
       return { ...state, files: [] };
     case 'FILES_CLEARED':
-      return { ...state, files: [], receivers: [], arrivals: 0, isShared: false };
+      return { ...state, files: [], receivers: [], isShared: false };
     case 'OPTIONS_CHANGED':
       return { ...state, options: { ...state.options, ...action.options } };
     case 'LINK_CREATED':
       return { ...state, isShared: true };
     case 'SHARE_ENDED':
-      return { ...state, receivers: [], arrivals: 0, isShared: false };
+      return { ...state, receivers: [], isShared: false };
     case 'PEER_REQUESTED':
-      return { ...state, pendingPeers: [...state.pendingPeers, { peerId: action.peerId, isTrusted: action.isTrusted }] };
+      return {
+        ...state,
+        pendingPeers: [...state.pendingPeers, { peerId: action.peerId, isTrusted: action.isTrusted, details: action.details }],
+      };
+    case 'PEER_ADDRESS': {
+      const withIp = <T extends { peerId: string; details: PeerDetails }>(item: T): T =>
+        item.peerId === action.peerId ? { ...item, details: { ...item.details, ip: action.ip } } : item;
+      return { ...state, pendingPeers: state.pendingPeers.map(withIp), receivers: state.receivers.map(withIp) };
+    }
     case 'PEER_ANSWERED':
       return { ...state, pendingPeers: state.pendingPeers.filter((peer) => peer.peerId !== action.peerId) };
     case 'PEER_DISCONNECTED': {
@@ -142,13 +140,9 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
       };
     }
     case 'RECEIVER_QUEUED':
-      return {
-        ...state,
-        receivers: [...state.receivers, newReceiver(action.peerId, state.arrivals + 1, 'queued')],
-        arrivals: state.arrivals + 1,
-      };
+      return { ...state, receivers: [...state.receivers, newReceiver(action.peerId, action.details, 'queued')] };
     case 'RECEIVER_ADMITTED':
-      return admitReceiver(state, action.peerId);
+      return admitReceiver(state, action.peerId, action.details);
     case 'RECEIVER_STARTED':
       return updateReceiver(state, action.peerId, (receiver) =>
         receiver.stage === 'choosing' ? { ...receiver, stage: 'transferring', fileIndices: action.fileIndices } : receiver

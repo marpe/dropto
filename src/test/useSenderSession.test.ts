@@ -4,6 +4,7 @@ import type { DataConnection } from 'peerjs';
 import { useSenderSession } from '../hooks/useSenderSession';
 import { BUSY_MESSAGE, LINK_USED_MESSAGE } from '../hooks/senderRoom';
 import type { AppSettings } from '../types/transfer';
+import type { ReceiverGreeting } from '../services/webrtc';
 import { SENDER_ROOM_STORAGE_KEY } from '../utils/roomMemory';
 import { MAX_SIMULTANEOUS_STORAGE_KEY } from '../utils/sharingMemory';
 import {
@@ -39,7 +40,7 @@ async function renderSenderSession() {
   return { ...fakes, ...hook, connection: fakes.connections[0] };
 }
 
-function connectPeer(session: Session, peerId: string, greeting: { shareKey: string | null } = typedCode) {
+function connectPeer(session: Session, peerId: string, greeting: ReceiverGreeting = typedCode) {
   const conn = createFakePeerConnection(peerId);
   act(() => {
     session.connection.handlers.onIncomingConnection?.(conn, greeting);
@@ -128,7 +129,7 @@ describe('useSenderSession', () => {
     });
 
     const peerConn = connectPeer(session, 'receiver-1');
-    expect(session.result.current.state.pendingPeers).toEqual([{ peerId: 'receiver-1', isTrusted: false }]);
+    expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'receiver-1', isTrusted: false }]);
 
     act(() => {
       session.result.current.actions.approvePeer('receiver-1');
@@ -347,14 +348,14 @@ describe('useSenderSession', () => {
     connectPeer(session, 'receiver-1', { shareKey: 'guessed' });
 
     expect(session.engines).toHaveLength(0);
-    expect(session.result.current.state.pendingPeers).toEqual([{ peerId: 'receiver-1', isTrusted: false }]);
+    expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'receiver-1', isTrusted: false }]);
   });
 
   it('holds a link receiver until files are queued and the link is created, then offers them', async () => {
     const session = await renderSenderSession();
     connectPeer(session, 'receiver-1', linkGreeting(session));
     expect(session.engines).toHaveLength(0);
-    expect(session.result.current.state.pendingPeers).toEqual([{ peerId: 'receiver-1', isTrusted: true }]);
+    expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'receiver-1', isTrusted: true }]);
 
     act(() => {
       session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
@@ -493,7 +494,7 @@ describe('useSenderSession', () => {
       connectPeer(session, 'receiver-1', linkGreeting(session));
 
       expect(session.engines).toHaveLength(0);
-      expect(session.result.current.state.pendingPeers).toEqual([{ peerId: 'receiver-1', isTrusted: false }]);
+      expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'receiver-1', isTrusted: false }]);
     });
 
     it('applies changed settings to new connections only, unless told to stop current transfers', async () => {
@@ -767,15 +768,35 @@ describe('useSenderSession', () => {
       expect(session.result.current.state.options.requireApproval).toBe(true);
       expect(session.result.current.state.roomNotice).toMatch(/accept each new person/i);
       connectPeer(session, 'guesser-4', linkGreeting(session));
-      expect(session.result.current.state.pendingPeers).toEqual([{ peerId: 'guesser-4', isTrusted: false }]);
+      expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'guesser-4', isTrusted: false }]);
     });
 
-    it('numbers people in the order they arrive', async () => {
+    it('labels people with the device and place they introduced, then their address once known', async () => {
       const session = await shareWithSeveral(2);
-      connectPeer(session, 'p1', linkGreeting(session));
-      connectPeer(session, 'p2', linkGreeting(session));
+      session.services.readAddress = async () => '203.0.113.7';
 
-      expect(session.result.current.state.receivers.map((receiver) => receiver.number)).toEqual([1, 2]);
+      act(() => {
+        session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('p1'), {
+          ...linkGreeting(session),
+          device: 'Chrome on Android',
+          timeZone: 'Europe/Stockholm',
+        });
+      });
+      expect(session.result.current.state.receivers[0].details).toEqual({
+        device: 'Chrome on Android',
+        timeZone: 'Europe/Stockholm',
+        ip: null,
+      });
+
+      await waitFor(() => expect(session.result.current.state.receivers[0].details.ip).toBe('203.0.113.7'));
+    });
+
+    it('labels people waiting for approval too', async () => {
+      const session = await shareWith({ requireApproval: true });
+
+      connectPeer(session, 'asking', { shareKey: null, device: 'Safari on iPhone' });
+
+      expect(session.result.current.state.pendingPeers[0].details.device).toBe('Safari on iPhone');
     });
   });
 

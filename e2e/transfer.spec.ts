@@ -214,6 +214,10 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(second.page.getByRole('heading', { name: /in line/i })).toBeVisible({ timeout: 15000 });
     await expect(second.page.getByText(/you.re next/i)).toBeVisible();
     await expect(senderPage.getByTestId('receiver-row')).toHaveCount(2);
+    // People are told apart by the device they introduced, plus their address once the route is known
+    const firstPerson = senderPage.getByTestId('receiver-row').first();
+    await expect(firstPerson).toContainText(/Chrome on [A-Za-z]+/);
+    await expect(firstPerson).toContainText(/(\d{1,3}\.){3}\d{1,3}|[0-9a-f]*:[0-9a-f:]+/, { timeout: 10000 });
 
     await first.getByTestId('start-download').click();
     await expect(first.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });

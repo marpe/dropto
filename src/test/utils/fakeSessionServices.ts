@@ -68,6 +68,7 @@ export function createFakeServices() {
       engines.push(engine);
       return engine;
     },
+    readAddress: async () => null,
     effects,
   };
   return { services, connections, engines, effects };

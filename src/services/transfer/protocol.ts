@@ -1,5 +1,5 @@
 import type { DataConnection } from 'peerjs';
-import type { ControlMessage, ManifestFile, TransferManifest } from '../../types/transfer';
+import type { ControlMessage, HelloPayload, ManifestFile, TransferManifest } from '../../types/transfer';
 
 export const CHUNK_SIZE = 64 * 1024;
 /** u32 fileIndex | u64 chunkIndex | u32 payloadLength, big-endian */
@@ -81,6 +81,24 @@ function isByteCount(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 
+// Display-only details from the peer: short, plain and optional, so a bad value is dropped rather than fatal
+const DEVICE_PATTERN = /^[\p{L}\p{N} .-]{1,60}$/u;
+const TIME_ZONE_PATTERN = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/;
+
+function parseHello(payload: UnknownRecord): HelloPayload | null {
+  if (typeof payload.shareKey !== 'string' && payload.shareKey !== null) {
+    return null;
+  }
+  const hello: HelloPayload = { shareKey: payload.shareKey };
+  if (typeof payload.device === 'string' && DEVICE_PATTERN.test(payload.device)) {
+    hello.device = payload.device;
+  }
+  if (typeof payload.timeZone === 'string' && payload.timeZone.length <= 64 && TIME_ZONE_PATTERN.test(payload.timeZone)) {
+    hello.timeZone = payload.timeZone;
+  }
+  return hello;
+}
+
 function parseManifestFile(value: unknown): ManifestFile | null {
   if (!isRecord(value)) {
     return null;
@@ -132,10 +150,10 @@ export function parseControlMessage(raw: string): ControlMessage | null {
   const payload = isRecord(message.payload) ? message.payload : {};
 
   switch (message.type) {
-    case 'HELLO':
-      return typeof payload.shareKey === 'string' || payload.shareKey === null
-        ? { type: 'HELLO', payload: { shareKey: payload.shareKey } }
-        : null;
+    case 'HELLO': {
+      const hello = parseHello(payload);
+      return hello ? { type: 'HELLO', payload: hello } : null;
+    }
     case 'AUTH_REQUEST':
       return isIndex(payload.attemptsLeft) && typeof payload.isIncorrect === 'boolean'
         ? { type: 'AUTH_REQUEST', payload: { attemptsLeft: payload.attemptsLeft, isIncorrect: payload.isIncorrect } }

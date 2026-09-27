@@ -4,7 +4,7 @@ import { describePeerError } from '../services/peerErrors';
 import { sendControlMessage } from '../services/transfer/protocol';
 import type { ReceiverGreeting } from '../services/webrtc';
 import type { AppSettings, TransferFile } from '../types/transfer';
-import type { SharingOptions } from '../types/sharing';
+import type { PeerDetails, SharingOptions } from '../types/sharing';
 import { generateShareKey } from '../utils/shareLink';
 import { recallRoom, rememberRoom } from '../utils/roomMemory';
 import type { SenderAction } from './senderState';
@@ -49,6 +49,8 @@ export class SenderRoom {
   private readonly pending = new Map<string, { conn: DataConnection; isTrusted: boolean }>();
   private queue: DataConnection[] = [];
   private readonly engines = new Map<string, SessionSender>();
+  // How each connected receiver introduced itself, plus its address once known
+  private readonly details = new Map<string, PeerDetails>();
   // Device effects (wake lock, sounds) span from the first engine starting to the last one ending
   private isRunning = false;
   // A one-person link stops admitting anyone once somebody has downloaded the files
@@ -183,6 +185,7 @@ export class SenderRoom {
     this.engines.clear();
     this.pending.clear();
     this.queue = [];
+    this.details.clear();
     this.shareKey = null;
     this.hasCompletedShare = false;
     this.pinLockouts = 0;
@@ -203,6 +206,8 @@ export class SenderRoom {
       }
     }
     soundService.playConnect();
+    this.details.set(conn.peer, { device: greeting.device ?? null, timeZone: greeting.timeZone ?? null, ip: null });
+    void this.lookUpAddress(conn);
     const hasLinkKey = greeting.shareKey !== null && greeting.shareKey === this.shareKey;
     const isTrusted = hasLinkKey && !options.requireApproval;
     if (isTrusted && isShared && files.length > 0) {
@@ -211,7 +216,7 @@ export class SenderRoom {
     }
     // Held until the link exists and files are queued, or (when not trusted) until the sender answers
     this.pending.set(conn.peer, { conn, isTrusted });
-    this.dispatch({ type: 'PEER_REQUESTED', peerId: conn.peer, isTrusted });
+    this.dispatch({ type: 'PEER_REQUESTED', peerId: conn.peer, isTrusted, details: this.detailsOf(conn.peer) });
   }
 
   private handleDisconnected(peerId?: string) {
@@ -244,6 +249,22 @@ export class SenderRoom {
     }
   }
 
+  private detailsOf(peerId: string): PeerDetails {
+    return this.details.get(peerId) ?? { device: null, timeZone: null, ip: null };
+  }
+
+  /** The address only shows once ICE has settled on a route, so it follows the rest of the details. */
+  private async lookUpAddress(conn: DataConnection) {
+    const connection = this.connection;
+    const ip = await this.services.readAddress(conn);
+    const known = this.details.get(conn.peer);
+    if (!ip || !known || this.connection !== connection) {
+      return;
+    }
+    this.details.set(conn.peer, { ...known, ip });
+    this.dispatch({ type: 'PEER_ADDRESS', peerId: conn.peer, ip });
+  }
+
   private capacity(): number {
     const { allowMultiple, maxSimultaneous } = this.config.options;
     return allowMultiple ? maxSimultaneous : 1;
@@ -259,7 +280,7 @@ export class SenderRoom {
       return;
     }
     this.queue.push(conn);
-    this.dispatch({ type: 'RECEIVER_QUEUED', peerId: conn.peer });
+    this.dispatch({ type: 'RECEIVER_QUEUED', peerId: conn.peer, details: this.detailsOf(conn.peer) });
     this.announcePositions();
   }
 
@@ -333,7 +354,7 @@ export class SenderRoom {
       this.isRunning = true;
       this.services.effects.onTransferStarted();
     }
-    this.dispatch({ type: 'RECEIVER_ADMITTED', peerId });
+    this.dispatch({ type: 'RECEIVER_ADMITTED', peerId, details: this.detailsOf(peerId) });
     engine.start(files, options.pin);
   }
 
