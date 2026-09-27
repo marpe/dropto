@@ -1,9 +1,11 @@
 class WakeLockService {
-  private wakeLock: any = null;
+  private wakeLock: WakeLockSentinel | null = null;
   private isRequested: boolean = false;
+  public enabled: boolean = true;
 
   constructor() {
     if (typeof document !== 'undefined') {
+      // Browsers drop wake locks when the tab is hidden; re-acquire once it is visible again
       document.addEventListener('visibilitychange', () => {
         if (this.isRequested && document.visibilityState === 'visible') {
           this.acquire();
@@ -13,10 +15,13 @@ class WakeLockService {
   }
 
   public async acquire(): Promise<boolean> {
+    if (!this.enabled) {
+      return false;
+    }
     this.isRequested = true;
     if ('wakeLock' in navigator) {
       try {
-        this.wakeLock = await (navigator as any).wakeLock.request('screen');
+        this.wakeLock = await navigator.wakeLock.request('screen');
         this.wakeLock.addEventListener('release', () => {
           this.wakeLock = null;
         });
@@ -35,10 +40,6 @@ class WakeLockService {
       this.wakeLock.release().catch(() => {});
       this.wakeLock = null;
     }
-  }
-
-  public isSupported(): boolean {
-    return typeof navigator !== 'undefined' && 'wakeLock' in navigator;
   }
 }
 
