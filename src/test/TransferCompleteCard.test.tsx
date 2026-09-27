@@ -44,16 +44,24 @@ function renderCard(overrides: Partial<ComponentProps<typeof TransferCompleteCar
   return { onAction };
 }
 
+/** The value shown in one stat tile. */
+function stat(name: string): string | undefined {
+  return screen.getByTestId(`stat-${name}`).querySelector('[data-stat-value]')?.textContent ?? undefined;
+}
+
 describe('TransferCompleteCard', () => {
   beforeEach(() => {
     vi.mocked(fireCelebration).mockClear();
   });
 
-  it('celebrates and summarises how much moved, how long it took and how fast', () => {
+  it('celebrates and keeps the transfer stats on screen: files, size, time taken and average speed', () => {
     renderCard();
 
     expect(screen.getByRole('heading', { name: 'Transfer Complete!' })).toBeDefined();
-    expect(screen.getByText('2 files · 2 MB · 2s · 1 MB/s average')).toBeDefined();
+    expect(stat('files')).toBe('2');
+    expect(stat('size')).toBe('2 MB');
+    expect(stat('time')).toBe('2s');
+    expect(stat('speed')).toBe('1 MB/s');
     expect(fireCelebration).toHaveBeenCalledTimes(1);
   });
 
@@ -65,6 +73,9 @@ describe('TransferCompleteCard', () => {
     expect(document.querySelector('[data-status="done"]')?.textContent).toContain('b.bin');
     expect(fireCelebration).not.toHaveBeenCalled();
 
+    // The stats stay visible when something went wrong too
+    expect(stat('files')).toBe('2');
+
     fireEvent.click(screen.getByRole('button', { name: 'Send More Files' }));
     expect(onAction).toHaveBeenCalledTimes(1);
   });
@@ -72,6 +83,9 @@ describe('TransferCompleteCard', () => {
   it('still summarises a transfer too fast to have timing data', () => {
     renderCard({ files: [files[1]], metrics: null });
 
-    expect(screen.getByText('1 file · 1 MB')).toBeDefined();
+    expect(stat('files')).toBe('1');
+    expect(stat('size')).toBe('1 MB');
+    expect(screen.queryByTestId('stat-time')).toBeNull();
+    expect(screen.queryByTestId('stat-speed')).toBeNull();
   });
 });

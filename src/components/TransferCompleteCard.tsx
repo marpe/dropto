@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Files, Gauge, HardDrive } from 'lucide-react';
 import { IconBadge } from './ui/IconBadge';
+import { StatTile } from './ui/StatTile';
 import { StatusCard } from './ui/StatusCard';
 import { TransferFileList } from './TransferFileList';
 import { fireCelebration } from '../services/confetti';
 import type { ManifestFile, TransferMetrics } from '../types/transfer';
 import { formatBytes, formatDuration, formatSpeed } from '../utils/format';
 import { getFileProgress } from '../utils/transferProgress';
+import { cn } from '../utils/cn';
 
 interface TransferCompleteCardProps {
   title: string;
@@ -19,14 +21,30 @@ interface TransferCompleteCardProps {
   corruptedFiles: string[];
 }
 
-function summarise(files: ManifestFile[], metrics: TransferMetrics | null): string {
-  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-  const parts = [`${files.length} ${files.length === 1 ? 'file' : 'files'}`, formatBytes(totalBytes)];
-  if (metrics && metrics.elapsedSeconds >= 1) {
-    parts.push(formatDuration(metrics.elapsedSeconds), `${formatSpeed(metrics.averageSpeed)} average`);
-  }
-  return parts.join(' · ');
+interface TransferStatsProps {
+  files: ManifestFile[];
+  metrics: TransferMetrics | null;
 }
+
+/** What the transfer came to, kept on screen once it is over. */
+const TransferStats: React.FC<TransferStatsProps> = ({ files, metrics }) => {
+  const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+  // Under a second there is no meaningful duration or speed to show
+  const hasTiming = metrics !== null && metrics.elapsedSeconds >= 1;
+
+  return (
+    <div className={cn('grid grid-cols-2 gap-3 mb-6', hasTiming && 'sm:grid-cols-4')}>
+      <StatTile data-testid="stat-files" icon={Files} label="Files" value={String(files.length)} />
+      <StatTile data-testid="stat-size" icon={HardDrive} label="Size" value={formatBytes(totalBytes)} />
+      {hasTiming && (
+        <>
+          <StatTile data-testid="stat-time" icon={Clock} label="Time Taken" value={formatDuration(metrics.elapsedSeconds)} />
+          <StatTile data-testid="stat-speed" icon={Gauge} label="Average Speed" value={formatSpeed(metrics.averageSpeed)} />
+        </>
+      )}
+    </div>
+  );
+};
 
 export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   title,
@@ -47,6 +65,7 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
   const fileList = files.length > 1 || !isVerified ? (
     <TransferFileList files={files} progress={getFileProgress(files, metrics, corruptedFiles, true)} className="mb-6" />
   ) : null;
+  const stats = <TransferStats files={files} metrics={metrics} />;
   const action = <div className="flex flex-wrap justify-center gap-3">{actions}</div>;
 
   if (isVerified) {
@@ -54,8 +73,8 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
       <StatusCard
         badge={<IconBadge icon={CheckCircle2} className="motion-safe:animate-bounce" />}
         title={title}
-        description={summarise(files, metrics)}
       >
+        {stats}
         {fileList}
         {action}
       </StatusCard>
@@ -69,6 +88,7 @@ export const TransferCompleteCard: React.FC<TransferCompleteCardProps> = ({
       title="Transfer Finished With Errors"
       description={`${count === 1 ? '1 file' : `${count} files`} failed the integrity check and may be corrupted. Send ${count === 1 ? 'it' : 'them'} again.`}
     >
+      {stats}
       {fileList}
       {action}
     </StatusCard>
