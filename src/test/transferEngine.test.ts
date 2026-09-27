@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TransferEngine } from '../services/transferEngine';
-import type { EngineEventCallback, TransferResult } from '../services/transferEngine';
+import type { EngineEventCallback, PinPrompt, TransferResult } from '../services/transferEngine';
 import { FastStreamingChecksum } from '../services/checksum';
 import type { TransferFile, TransferManifest, TransferMetrics } from '../types/transfer';
 import { clearFilePickers, createMockDirectoryTree } from './utils/mockFileSystem';
@@ -112,7 +112,6 @@ async function startReceiverWithFakeSender(fileSizes: number[], callbacks: Engin
   });
   const manifest = {
     sessionId: 's',
-    pinRequired: false,
     totalBytes: fileSizes.reduce((a, b) => a + b, 0),
     files: fileSizes.map((size, i) => ({
       id: `f${i}`,
@@ -178,7 +177,7 @@ describe('TransferEngine Full Protocol Flow', () => {
     });
 
     // Start Sender transfer
-    await senderEngine.startSenderTransfer(filesToSend, false);
+    await senderEngine.startSenderTransfer(filesToSend);
 
     await waitFor(() => transferCompleted);
 
@@ -200,8 +199,7 @@ describe('TransferEngine Full Protocol Flow', () => {
     senderEngine.init(senderConn as any, true, {});
 
     await senderEngine.startSenderTransfer(
-      [createTestFile(1024, 'a.bin'), { ...createTestFile(2048, 'b.bin'), relativePath: 'dir/b.bin' }],
-      false
+      [createTestFile(1024, 'a.bin'), { ...createTestFile(2048, 'b.bin'), relativePath: 'dir/b.bin' }]
     );
 
     expect(await waitFor(() => received !== null)).toBe(true);
@@ -234,7 +232,7 @@ describe('TransferEngine Full Protocol Flow', () => {
       },
     });
 
-    await senderEngine.startSenderTransfer([createTestFile(150 * 1024)], false);
+    await senderEngine.startSenderTransfer([createTestFile(150 * 1024)]);
 
     expect(await waitFor(() => senderCompleted)).toBe(true);
     expect(senderFileResults).toEqual([[0, true]]);
@@ -262,8 +260,7 @@ describe('TransferEngine Full Protocol Flow', () => {
     });
 
     await senderEngine.startSenderTransfer(
-      [createTestFile(100 * 1024, 'a.bin'), createTestFile(70 * 1024, 'b.bin')],
-      false
+      [createTestFile(100 * 1024, 'a.bin'), createTestFile(70 * 1024, 'b.bin')]
     );
 
     expect(await waitFor(() => senderEvents.includes('all'))).toBe(true);
@@ -282,7 +279,7 @@ describe('TransferEngine connection loss', () => {
       },
     });
 
-    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)]);
     senderConn.emit('close', undefined);
 
     expect(errors).toHaveLength(1);
@@ -304,7 +301,7 @@ describe('TransferEngine connection loss', () => {
     });
     senderEngine.init(senderConn as any, true, {});
 
-    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)]);
     await waitFor(() => manifestReceived);
     receiverConn.emit('close', undefined);
 
@@ -334,7 +331,7 @@ describe('TransferEngine connection loss', () => {
       },
     });
 
-    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    await senderEngine.startSenderTransfer([createTestFile(10 * 1024)]);
     expect(await waitFor(() => senderCompleted)).toBe(true);
     senderConn.emit('close', undefined);
     receiverConn.emit('close', undefined);
@@ -354,7 +351,7 @@ describe('TransferEngine connection loss', () => {
       },
     });
 
-    await engine.startSenderTransfer([createTestFile(10 * 1024)], false);
+    await engine.startSenderTransfer([createTestFile(10 * 1024)]);
     oldConn.emit('close', undefined);
 
     expect(errors).toEqual([]);
@@ -413,7 +410,7 @@ describe('TransferEngine storage and read failures', () => {
     });
     const { senderEngine, isReceiverCompleted } = startPair([], []);
 
-    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 4)], false);
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 4)]);
 
     expect(await waitFor(isReceiverCompleted)).toBe(true);
     expect(maxInFlight).toBe(1);
@@ -427,7 +424,7 @@ describe('TransferEngine storage and read failures', () => {
     const senderErrors: string[] = [];
     const { senderEngine, isReceiverCompleted } = startPair(receiverErrors, senderErrors);
 
-    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 3)], false);
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * 3)]);
 
     expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
     // Let any in-flight FILE_COMPLETE arrive; it must not complete the failed transfer
@@ -462,7 +459,7 @@ describe('TransferEngine storage and read failures', () => {
       },
     });
 
-    await senderEngine.startSenderTransfer([createTestFile(1024, 'a.bin'), createTestFile(1024, 'b.bin')], false);
+    await senderEngine.startSenderTransfer([createTestFile(1024, 'a.bin'), createTestFile(1024, 'b.bin')]);
 
     expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
     expect(receiverErrors).toHaveLength(1);
@@ -479,7 +476,7 @@ describe('TransferEngine storage and read failures', () => {
       slice: () => ({ arrayBuffer: () => Promise.reject(new Error('File was modified')) }),
     } as unknown as File;
 
-    await senderEngine.startSenderTransfer([unreadable], false);
+    await senderEngine.startSenderTransfer([unreadable]);
 
     expect(await waitFor(() => receiverErrors.length > 0 && senderErrors.length > 0, 1000)).toBe(true);
     expect(receiverErrors).toHaveLength(1);
@@ -517,7 +514,7 @@ describe('TransferEngine progress reporting', () => {
     });
     const chunkCount = 40;
 
-    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * chunkCount)], false);
+    await senderEngine.startSenderTransfer([createTestFile(64 * 1024 * chunkCount)]);
     // Wait for both sides so no engine is still writing document.title when later tests run
     expect(await waitFor(() => receiverCompleted && senderCompleted)).toBe(true);
 
@@ -619,7 +616,7 @@ describe('TransferEngine multi-file receive', () => {
 
     const first = { ...createTestFile(100 * 1024, 'a.bin'), relativePath: 'album/a.bin' };
     const second = { ...createTestFile(70 * 1024, 'b.bin'), relativePath: 'album/raw/b.bin' };
-    await senderEngine.startSenderTransfer([first, second], false);
+    await senderEngine.startSenderTransfer([first, second]);
 
     expect(await waitFor(() => receiverCompleted)).toBe(true);
     expect((window as any).showDirectoryPicker).toHaveBeenCalledTimes(1);
@@ -629,6 +626,106 @@ describe('TransferEngine multi-file receive', () => {
       writables[path].write.mock.calls.reduce((acc: number, call: unknown[]) => acc + (call[0] as Uint8Array).byteLength, 0);
     expect(bytesWritten('album/a.bin')).toBe(100 * 1024);
     expect(bytesWritten('album/raw/b.bin')).toBe(70 * 1024);
+  });
+});
+
+describe('TransferEngine session PIN', () => {
+  function startPinSession(pin: string) {
+    const { senderConn, receiverConn } = createConnectedPair();
+    const senderEngine = new TransferEngine();
+    const receiverEngine = new TransferEngine();
+    const prompts: PinPrompt[] = [];
+    const receiverErrors: string[] = [];
+    const senderErrors: string[] = [];
+    let manifest: TransferManifest | null = null;
+    receiverEngine.init(receiverConn as any, false, {
+      onPinRequired: (prompt) => {
+        prompts.push(prompt);
+      },
+      onManifest: (m) => {
+        manifest = m;
+      },
+      onError: (err) => {
+        receiverErrors.push(err);
+      },
+    });
+    senderEngine.init(senderConn as any, true, {
+      onError: (err) => {
+        senderErrors.push(err);
+      },
+    });
+    const start = () => senderEngine.startSenderTransfer([createTestFile(1024, 'secret-plans.pdf')], pin);
+    return {
+      senderConn,
+      receiverConn,
+      receiverEngine,
+      prompts,
+      receiverErrors,
+      senderErrors,
+      start,
+      getManifest: () => manifest as TransferManifest | null,
+    };
+  }
+
+  it('asks the receiver for the PIN before revealing any file details', async () => {
+    const session = startPinSession('1234');
+
+    await session.start();
+    await waitFor(() => session.prompts.length > 0);
+    await sleep(20);
+
+    expect(session.prompts).toEqual([{ attemptsLeft: 3, incorrect: false }]);
+    expect(session.getManifest()).toBeNull();
+  });
+
+  it('sends the manifest once the correct PIN is entered', async () => {
+    const session = startPinSession('1234');
+    await session.start();
+    await waitFor(() => session.prompts.length > 0);
+
+    session.receiverEngine.submitPin('1234');
+
+    expect(await waitFor(() => session.getManifest() !== null)).toBe(true);
+    expect(session.getManifest()!.files[0].name).toBe('secret-plans.pdf');
+  });
+
+  it('asks again with fewer attempts after a wrong PIN', async () => {
+    const session = startPinSession('1234');
+    await session.start();
+    await waitFor(() => session.prompts.length > 0);
+
+    session.receiverEngine.submitPin('0000');
+
+    expect(await waitFor(() => session.prompts.length === 2)).toBe(true);
+    expect(session.prompts[1]).toEqual({ attemptsLeft: 2, incorrect: true });
+    expect(session.getManifest()).toBeNull();
+  });
+
+  it('ends the transfer on both sides after too many wrong PINs', async () => {
+    const session = startPinSession('1234');
+    await session.start();
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await waitFor(() => session.prompts.length === attempt);
+      session.receiverEngine.submitPin('0000');
+    }
+
+    expect(await waitFor(() => session.receiverErrors.length > 0 && session.senderErrors.length > 0)).toBe(true);
+    expect(session.getManifest()).toBeNull();
+    expect(session.prompts).toHaveLength(3);
+  });
+
+  it('refuses to stream files to a receiver that skipped the PIN', async () => {
+    const session = startPinSession('1234');
+    const senderSend = vi.spyOn(session.senderConn, 'send');
+    await session.start();
+
+    // A modified client asks for the file without authenticating
+    session.receiverConn.send(JSON.stringify({ type: 'FILE_START', payload: { fileIndex: 0, resumeFromChunk: 0 } }));
+    await sleep(50);
+
+    const binarySent = senderSend.mock.calls.some(([data]) => data instanceof ArrayBuffer);
+    expect(binarySent).toBe(false);
   });
 });
 
@@ -670,7 +767,7 @@ describe('TransferEngine integrity verification', () => {
       },
     });
 
-    await senderEngine.startSenderTransfer(files, false);
+    await senderEngine.startSenderTransfer(files);
     await waitFor(() => receiverResult !== null && senderResult !== null);
     return { receiverResult, senderResult };
   }

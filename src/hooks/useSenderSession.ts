@@ -250,7 +250,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       }),
     });
     dispatch({ type: 'TRANSFER_STARTED' });
-    engine.startSenderTransfer(state.files, !!state.pin);
+    engine.startSenderTransfer(state.files, state.pin);
   };
 
   const rejectPeer = () => {

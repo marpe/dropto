@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef } from 'react';
-import type { TransferResult } from '../services/transferEngine';
+import type { PinPrompt, TransferResult } from '../services/transferEngine';
 import { soundService } from '../services/sound';
 import type { AppSettings, ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 import { defaultSessionServices } from './sessionServices';
@@ -9,6 +9,7 @@ export interface ReceiverSessionState {
   status: ReceiverStatus;
   roomCode: string;
   pin: string;
+  pinPrompt: PinPrompt | null;
   manifest: TransferManifest | null;
   metrics: TransferMetrics | null;
   isPaused: boolean;
@@ -22,6 +23,8 @@ type ReceiverAction =
   | { type: 'CONNECT_REQUESTED' }
   | { type: 'CONNECTED' }
   | { type: 'CONNECT_FAILED'; error: string }
+  | { type: 'PIN_REQUIRED'; prompt: PinPrompt }
+  | { type: 'PIN_SUBMITTED' }
   | { type: 'MANIFEST_RECEIVED'; manifest: TransferManifest }
   | { type: 'PEER_DISCONNECTED' }
   | { type: 'SAVING_STARTED' }
@@ -36,7 +39,7 @@ type ReceiverAction =
 const noProgress = { metrics: null, isPaused: false } as const;
 
 // Before a transfer starts, losing the sender means it declined or went away
-const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'connected'];
+const AWAITING_SENDER: ReceiverStatus[] = ['connecting', 'waiting_approval', 'pin_required', 'connected'];
 
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
   switch (action.type) {
@@ -50,8 +53,18 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
       return { ...state, status: 'waiting_approval' };
     case 'CONNECT_FAILED':
       return { ...state, status: 'error', error: action.error };
+    case 'PIN_REQUIRED':
+      // After a wrong attempt, clear the field so the next try starts fresh
+      return {
+        ...state,
+        status: 'pin_required',
+        pinPrompt: action.prompt,
+        pin: action.prompt.incorrect ? '' : state.pin,
+      };
+    case 'PIN_SUBMITTED':
+      return { ...state, status: 'waiting_approval' };
     case 'MANIFEST_RECEIVED':
-      return { ...state, status: 'connected', manifest: action.manifest };
+      return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null };
     case 'PEER_DISCONNECTED':
       if (!AWAITING_SENDER.includes(state.status)) {
         return state;
@@ -85,6 +98,7 @@ export const initialReceiverState: ReceiverSessionState = {
   status: 'idle',
   roomCode: '',
   pin: '',
+  pinPrompt: null,
   manifest: null,
   metrics: null,
   isPaused: false,
@@ -176,6 +190,7 @@ export function useReceiverSession({
         };
 
       engine.init(conn, false, {
+        onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
         onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
         onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
         onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
@@ -231,6 +246,10 @@ export function useReceiverSession({
       setRoomCode: (roomCode: string) => dispatch({ type: 'ROOM_CODE_CHANGED', roomCode }),
       setPin: (pin: string) => dispatch({ type: 'PIN_CHANGED', pin }),
       connect,
+      submitPin: () => {
+        engineRef.current?.submitPin(state.pin);
+        dispatch({ type: 'PIN_SUBMITTED' });
+      },
       startSaving,
       togglePause: () => engineRef.current?.togglePause(),
       cancel,

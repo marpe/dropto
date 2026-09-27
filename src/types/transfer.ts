@@ -15,7 +15,6 @@ export interface TransferFile {
 
 export interface TransferManifest {
   sessionId: string;
-  pinRequired: boolean;
   totalBytes: number;
   files: ManifestFile[];
 }
@@ -28,13 +27,13 @@ export type ReceiverStatus =
   | 'idle'
   | 'connecting'
   | 'waiting_approval'
+  | 'pin_required'
   | 'connected'
   | 'transferring'
   | 'completed'
   | 'error';
 
 export type ProtocolMessageType =
-  | 'HELLO'
   | 'AUTH_REQUEST'
   | 'AUTH_RESPONSE'
   | 'MANIFEST'

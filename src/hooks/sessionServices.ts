@@ -6,7 +6,7 @@ export type SessionConnection = Pick<WebRtcService, 'initSender' | 'initReceiver
 
 export type SessionEngine = Pick<
   TransferEngine,
-  'init' | 'startSenderTransfer' | 'startReceiving' | 'togglePause' | 'cancel'
+  'init' | 'startSenderTransfer' | 'startReceiving' | 'submitPin' | 'togglePause' | 'cancel'
 >;
 
 /** Creates the per-session signalling connection and transfer engine; swapped for fakes in tests. */

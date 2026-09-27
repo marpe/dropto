@@ -157,4 +157,52 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderContext.close();
     await receiverContext.close();
   });
+
+  test('PIN-protected transfer hides files until the correct PIN is entered', async ({ browser }) => {
+    const senderContext = await browser.newContext();
+    const receiverContext = await browser.newContext();
+    const senderPage = await senderContext.newPage();
+    const receiverPage = await receiverContext.newPage();
+
+    await senderPage.goto('/');
+    const roomCodeElement = senderPage.locator('.font-mono.text-2xl.font-black');
+    await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
+    const roomCode = (await roomCodeElement.textContent())?.trim();
+
+    const fileChooserPromise = senderPage.waitForEvent('filechooser');
+    await senderPage.locator('button:has-text("Select Files")').click();
+    await (await fileChooserPromise).setFiles([
+      { name: 'secret-plans.pdf', mimeType: 'application/pdf', buffer: Buffer.from('top secret') },
+    ]);
+    await senderPage.locator('input[placeholder="e.g. 1234"]').fill('2468');
+
+    await receiverPage.addInitScript(() => {
+      (window as any).showSaveFilePicker = async () => ({
+        createWritable: async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} }),
+      });
+    });
+    await receiverPage.goto(`/?room=${roomCode}`);
+    await receiverPage.locator('button:has-text("Connect & Download")').click();
+    await senderPage.locator('button:has-text("Accept")').click({ timeout: 15000 });
+
+    // File names must stay hidden until the PIN is accepted
+    await expect(receiverPage.locator('text=This Transfer Is PIN-Protected')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.locator('text=secret-plans.pdf')).toHaveCount(0);
+
+    const pinInput = receiverPage.locator('input[placeholder="Session PIN…"]');
+    await pinInput.fill('1111');
+    await receiverPage.locator('button:has-text("Unlock Files")').click();
+    await expect(receiverPage.locator('text=Incorrect PIN. 2 attempts left.')).toBeVisible({ timeout: 15000 });
+
+    await pinInput.fill('2468');
+    await receiverPage.locator('button:has-text("Unlock Files")').click();
+    await expect(receiverPage.locator('text=secret-plans.pdf')).toBeVisible({ timeout: 15000 });
+
+    await receiverPage.locator('button:has-text("Select Save Location & Start Download")').click();
+    await expect(receiverPage.locator('text=Download Complete & Verified!')).toBeVisible({ timeout: 15000 });
+    await expect(senderPage.locator('text=Transfer Complete!')).toBeVisible({ timeout: 15000 });
+
+    await senderContext.close();
+    await receiverContext.close();
+  });
 });

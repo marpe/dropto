@@ -6,7 +6,6 @@ import type { TransferManifest, TransferMetrics } from '../types/transfer';
 describe('ReceiverView Component UI & Interaction', () => {
   const dummyManifest: TransferManifest = {
     sessionId: 'test-session',
-    pinRequired: false,
     totalBytes: 1048576,
     files: [
       {
@@ -30,6 +29,8 @@ describe('ReceiverView Component UI & Interaction', () => {
         onPinChange={() => {}}
         onConnect={onConnect}
         connectionState="idle"
+        pinPrompt={null}
+        onSubmitPin={() => {}}
         manifest={null}
         transferMetrics={null}
         onStartSaving={() => {}}
@@ -65,6 +66,8 @@ describe('ReceiverView Component UI & Interaction', () => {
         onPinChange={() => {}}
         onConnect={() => {}}
         connectionState="connected"
+        pinPrompt={null}
+        onSubmitPin={() => {}}
         manifest={dummyManifest}
         transferMetrics={null}
         onStartSaving={onStartSaving}
@@ -95,6 +98,50 @@ describe('ReceiverView Component UI & Interaction', () => {
     });
   });
 
+  function renderPinStep(overrides: { pin?: string; incorrect?: boolean; attemptsLeft?: number } = {}) {
+    const onSubmitPin = vi.fn();
+    const onPinChange = vi.fn();
+    render(
+      <ReceiverView
+        roomCode="DW-123456"
+        onRoomCodeChange={() => {}}
+        pin={overrides.pin ?? '1234'}
+        onPinChange={onPinChange}
+        onConnect={() => {}}
+        connectionState="pin_required"
+        pinPrompt={{ attemptsLeft: overrides.attemptsLeft ?? 3, incorrect: overrides.incorrect ?? false }}
+        onSubmitPin={onSubmitPin}
+        manifest={null}
+        transferMetrics={null}
+        onStartSaving={() => {}}
+        onTogglePause={() => {}}
+        onCancelTransfer={() => {}}
+        isPaused={false}
+        errorMessage={null}
+        isNativeFSA={true}
+        corruptedFiles={[]}
+        onReset={() => {}}
+      />
+    );
+    return { onSubmitPin, onPinChange };
+  }
+
+  it('asks for the session PIN and submits it', () => {
+    const { onSubmitPin, onPinChange } = renderPinStep();
+
+    fireEvent.change(screen.getByPlaceholderText(/pin/i), { target: { value: '12345' } });
+    fireEvent.click(screen.getByRole('button', { name: /unlock/i }));
+
+    expect(onPinChange).toHaveBeenCalledWith('12345');
+    expect(onSubmitPin).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the remaining attempts after a wrong PIN', () => {
+    renderPinStep({ pin: '', incorrect: true, attemptsLeft: 2 });
+
+    expect(screen.getByText(/incorrect pin/i).textContent).toMatch(/2 attempts left/i);
+  });
+
   it('displays the metrics dashboard once connectionState is transferring', () => {
     const dummyMetrics: TransferMetrics = {
       currentSpeed: 1048576 * 15, // 15 MB/s
@@ -117,6 +164,8 @@ describe('ReceiverView Component UI & Interaction', () => {
         onPinChange={() => {}}
         onConnect={() => {}}
         connectionState="transferring"
+        pinPrompt={null}
+        onSubmitPin={() => {}}
         manifest={dummyManifest}
         transferMetrics={dummyMetrics}
         onStartSaving={() => {}}

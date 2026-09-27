@@ -102,6 +102,8 @@ export const App: React.FC = () => {
               onPinChange={receiver.actions.setPin}
               onConnect={receiver.actions.connect}
               connectionState={receiver.state.status}
+              pinPrompt={receiver.state.pinPrompt}
+              onSubmitPin={receiver.actions.submitPin}
               manifest={receiver.state.manifest}
               transferMetrics={receiver.state.metrics}
               onStartSaving={receiver.actions.startSaving}
