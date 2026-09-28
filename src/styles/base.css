@@ -22,9 +22,10 @@
   }
 
   /* showModal() already makes the page behind a dialog inert; this also stops it scrolling. The stable
-     gutter keeps the layout from shifting when the scrollbar goes away */
+     gutter keeps the layout from shifting when the scrollbar goes away; on both edges so the centred
+     column (and full-width cards on narrow windows) stay symmetric */
   html {
-    scrollbar-gutter: stable;
+    scrollbar-gutter: stable both-edges;
   }
 
   html:has(dialog:modal) {
