@@ -31,7 +31,7 @@ function presenceOf(receiver: SenderReceiver): Presence {
   return receiver.stage === 'failed' ? 'failed' : 'connected';
 }
 
-/** What they are doing: downloading, in line, idle since their last download (or arrival), or why it failed */
+/** What they are doing, in a few words: downloading, in line, idle since their last download (or arrival), failed */
 function describeActivity(receiver: SenderReceiver, queuePosition: number | null, nowMs: number): string | null {
   if (receiver.hasLeft) {
     return null;
@@ -50,7 +50,8 @@ function describeActivity(receiver: SenderReceiver, queuePosition: number | null
       return metrics ? `${Math.floor(metrics.overallPercent)}% · ${formatSpeed(metrics.currentSpeed)}` : 'Starting…';
     }
     case 'failed':
-      return receiver.error ?? 'Failed';
+      // Why is spelled out on its own line, where a long reason has room to wrap
+      return 'Failed';
     default:
       return null;
   }
@@ -73,10 +74,18 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
   const sent = getSentFiles(receiver);
   const activity = describeActivity(receiver, queuePosition, nowMs);
   const bytesSent = receiver.bytesSent + (receiver.stage === 'transferring' ? (receiver.metrics?.bytesTransferred ?? 0) : 0);
+  const downloadPercent =
+    receiver.stage === 'transferring'
+      ? (receiver.metrics?.overallPercent ?? 0)
+      : receiver.stage === 'queued'
+        ? 0
+        : receiver.stage === 'completed'
+          ? 100
+          : null;
 
   return (
     <li data-testid="receiver-row" data-stage={receiver.stage} className="py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-2">
         <PeerIdentity
           details={receiver.details}
           presence={presenceOf(receiver)}
@@ -107,10 +116,17 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
         )}
       </div>
 
-      {/* The whole download at a glance, over the per-file bars below; empty while it waits for a slot */}
-      {(receiver.stage === 'transferring' || receiver.stage === 'queued') && (
-        <div data-testid="download-progress" data-percent={Math.floor(receiver.metrics?.overallPercent ?? 0)}>
-          <ProgressBar percent={receiver.stage === 'transferring' ? (receiver.metrics?.overallPercent ?? 0) : 0} variant="subtle" />
+      {receiver.stage === 'failed' && receiver.error && (
+        <p data-testid="receiver-error" className="pl-6 text-xs text-text-danger-1 break-words">
+          {receiver.error}
+        </p>
+      )}
+
+      {/* The whole download at a glance, over the per-file bars below: empty while it waits for a slot, full once
+          done, and back to empty when the next download starts */}
+      {downloadPercent !== null && (
+        <div data-testid="download-progress" data-percent={Math.floor(downloadPercent)}>
+          <ProgressBar percent={downloadPercent} variant="subtle" />
         </div>
       )}
 
