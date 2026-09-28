@@ -82,7 +82,7 @@ export function finishedFilesOf<T extends NamedFile & { id: string }>(
  * new ones in the download under way, each with its progress. Files it never asked for are left out.
  */
 export function getSentFiles(receiver: SenderReceiver): { files: ManifestFile[]; progress: (FileProgress | null)[] } {
-  const isDownloading = receiver.stage === 'transferring';
+  const isDownloading = receiver.stage === 'transferring' || receiver.stage === 'interrupted';
   const sentIds = new Set(receiver.sentFiles.map((file) => file.id));
   const files = isDownloading
     ? [...receiver.sentFiles, ...receiver.downloadFiles.filter((file) => !sentIds.has(file.id))]

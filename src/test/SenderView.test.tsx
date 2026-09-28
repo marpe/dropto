@@ -49,6 +49,7 @@ function makeReceiver(overrides: Partial<SenderReceiver> = {}): SenderReceiver {
     sentFiles: [],
     finishedFiles: {},
     bytesSent: 0,
+    downloadStartBytes: 0,
     metrics: null,
     isPaused: false,
     error: null,

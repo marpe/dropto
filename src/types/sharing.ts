@@ -9,8 +9,8 @@ export interface SharingOptions {
   maxSimultaneous: number;
 }
 
-/** Where one receiver is, from arriving at the link to its download ending. */
-export type ReceiverStage = 'queued' | 'choosing' | 'transferring' | 'completed' | 'failed';
+/** Where one receiver is, from arriving at the link to its download ending. `interrupted`: cut off, reconnecting */
+export type ReceiverStage = 'queued' | 'choosing' | 'transferring' | 'interrupted' | 'completed' | 'failed';
 
 /** What the sender knows about a receiver, to tell people apart. Any part may be unknown. */
 export interface PeerDetails {
@@ -45,6 +45,8 @@ export interface SenderReceiver {
   finishedFiles: Record<string, FinishedFile>;
   /** Everything sent to them over finished (or failed) downloads, repeats included; the running one is in `metrics` */
   bytesSent: number;
+  /** Bytes of the running download already counted in `bytesSent` (it carries on one cut off earlier) */
+  downloadStartBytes: number;
   metrics: TransferMetrics | null;
   isPaused: boolean;
   error: string | null;

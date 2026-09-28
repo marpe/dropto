@@ -319,7 +319,8 @@ export class SenderRoom {
     const peerId = conn.peer;
     const start = () => {
       this.occupySlot(peerId);
-      this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices });
+      // Task 7 resumes a cut-off download from where it stopped; for now every download starts at 0
+      this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices, startBytes: 0 });
     };
     if (this.hasFreeSlot()) {
       start();

@@ -28,6 +28,9 @@ function presenceOf(receiver: SenderReceiver): Presence {
   if (receiver.hasLeft) {
     return 'gone';
   }
+  if (receiver.stage === 'interrupted') {
+    return 'waiting';
+  }
   return receiver.stage === 'failed' ? 'failed' : 'connected';
 }
 
@@ -49,6 +52,8 @@ function describeActivity(receiver: SenderReceiver, queuePosition: number | null
       const metrics = receiver.metrics;
       return metrics ? `${Math.floor(metrics.overallPercent)}% · ${formatSpeed(metrics.currentSpeed)}` : 'Starting…';
     }
+    case 'interrupted':
+      return 'Reconnecting…';
     case 'failed':
       // Why is spelled out on its own line, where a long reason has room to wrap
       return 'Failed';
@@ -70,18 +75,18 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
   const { name } = describePeer(receiver.details);
   // Still connected after a download counts as idle, and can be disconnected; only the gone can be dismissed
   const isGone = receiver.hasLeft || receiver.stage === 'failed';
-  const stopTitles = STOP_TITLES[receiver.stage === 'queued' || receiver.stage === 'transferring' ? receiver.stage : 'idle'];
+  const isDownloading = receiver.stage === 'transferring' || receiver.stage === 'interrupted';
+  const stopTitles = STOP_TITLES[receiver.stage === 'queued' ? 'queued' : isDownloading ? 'transferring' : 'idle'];
   const sent = getSentFiles(receiver);
   const activity = describeActivity(receiver, queuePosition, nowMs);
   const bytesSent = receiver.bytesSent + (receiver.stage === 'transferring' ? (receiver.metrics?.bytesTransferred ?? 0) : 0);
-  const downloadPercent =
-    receiver.stage === 'transferring'
-      ? (receiver.metrics?.overallPercent ?? 0)
-      : receiver.stage === 'queued'
-        ? 0
-        : receiver.stage === 'completed'
-          ? 100
-          : null;
+  const downloadPercent = isDownloading
+    ? (receiver.metrics?.overallPercent ?? 0)
+    : receiver.stage === 'queued'
+      ? 0
+      : receiver.stage === 'completed'
+        ? 100
+        : null;
 
   return (
     <li data-testid="receiver-row" data-stage={receiver.stage} className="py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
