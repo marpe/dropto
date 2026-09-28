@@ -57,10 +57,11 @@ export const ShareBox: React.FC<ShareBoxProps> = ({ roomCode, shareUrl, notice =
         <Button
           disabled={!isReady}
           onClick={() => copyLink(shareUrl)}
-          className="shrink-0 rounded-none shadow-none hover:shadow-none active:scale-100 px-4"
+          aria-label={copiedLink ? 'Copied' : 'Copy link'}
+          title={copiedLink ? 'Copied' : 'Copy link'}
+          className="shrink-0 rounded-none shadow-none hover:shadow-none active:scale-100 px-3.5"
         >
           {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          <span>{copiedLink ? 'Copied' : 'Copy link'}</span>
         </Button>
       </div>
 

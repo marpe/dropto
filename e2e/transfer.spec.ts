@@ -339,9 +339,13 @@ interface ShareOptions {
   simultaneous?: number;
 }
 
-/** Creates the link, then sets it up (settings apply as they change), optionally behind a PIN or for several people. */
+/** Creates the link, then (in the settings dialog, where changes apply at once) puts it behind a PIN or opens it to several people. */
 async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) {
   await page.getByTestId('share-files').click();
+  if (!pin && !simultaneous) {
+    return;
+  }
+  await page.getByTestId('open-link-settings').click();
   if (pin) {
     await page.getByRole('checkbox', { name: /require a pin/i }).check();
     await page.getByTestId('pin-input').fill(pin);
@@ -353,6 +357,7 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
       await page.getByTitle('More').click();
     }
   }
+  await page.getByRole('button', { name: 'Done' }).click();
 }
 
 /** The room code is shown once the link has been created. */
