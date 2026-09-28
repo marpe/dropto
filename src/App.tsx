@@ -16,7 +16,7 @@ import { useReceiverSession } from './hooks/useReceiverSession';
 import { useLeaveGuard } from './hooks/useLeaveGuard';
 import { useProgressTitle } from './hooks/useProgressTitle';
 import { usePageFileDrop } from './hooks/usePageFileDrop';
-import type { ReceiverStatus, SenderStatus } from './types/transfer';
+import type { AddFiles, ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
 import { supportsSaveFilePicker } from './utils/fileSystemAccess';
 import type { ShareLink } from './utils/shareLink';
@@ -62,7 +62,7 @@ export const App: React.FC = () => {
     sender.status === 'transferring' ? sender.focus?.metrics : receiver.state.status === 'transferring' ? receiver.state.metrics : null;
   useProgressTitle(activeMetrics ? activeMetrics.overallPercent : null);
 
-  const addDroppedFiles = (files: File[]) => {
+  const addDroppedFiles: AddFiles = (files) => {
     setMode('send');
     sender.actions.addFiles(files);
   };

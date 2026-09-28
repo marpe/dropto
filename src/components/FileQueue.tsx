@@ -1,19 +1,23 @@
 import type { RefObject } from 'react';
 import React from 'react';
 import { RotateCcw, X } from 'lucide-react';
+import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { IconButton } from './ui/IconButton';
 import { Notice } from './ui/Notice';
 import { FilePickerButtons } from './FilePickerButtons';
 import { FileTable, FileTableRow } from './FileTable';
 import { FileTotals } from './FileTotals';
-import type { ManifestFile, TransferFile } from '../types/transfer';
+import type { AddFiles, ManifestFile, TransferFile } from '../types/transfer';
 
 interface FileQueueProps {
 	files: TransferFile[];
 	/** Listed before a reload but not added again yet; shown faded, and not offered to anyone */
 	missingFiles?: ManifestFile[];
-	onAddFiles: (files: File[]) => void;
+	/** How many missing files the browser can read back after one OK (Chromium kept their handles) */
+	restorableCount?: number;
+	onRestoreFiles?: () => void;
+	onAddFiles: AddFiles;
 	/** Lets other controls (e.g. the approval dialog) open the file picker */
 	fileInputRef: RefObject<HTMLInputElement | null>;
 	onRemoveFile: (fileId: string) => void;
@@ -25,6 +29,8 @@ interface FileQueueProps {
 export const FileQueue: React.FC<FileQueueProps> = ({
 	                                                    files,
 	                                                    missingFiles = [],
+	                                                    restorableCount = 0,
+	                                                    onRestoreFiles,
 	                                                    onAddFiles,
 	                                                    fileInputRef,
 	                                                    onRemoveFile,
@@ -41,8 +47,20 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 				<Notice tone="warning"
 				        icon={RotateCcw}
 				        className="mb-3">
-					{missingFiles.length === 1 ? '1 file needs' : `${missingFiles.length} files need`} adding again after the
-					reload. Pick or drop them and they fill back in.
+					<span className="flex flex-wrap items-center justify-between gap-3">
+						<span>
+							{missingFiles.length === 1 ? '1 file needs' : `${missingFiles.length} files need`} adding again after
+							the reload. {restorableCount > 0 ? 'Restore them, or pick' : 'Pick'} or drop them and they fill back in.
+						</span>
+						{restorableCount > 0 && onRestoreFiles && (
+							<Button data-testid="restore-files"
+							        variant="secondary"
+							        size="sm"
+							        onClick={onRestoreFiles}>
+								Restore
+							</Button>
+						)}
+					</span>
 				</Notice>
 			)}
 			<FileTable files={[...files, ...missingFiles]}

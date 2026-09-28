@@ -1,8 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
+import type { AddFiles, IncomingFile } from '../types/transfer';
 import { collectDroppedFiles } from '../utils/droppedFiles';
+import { handlesFromDrop } from '../utils/fileHandles';
 
 function carriesFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
+/**
+ * Pairs dropped files with the handles Chromium gives for what was dropped, so they can be read again after a
+ * reload. Only files dropped as themselves have one; files inside a dropped folder go without.
+ */
+function withDropHandles(files: File[], handles: (FileSystemHandle | null)[]): IncomingFile[] {
+  const byName = new Map(
+    handles.flatMap((handle) => (handle?.kind === 'file' ? [[handle.name, handle as FileSystemFileHandle] as const] : []))
+  );
+  return files.map((file) => ({ file, handle: file.webkitRelativePath ? undefined : byName.get(file.name) }));
 }
 
 function isTextField(target: EventTarget | null): boolean {
@@ -13,7 +26,7 @@ function isTextField(target: EventTarget | null): boolean {
  * Lets files be dropped (or pasted) anywhere on the page. `onFiles` is null while files can't be added;
  * drops are still swallowed then, because the browser's default is to open the file and lose the session.
  */
-export function usePageFileDrop(onFiles: ((files: File[]) => void) | null) {
+export function usePageFileDrop(onFiles: AddFiles | null) {
   const [isDragging, setIsDragging] = useState(false);
   const onFilesRef = useRef(onFiles);
   // dragenter/dragleave fire for every child element crossed; only the outermost pair matters
@@ -54,10 +67,13 @@ export function usePageFileDrop(onFiles: ((files: File[]) => void) | null) {
       if (!addFiles || !event.dataTransfer) {
         return;
       }
-      collectDroppedFiles(event.dataTransfer)
-        .then((files) => {
+      // Both read the drop synchronously before their first await; the DataTransfer is emptied afterwards
+      const collecting = collectDroppedFiles(event.dataTransfer);
+      const takingHandles = event.dataTransfer.items ? handlesFromDrop(event.dataTransfer.items) : Promise.resolve([]);
+      Promise.all([collecting, takingHandles])
+        .then(([files, handles]) => {
           if (files.length > 0) {
-            addFiles(files);
+            addFiles(withDropHandles(files, handles));
           }
         })
         .catch((err) => console.error('Could not read the dropped files:', err));

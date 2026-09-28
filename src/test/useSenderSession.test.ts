@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { DataConnection } from 'peerjs';
 import { useSenderSession } from '../hooks/useSenderSession';
 import type { AppSettings } from '../types/transfer';
 import type { ReceiverGreeting } from '../services/webrtc';
+import type { FileHandleServices, SessionServices } from '../hooks/sessionServices';
+import type { HandleReadResult } from '../utils/fileHandles';
 import { SENDER_ROOM_STORAGE_KEY } from '../utils/roomMemory';
 import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
 import {
@@ -28,8 +30,9 @@ const settings: AppSettings = {
 
 type Session = Awaited<ReturnType<typeof renderSenderSession>>;
 
-async function renderSenderSession() {
+async function renderSenderSession(configure?: (services: SessionServices) => void) {
   const fakes = createFakeServices();
+  configure?.(fakes.services);
   const hook = renderHook(({ active }) => useSenderSession({ active, settings, services: fakes.services }), {
     initialProps: { active: true },
   });
@@ -1049,5 +1052,103 @@ describe('useSenderSession', () => {
     const second = await renderSenderSession();
 
     expect(second.result.current.state.isShared).toBe(false);
+  });
+
+  describe('files kept through a reload (Chromium file handles)', () => {
+    const lastModified = 1_700_000_000_000;
+    const hello = () => new File(['hello'], 'hello.txt', { lastModified });
+
+    /** An in-memory handle store; `access` decides what reading a handle gives after the reload. */
+    function fakeFileHandles(access: { current: 'granted' | 'prompt' }) {
+      const kept = new Map<string, FileSystemFileHandle>();
+      const read = vi.fn(
+        async (): Promise<HandleReadResult> =>
+          access.current === 'granted' ? { status: 'ready', file: hello() } : { status: 'needs-permission' }
+      );
+      const fileHandles: FileHandleServices = {
+        store: {
+          saveMany: async (entries) => {
+            entries.forEach(([key, handle]) => kept.set(key, handle));
+          },
+          load: async (keys) => new Map(keys.flatMap((key) => (kept.has(key) ? [[key, kept.get(key)!] as const] : []))),
+          remove: async (keys) => {
+            keys.forEach((key) => kept.delete(key));
+          },
+          clear: async () => {
+            kept.clear();
+          },
+        },
+        read,
+        requestAccess: vi.fn(async () => {
+          access.current = 'granted';
+          return true;
+        }),
+      };
+      return { fileHandles, kept };
+    }
+
+    const handle = { kind: 'file', name: 'hello.txt' } as unknown as FileSystemFileHandle;
+
+    async function reloadWith(fileHandles: FileHandleServices) {
+      const first = await renderSenderSession((services) => {
+        services.fileHandles = fileHandles;
+      });
+      act(() => {
+        first.result.current.actions.addFiles([{ file: hello(), handle }]);
+      });
+      const id = first.result.current.state.files[0].id;
+      first.unmount();
+      const second = await renderSenderSession((services) => {
+        services.fileHandles = fileHandles;
+      });
+      return { id, second };
+    }
+
+    it('reads the files back by themselves when the browser still allows it', async () => {
+      const { fileHandles } = fakeFileHandles({ current: 'granted' });
+
+      const { id, second } = await reloadWith(fileHandles);
+
+      await waitFor(() => expect(second.result.current.state.files.map((file) => file.id)).toEqual([id]));
+      expect(second.result.current.state.missingFiles).toEqual([]);
+    });
+
+    it('asks once for access when the browser wants the user to allow it again', async () => {
+      const access = { current: 'prompt' as 'granted' | 'prompt' };
+      const { fileHandles } = fakeFileHandles(access);
+
+      const { id, second } = await reloadWith(fileHandles);
+      await waitFor(() => expect(second.result.current.restorableCount).toBe(1));
+      expect(second.result.current.state.files).toEqual([]);
+
+      await act(async () => {
+        await second.result.current.actions.restoreFiles();
+      });
+
+      expect(fileHandles.requestAccess).toHaveBeenCalledWith([handle]);
+      expect(second.result.current.state.files.map((file) => file.id)).toEqual([id]);
+      expect(second.result.current.restorableCount).toBe(0);
+    });
+
+    it('lets go of a handle when its file is removed, and of all of them when starting over', async () => {
+      const { fileHandles, kept } = fakeFileHandles({ current: 'granted' });
+      const session = await renderSenderSession((services) => {
+        services.fileHandles = fileHandles;
+      });
+      act(() => {
+        session.result.current.actions.addFiles([{ file: hello(), handle }, { file: new File(['x'], 'x.txt'), handle }]);
+      });
+      await waitFor(() => expect(kept.size).toBe(2));
+
+      act(() => {
+        session.result.current.actions.removeFile(session.result.current.state.files[0].id);
+      });
+      await waitFor(() => expect(kept.size).toBe(1));
+
+      act(() => {
+        session.result.current.actions.startOver();
+      });
+      await waitFor(() => expect(kept.size).toBe(0));
+    });
   });
 });

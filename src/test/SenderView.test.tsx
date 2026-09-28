@@ -60,6 +60,7 @@ function makeActions(overrides: Partial<SenderSession['actions']> = {}): SenderS
   return {
     addFiles: vi.fn(),
     removeFile: vi.fn(),
+    restoreFiles: vi.fn(),
     clearFiles: vi.fn(),
     startOver: vi.fn(),
     togglePauseReceiver: vi.fn(),
@@ -81,16 +82,18 @@ interface SessionOverrides {
   status?: SenderStatus;
   focus?: SenderReceiver | null;
   actions?: Partial<SenderSession['actions']>;
+  restorableCount?: number;
 }
 
 function renderSenderView(
-  { state = {}, status = 'waiting', focus = null, actions = {} }: SessionOverrides = {},
+  { state = {}, status = 'waiting', focus = null, actions = {}, restorableCount = 0 }: SessionOverrides = {},
   onSwitchToReceive?: () => void
 ) {
   const session = {
     state: { ...createInitialSenderState(), roomCode: 'DW-ABC234', shareKey: 'link-key', ...state },
     status,
     focus,
+    restorableCount,
     actions: makeActions(actions),
   } as SenderSession;
   render(<SenderView session={session} onSwitchToReceive={onSwitchToReceive} />);

@@ -24,7 +24,20 @@ describe('usePageFileDrop', () => {
       dropOnPage();
     });
 
-    expect(onFiles).toHaveBeenCalledWith([file]);
+    expect(onFiles).toHaveBeenCalledWith([{ file }]);
+  });
+
+  it('keeps the handle Chromium gives for a dropped file, so it can be read again after a reload', async () => {
+    const onFiles = vi.fn();
+    renderHook(() => usePageFileDrop(onFiles));
+    const handle = { kind: 'file', name: 'hello.txt' };
+    const items = [{ kind: 'file', getAsFileSystemHandle: () => Promise.resolve(handle) }];
+
+    await act(async () => {
+      fireEvent(window, createEvent.drop(window, { dataTransfer: { files: [file], items, types: ['Files'] } }));
+    });
+
+    expect(onFiles).toHaveBeenCalledWith([{ file, handle }]);
   });
 
   it('shows the drop target only while files are dragged over the page', () => {

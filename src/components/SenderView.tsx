@@ -125,6 +125,8 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         <FileQueue
           files={files}
           missingFiles={missingFiles}
+          restorableCount={session.restorableCount}
+          onRestoreFiles={() => void actions.restoreFiles()}
           onAddFiles={actions.addFiles}
           fileInputRef={fileInputRef}
           onRemoveFile={(fileId) => {
