@@ -360,6 +360,20 @@ describe('SenderView', () => {
     expect(screen.queryByTestId('confirm')).toBeNull();
   });
 
+  it('removes every file still missing after a reload from the callout, leaving the ones added again', () => {
+    const missing = [
+      { id: 'm1', name: 'holiday.jpg', size: 4096, type: 'image/jpeg', lastModified: 1 },
+      { id: 'm2', name: 'notes.txt', size: 12, type: 'text/plain', lastModified: 1 },
+    ];
+    const actions = renderSenderView({ state: shared({ files: [queuedFile], missingFiles: missing, receivers: [makeReceiver()] }) });
+
+    fireEvent.click(screen.getByTestId('remove-missing'));
+
+    // Nobody was ever offered them, so there is nothing to confirm even with someone connected
+    expect(actions.removeFiles).toHaveBeenCalledWith(['m1', 'm2']);
+    expect(screen.queryByTestId('confirm')).toBeNull();
+  });
+
   it('sorts the files by the column clicked, then the other way, then back to the order they were added', () => {
     const small: TransferFile = { ...queuedFile, id: 's', name: 'zebra.txt', size: 10, lastModified: 3 };
     const large: TransferFile = { ...queuedFile, id: 'l', name: 'apple.txt', size: 5000, lastModified: 1 };
