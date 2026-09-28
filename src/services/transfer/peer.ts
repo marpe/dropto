@@ -1,5 +1,5 @@
 import type { DataConnection } from 'peerjs';
-import type { ControlMessage, NamedFile, TransferEvents, TransferMetrics } from '../../types/transfer';
+import type { ControlMessage, DownloadInterruption, NamedFile, TransferEvents, TransferMetrics } from '../../types/transfer';
 import { displayPath } from '../../utils/filePath';
 import { TransferMetricsTracker } from './metrics';
 import { parseControlMessage, sendControlMessage, toArrayBuffer } from './protocol';
@@ -20,6 +20,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   private isActive = false;
   private incomingQueue: Promise<void> = Promise.resolve();
   private corruptedFiles: string[] = [];
+  private finishedCount = 0;
 
   constructor(conn: DataConnection, events: Events) {
     this.conn = conn;
@@ -67,16 +68,36 @@ export abstract class TransferPeer<Events extends TransferEvents> {
     sendControlMessage(this.conn, message);
   }
 
-  protected beginTransfer(totalBytes: number, totalFiles: number) {
+  protected beginTransfer(totalBytes: number, totalFiles: number, startBytes = 0) {
     this.isActive = true;
     this.corruptedFiles = [];
-    this.metrics = new TransferMetricsTracker(totalBytes, totalFiles);
+    this.finishedCount = 0;
+    this.metrics = new TransferMetricsTracker(totalBytes, totalFiles, Date.now, startBytes);
   }
 
   protected recordVerification(file: NamedFile | undefined, isVerified: boolean) {
+    this.finishedCount++;
     if (!isVerified && file) {
       this.corruptedFiles.push(displayPath(file));
     }
+  }
+
+  /** What a download cut off now leaves behind; the receiver adds the file it was writing. */
+  protected captureInterruption(): DownloadInterruption {
+    return { finishedCount: this.finishedCount, corruptedFiles: [...this.corruptedFiles], resume: null };
+  }
+
+  /**
+   * Ends this engine because its connection is gone or being replaced. Mid-download it returns what was
+   * finished and, on the receiver, the open file to carry on with; outside a download (or once stopped), null.
+   */
+  public interrupt(): DownloadInterruption | null {
+    if (this.isStopped) {
+      return null;
+    }
+    const interruption = this.isActive ? this.captureInterruption() : null;
+    this.stop();
+    return interruption;
   }
 
   protected completeTransfer() {
@@ -168,14 +189,13 @@ export abstract class TransferPeer<Events extends TransferEvents> {
     if (this.isStopped) {
       return;
     }
-    if (!this.isActive) {
-      this.stop();
+    const interruption = this.interrupt();
+    if (!interruption) {
       this.events.onPeerLeft?.();
       return;
     }
-    this.stop();
     if (this.events.onConnectionLost) {
-      this.events.onConnectionLost();
+      this.events.onConnectionLost(interruption);
     } else {
       this.events.onError?.('Connection to peer lost');
     }

@@ -7,6 +7,7 @@ import { CHUNK_HEADER_SIZE, encodeChunk } from '../services/transfer/protocol';
 import { FastStreamingChecksum } from '../services/checksum';
 import type { StorageWriter } from '../services/storage';
 import type {
+  DownloadInterruption,
   PinPrompt,
   ReceiverEvents,
   SenderEvents,
@@ -723,6 +724,94 @@ describe('connection loss', () => {
     expect(departures).toBe(2);
     expect(pair.record.senderErrors).toEqual([]);
     expect(pair.record.receiverErrors).toEqual([]);
+  });
+
+  it('keeps the open file when the connection drops mid-file, so the next connection can carry on', async () => {
+    const storage = fakeStorage(() => new Promise<void>(() => {}));
+    // An object, so TypeScript does not narrow the callback-assigned value to null
+    const seen: { interruption: DownloadInterruption | null } = { interruption: null };
+    let hasStarted = false;
+    const pair = createTransferPair({
+      senderEvents: {
+        onReceiverStarted: () => {
+          hasStarted = true;
+        },
+      },
+      receiverEvents: {
+        onConnectionLost: (cut) => {
+          seen.interruption = cut;
+        },
+      },
+      receiverOptions: { chooseStorage: storage.chooseStorage },
+    });
+    pair.sender.start([createTestFile(512 * 1024)]);
+    await waitFor(() => hasStarted && storage.writers[0]?.write.mock.calls.length === 1);
+
+    pair.receiverConn.emit('close');
+
+    // The first chunk was handed to the writer, so it counts even though its write has not finished
+    expect(seen.interruption).toMatchObject({
+      finishedCount: 0,
+      corruptedFiles: [],
+      resume: { fileId: 'test-video.mp4', fileSize: 512 * 1024, nextChunk: 1, receivedBytes: 64 * 1024, remainingIds: ['test-video.mp4'] },
+    });
+    expect(seen.interruption?.resume?.writer).toBe(storage.writers[0]);
+    expect(storage.writers[0].abort).not.toHaveBeenCalled();
+    expect(pair.record.receiverErrors).toEqual([]);
+  });
+
+  it('tells both sides how many files were finished before the cut', async () => {
+    let writes = 0;
+    // The first file (2 chunks) is written; the second hangs on its first chunk
+    const storage = fakeStorage(() => (++writes > 2 ? new Promise<void>(() => {}) : Promise.resolve()));
+    let senderCut: DownloadInterruption | null = null;
+    let finishedOnSender = 0;
+    const pair = createTransferPair({
+      senderEvents: {
+        onFileComplete: () => {
+          finishedOnSender++;
+        },
+        onConnectionLost: (cut) => {
+          senderCut = cut;
+        },
+      },
+      receiverOptions: { chooseStorage: storage.chooseStorage },
+    });
+    pair.sender.start([createTestFile(100 * 1024, 'a.bin'), createTestFile(100 * 1024, 'b.bin')]);
+    await waitFor(() => finishedOnSender === 1 && writes === 3);
+
+    pair.senderConn.emit('close');
+
+    expect(senderCut).toEqual({ finishedCount: 1, corruptedFiles: [], resume: null });
+  });
+
+  it('ends at once when told the connection is being replaced, returning what can carry on', async () => {
+    const storage = fakeStorage(() => new Promise<void>(() => {}));
+    let hasStarted = false;
+    const pair = createTransferPair({
+      senderEvents: {
+        onReceiverStarted: () => {
+          hasStarted = true;
+        },
+      },
+      receiverOptions: { chooseStorage: storage.chooseStorage },
+    });
+    pair.sender.start([createTestFile(512 * 1024)]);
+    await waitFor(() => hasStarted && storage.writers[0]?.write.mock.calls.length === 1);
+
+    const cut = pair.receiver.interrupt();
+
+    expect(cut?.resume?.nextChunk).toBe(1);
+    // A second call, or the connection closing afterwards, changes nothing
+    expect(pair.receiver.interrupt()).toBeNull();
+  });
+
+  it('has nothing to carry on when the connection drops outside a download', () => {
+    const senderConn = new MockDataConnection();
+    const sender = new TransferSender(asConnection(senderConn), {});
+    sender.start([createTestFile(10 * 1024)]);
+
+    expect(sender.interrupt()).toBeNull();
   });
 });
 

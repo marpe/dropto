@@ -1,3 +1,5 @@
+import type { ResumePoint } from '../services/transfer/receiver';
+
 /** A file queued on the sender. */
 export interface TransferFile {
   id: string;
@@ -125,6 +127,15 @@ export interface FinishedFile {
   isCorrupted: boolean;
 }
 
+/** What a download cut off by a dropped connection leaves behind. */
+export interface DownloadInterruption {
+  /** Files of the download finished (and acknowledged) before the cut, from its start */
+  finishedCount: number;
+  corruptedFiles: string[];
+  /** Receiver only: the file that was being written, still open, to carry on with; null when none was */
+  resume: ResumePoint | null;
+}
+
 export interface TransferEvents {
   onMetrics?: (metrics: TransferMetrics) => void;
   onFileComplete?: (fileIndex: number, isVerified: boolean) => void;
@@ -133,8 +144,8 @@ export interface TransferEvents {
   onError?: (message: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
-  /** The connection dropped mid-transfer; when provided it replaces the generic onError for that case */
-  onConnectionLost?: () => void;
+  /** The connection dropped mid-download; when provided it replaces the generic onError for that case */
+  onConnectionLost?: (interruption: DownloadInterruption) => void;
   /** The connection closed while no download was running (before the first or between two): nothing was lost */
   onPeerLeft?: () => void;
 }

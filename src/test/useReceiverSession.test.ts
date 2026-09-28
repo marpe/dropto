@@ -674,7 +674,7 @@ describe('useReceiverSession', () => {
       });
 
       act(() => {
-        session.engines[0].events.onConnectionLost?.();
+        session.engines[0].events.onConnectionLost?.({ finishedCount: 0, corruptedFiles: [], resume: null });
       });
 
       await waitFor(() => expect(session.engines).toHaveLength(2));
@@ -690,7 +690,7 @@ describe('useReceiverSession', () => {
       });
 
       act(() => {
-        session.engines[0].events.onConnectionLost?.();
+        session.engines[0].events.onConnectionLost?.({ finishedCount: 0, corruptedFiles: [], resume: null });
       });
 
       expect(session.engines[0].cancel).toHaveBeenCalled();
