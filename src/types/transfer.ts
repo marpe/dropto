@@ -165,6 +165,10 @@ export interface ReceiverEvents extends TransferEvents {
   onPinRequired?: (prompt: PinPrompt) => void;
   /** The sender is busy with others; `position` 1 means this receiver is next */
   onQueued?: (position: number) => void;
+  /** A download cut off by a dropped connection carries on: these manifest indices, the cut-off file first */
+  onResumed?: (fileIndices: number[]) => void;
+  /** It could not carry on (the file is gone, changed or moved in the list); the half-written file was let go */
+  onResumeFailed?: () => void;
 }
 
 export interface IceServerConfig {
