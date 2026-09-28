@@ -6,7 +6,9 @@ export function formatBytes(bytes: number, decimals = 2): string {
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  // Fractions of a kilobyte are noise ("2.93 KB"); from MB up they still tell sizes apart
+  const places = i <= 1 ? 0 : dm;
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(places)) + ' ' + sizes[i];
 }
 
 export function formatSpeed(bytesPerSec: number): string {

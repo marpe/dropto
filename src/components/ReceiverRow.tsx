@@ -9,7 +9,7 @@ import type { Presence } from './ui/StatusDot';
 import { useNow } from '../hooks/useNow';
 import type { SenderReceiver } from '../types/sharing';
 import { cn } from '../utils/cn';
-import { formatElapsed, formatSpeed } from '../utils/format';
+import { formatBytes, formatElapsed, formatSpeed } from '../utils/format';
 import { describePeer } from '../utils/deviceInfo';
 import { getSentFiles } from '../utils/transferProgress';
 
@@ -71,6 +71,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
   const stopTitles = STOP_TITLES[receiver.stage === 'queued' || receiver.stage === 'transferring' ? receiver.stage : 'idle'];
   const sent = getSentFiles(receiver);
   const activity = describeActivity(receiver, queuePosition, nowMs);
+  const bytesSent = receiver.bytesSent + (receiver.stage === 'transferring' ? (receiver.metrics?.bytesTransferred ?? 0) : 0);
 
   return (
     <li data-testid="receiver-row" data-stage={receiver.stage} className="py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
@@ -78,6 +79,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
         <PeerIdentity
           details={receiver.details}
           presence={presenceOf(receiver)}
+          detail={bytesSent > 0 && <span data-testid="bytes-sent">{formatBytes(bytesSent)} sent</span>}
           status={
             activity && (
               <span

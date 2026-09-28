@@ -349,6 +349,24 @@ describe('useSenderSession', () => {
     expect(result.current.focus).toBeNull();
   });
 
+  it('adds up what each person was sent, downloading the same file again included', async () => {
+    const { engine, result } = await startTransfer();
+    const download = () => {
+      act(() => {
+        engine.events.onReceiverStarted?.([0]);
+      });
+      act(() => {
+        engine.events.onAllCompleted?.({ corruptedFiles: [] });
+      });
+    };
+
+    download();
+    download();
+
+    // hello.txt is 5 bytes
+    expect(result.current.focus?.bytesSent).toBe(10);
+  });
+
   it('counts someone connected without downloading as idle, and someone who left after finishing as left', async () => {
     const { engine, result } = await startTransfer();
     const idleSince = () => result.current.focus?.idleSinceMs ?? null;

@@ -18,6 +18,9 @@ describe('format utilities', () => {
   it('formats bytes accurately up to 10GB and beyond', () => {
     expect(formatBytes(0)).toBe('0 B');
     expect(formatBytes(1024)).toBe('1 KB');
+    // Kilobytes are whole numbers; megabytes keep their decimals
+    expect(formatBytes(3000)).toBe('3 KB');
+    expect(formatBytes(1.5 * 1024 * 1024)).toBe('1.5 MB');
     expect(formatBytes(1024 * 1024)).toBe('1 MB');
     expect(formatBytes(10737418240)).toBe('10 GB'); // 10 GB
     expect(formatBytes(107374182400)).toBe('100 GB'); // 100 GB

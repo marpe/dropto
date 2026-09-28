@@ -19,16 +19,18 @@ interface PeerIdentityProps {
   presence: Presence;
   /** What they are doing, at the end of the first line */
   status?: React.ReactNode;
+  /** More about them at the end of the second line, e.g. how much they have received */
+  detail?: React.ReactNode;
 }
 
 /**
  * Who someone on the link is: browser, system and model, then what kind of device it is, their address,
  * place and route once known, and a warning when their browser keeps downloads in memory.
  */
-export const PeerIdentity: React.FC<PeerIdentityProps> = ({ details, presence, status }) => {
+export const PeerIdentity: React.FC<PeerIdentityProps> = ({ details, presence, status, detail }) => {
   const { browser, name, meta } = describePeer(details);
   const formFactor = details.formFactor ? FORM_FACTORS[details.formFactor] : null;
-  const hasSecondLine = meta || formFactor || details.storage === 'memory';
+  const hasSecondLine = meta || formFactor || details.storage === 'memory' || detail;
   return (
     <div className="flex-1 min-w-0 space-y-1">
       <div className="flex items-baseline justify-between gap-2">
@@ -58,6 +60,7 @@ export const PeerIdentity: React.FC<PeerIdentityProps> = ({ details, presence, s
               {meta ? '· ' : ''}Saves to memory
             </span>
           )}
+          {detail && <span className="ml-auto shrink-0 pl-2">{detail}</span>}
         </p>
       )}
     </div>
