@@ -4,7 +4,8 @@ import { Screen } from './ui/Screen';
 import { IconBadge } from './ui/IconBadge';
 import { Button } from './ui/Button';
 import { StatusCard } from './ui/StatusCard';
-import type { FinishedFile, ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
+import type { ReceiverStatus, TransferManifest } from '../types/transfer';
+import type { ReceiverSession } from '../hooks/useReceiverSession';
 import { TransferSummary } from './TransferSummary';
 import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
@@ -12,39 +13,9 @@ import type { WaitingStage } from './WaitingForSenderCard';
 import { IncomingFilesCard } from './IncomingFilesCard';
 import { RoomCodeForm } from './RoomCodeForm';
 import { pickFiles } from '../utils/fileSelection';
-import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
-  roomCode: string;
-  onRoomCodeChange: (code: string) => void;
-  pin: string;
-  onPinChange: (pin: string) => void;
-  onConnect: () => void;
-  connectionState: ReceiverStatus;
-  pinPrompt: PinPrompt | null;
-  onSubmitPin: () => void;
-  manifest: TransferManifest | null;
-  transferMetrics: TransferMetrics | null;
-  onStartSaving: (fileIndices?: number[]) => void | Promise<void>;
-  onTogglePause: () => void;
-  onCancelTransfer: () => void;
-  /** While reconnecting to a sender that went away: try again now */
-  onRetryNow?: () => void;
-  isPaused: boolean;
-  errorMessage: string | null;
-  isNativeFSA: boolean;
-  corruptedFiles: string[];
-  onReset: () => void;
-  /** Connected through the sender's link, so there is no approval to wait for */
-  isInvited?: boolean;
-  /** Manifest indices being downloaded; null means all of them */
-  selectedFileIndices?: number[] | null;
-  /** Place in the sender's line while the download waits for a free slot */
-  queuePosition?: number | null;
-  /** Files downloaded so far on this connection, by id */
-  finishedFiles?: Record<string, FinishedFile>;
-  /** The sender went away after a finished download */
-  hasSenderLeft?: boolean;
+  session: ReceiverSession;
 }
 
 function getWaitingStage(
@@ -70,36 +41,13 @@ function getWaitingStage(
   return null;
 }
 
-export const ReceiverView: React.FC<ReceiverViewProps> = ({
-  roomCode,
-  onRoomCodeChange,
-  pin,
-  onPinChange,
-  onConnect,
-  connectionState,
-  pinPrompt,
-  onSubmitPin,
-  manifest,
-  transferMetrics,
-  onStartSaving,
-  onTogglePause,
-  onCancelTransfer,
-  onRetryNow,
-  isPaused,
-  errorMessage,
-  isNativeFSA,
-  corruptedFiles,
-  onReset,
-  isInvited = false,
-  selectedFileIndices = null,
-  queuePosition = null,
-  finishedFiles = {},
-  hasSenderLeft = false,
-}) => {
-  const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
-  const isTransferring = connectionState === 'transferring';
-  const hasDownloaded = isTransferring || connectionState === 'completed';
-  const isChoosing = connectionState === 'connected' && !waitingStage;
+export const ReceiverView: React.FC<ReceiverViewProps> = ({ session }) => {
+  const { state, actions } = session;
+  const { status, manifest, selectedFileIndices, isPaused } = state;
+  const waitingStage = getWaitingStage(status, state.isInvited, manifest);
+  const isTransferring = status === 'transferring';
+  const hasDownloaded = isTransferring || status === 'completed';
+  const isChoosing = status === 'connected' && !waitingStage;
 
   return (
     <Screen>
@@ -108,37 +56,37 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         <>
           {hasDownloaded && (
             <TransferSummary
-              metrics={transferMetrics}
+              metrics={state.metrics}
               files={pickFiles(manifest.files, selectedFileIndices)}
               isPaused={isPaused}
-              queuePosition={isTransferring ? queuePosition : null}
-              completion={isTransferring ? null : { corruptedFiles }}
+              queuePosition={isTransferring ? state.queuePosition : null}
+              completion={isTransferring ? null : { corruptedFiles: state.corruptedFiles }}
             />
           )}
           <IncomingFilesCard
             manifest={manifest}
-            isNativeFSA={isNativeFSA}
-            onStartSaving={onStartSaving}
-            download={isTransferring ? { fileIndices: selectedFileIndices, metrics: transferMetrics, isPaused } : null}
-            finishedFiles={finishedFiles}
-            hasSenderLeft={hasSenderLeft}
-            onTogglePause={onTogglePause}
-            onCancel={onCancelTransfer}
+            onStartSaving={actions.startSaving}
+            download={isTransferring ? { fileIndices: selectedFileIndices, metrics: state.metrics, isPaused } : null}
+            finishedFiles={state.finishedFiles}
+            hasSenderLeft={state.hasSenderLeft}
+            onTogglePause={actions.togglePause}
+            onCancel={actions.cancel}
+            onDone={actions.reset}
           />
         </>
-      ) : connectionState === 'error' && errorMessage ? (
+      ) : status === 'error' && state.error ? (
         // A dead end gets its own screen: the code form would invite retrying something that cannot work
         <StatusCard
           badge={<IconBadge icon={AlertCircle} tone="danger" />}
           title="Couldn’t receive the files"
-          description={errorMessage}
+          description={state.error}
         >
           <div className="flex flex-wrap justify-center gap-3">
-            <Button data-testid="retry-connect" onClick={onConnect} className="px-6">
+            <Button data-testid="retry-connect" onClick={actions.connect} className="px-6">
               <RotateCw className="w-4 h-4" />
               Try again
             </Button>
-            <Button data-testid="enter-other-code" variant="secondary" onClick={onReset} className="px-6">
+            <Button data-testid="enter-other-code" variant="secondary" onClick={actions.reset} className="px-6">
               Enter a different code
             </Button>
           </div>
@@ -146,15 +94,15 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
       ) : waitingStage ? (
         <WaitingForSenderCard
           stage={waitingStage}
-          roomCode={roomCode}
+          roomCode={state.roomCode}
           // Still connecting there is no engine to cancel; starting over abandons the attempt
-          onCancel={waitingStage === 'connecting' ? onReset : onCancelTransfer}
-          onRetry={waitingStage === 'reconnecting' ? onRetryNow : undefined}
+          onCancel={waitingStage === 'connecting' ? actions.reset : actions.cancel}
+          onRetry={waitingStage === 'reconnecting' ? actions.retryNow : undefined}
         />
-      ) : connectionState === 'pin_required' && pinPrompt ? (
-        <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
+      ) : status === 'pin_required' && state.pinPrompt ? (
+        <PinEntryCard pin={state.pin} prompt={state.pinPrompt} onPinChange={actions.setPin} onSubmit={actions.submitPin} />
       ) : (
-        <RoomCodeForm roomCode={roomCode} onRoomCodeChange={onRoomCodeChange} onConnect={onConnect} />
+        <RoomCodeForm roomCode={state.roomCode} onRoomCodeChange={actions.setRoomCode} onConnect={actions.connect} />
       )}
     </Screen>
   );

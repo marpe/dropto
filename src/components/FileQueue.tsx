@@ -10,6 +10,7 @@ import { FilePickerButtons } from './FilePickerButtons';
 import { FileTable, FileTableRow } from './FileTable';
 import { FileTotals } from './FileTotals';
 import type { AddFiles, ManifestFile, TransferFile } from '../types/transfer';
+import { toggleInSet } from '../utils/sets';
 
 interface FileQueueProps {
   files: TransferFile[];
@@ -45,15 +46,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({
   const canTick = allFiles.length > 1;
   const isAllTicked = ticked.length === allFiles.length;
 
-  const toggle = (fileId: string) => {
-    setTickedIds((current) => {
-      const next = new Set(current);
-      if (!next.delete(fileId)) {
-        next.add(fileId);
-      }
-      return next;
-    });
-  };
+  const toggle = (fileId: string) => setTickedIds((current) => toggleInSet(current, fileId));
   const removeTicked = () => {
     onRemoveFiles(ticked.map((file) => file.id));
     setTickedIds(new Set());
