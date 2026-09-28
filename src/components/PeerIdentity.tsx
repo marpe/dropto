@@ -27,14 +27,14 @@ export const PeerIdentity: React.FC<PeerIdentityProps> = ({ details, presence, s
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-2">
           <OsIcon system={system} formFactor={details.formFactor} className="text-text-3" />
-          <span className="truncate">{name}</span>
+          <span className="truncate">{name}</span> User
         </span>
         <span className="flex shrink-0 items-center gap-1.5 text-xs text-text-4 tabular-nums">
           <StatusDot presence={presence} />
           {status}
         </span>
       </div>
-      <p className="flex min-w-0 items-center gap-1.5 pl-6 text-2xs text-text-5 tabular-nums">
+      <p className="flex min-w-0 items-center gap-1.5 text-2xs text-text-5 tabular-nums">
         {browser && (
           <>
             <BrowserIcon browser={browser} className="w-3 h-3 text-text-5" />
