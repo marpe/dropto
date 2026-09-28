@@ -141,6 +141,8 @@ const KNOWN_BROWSERS = new Set(BROWSERS.map(([, name]) => name));
 export interface PeerDescription {
   /** Shown as its logo; null when the device did not say */
   browser: string | null;
+  /** "Android", as describeDevice names it; shown as its logo, null when unknown */
+  system: string | null;
   /** The system ("Android"), or the whole device description when no browser is named */
   name: string;
   meta: string | null;
@@ -156,7 +158,9 @@ export function describePeer(details: PeerDetails): PeerDescription {
   // "Chrome on Android", as built by describeDevice
   const [browser, system] = details.device?.split(' on ') ?? [];
   if (browser && system && KNOWN_BROWSERS.has(browser)) {
-    return { browser, name: withModel(system), meta };
+    return { browser, system, name: withModel(system), meta };
   }
-  return { browser: null, name: withModel(details.device ?? 'Unknown device'), meta };
+  // describeDevice's "Android device", when the browser was not recognised
+  const bareSystem = details.device?.endsWith(' device') ? details.device.slice(0, -' device'.length) : null;
+  return { browser: null, system: bareSystem, name: withModel(details.device ?? 'Unknown device'), meta };
 }

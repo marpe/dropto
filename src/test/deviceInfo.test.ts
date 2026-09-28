@@ -61,6 +61,7 @@ describe('describePeer', () => {
   it('splits the browser from the system and labels the time zone', () => {
     expect(describePeer({ device: 'Chrome on Android', timeZone: 'Europe/Stockholm', ip: '203.0.113.7' })).toEqual({
       browser: 'Chrome',
+      system: 'Android',
       name: 'Android',
       meta: '203.0.113.7 · Time zone: Stockholm',
     });
@@ -69,19 +70,25 @@ describe('describePeer', () => {
   it('keeps a device without a known browser as its name', () => {
     expect(describePeer({ device: 'Android device', timeZone: null, ip: null })).toEqual({
       browser: null,
+      system: 'Android',
       name: 'Android device',
       meta: null,
     });
   });
 
   it('still reads well with nothing known', () => {
-    expect(describePeer({ device: null, timeZone: null, ip: null })).toEqual({ browser: null, name: 'Unknown device', meta: null });
+    expect(describePeer({ device: null, timeZone: null, ip: null })).toEqual({
+      browser: null,
+      system: null,
+      name: 'Unknown device',
+      meta: null,
+    });
   });
 
   it('adds the model to the system, and says when the connection goes through a relay', () => {
     expect(
       describePeer({ device: 'Chrome on Android', timeZone: null, ip: null, model: 'Pixel 8', route: 'relayed' })
-    ).toEqual({ browser: 'Chrome', name: 'Android · Pixel 8', meta: 'Relayed' });
+    ).toEqual({ browser: 'Chrome', system: 'Android', name: 'Android · Pixel 8', meta: 'Relayed' });
   });
 });
 

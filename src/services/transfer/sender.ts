@@ -1,6 +1,7 @@
 import type { DataConnection } from 'peerjs';
 import type { ControlMessage, SenderEvents, TransferFile, TransferManifest } from '../../types/transfer';
 import { FastStreamingChecksum } from '../checksum';
+import { displayPath } from '../../utils/filePath';
 import { TransferPeer } from './peer';
 import { CHUNK_SIZE, encodeChunk } from './protocol';
 
@@ -20,6 +21,21 @@ function waitForBufferDrain(channel: RTCDataChannel): Promise<void> {
     // Some browsers occasionally miss the event; never stall the transfer on it
     const safetyTimer = setTimeout(done, DRAIN_TIMEOUT_MS);
   });
+}
+
+/**
+ * Reads part of a file from disk. The browser refuses (NotReadableError, with a generic message) when the file
+ * changed or moved after it was picked, or is an online-only copy in a synced folder, so say which file and why.
+ */
+async function readSlice(file: TransferFile, start: number, end: number): Promise<Uint8Array> {
+  try {
+    return new Uint8Array(await file.rawFile.slice(start, end).arrayBuffer());
+  } catch (err) {
+    console.warn('Could not read', displayPath(file), err);
+    throw new Error(
+      `Couldn’t read ${displayPath(file)}. It may have changed or moved since it was added, or be online-only (OneDrive, iCloud). Add it again.`
+    );
+  }
 }
 
 function toManifest(files: TransferFile[]): TransferManifest {
@@ -205,7 +221,7 @@ export class TransferSender extends TransferPeer<SenderEvents> {
 
       const start = chunkIndex * CHUNK_SIZE;
       const end = Math.min(start + CHUNK_SIZE, file.size);
-      const payload = new Uint8Array(await file.rawFile.slice(start, end).arrayBuffer());
+      const payload = await readSlice(file, start, end);
       checksum.update(payload);
       this.conn.send(encodeChunk(fileIndex, chunkIndex, payload));
 

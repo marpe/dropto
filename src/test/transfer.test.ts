@@ -770,18 +770,19 @@ describe('storage and read failures', () => {
     expect(pair.record.senderErrors).toHaveLength(1);
   });
 
-  it('reports an unreadable source file on both sides', async () => {
+  it('reports an unreadable source file on both sides, naming the file and what to do', async () => {
     const pair = createTransferPair();
     const unreadable = createTestFile(10 * 1024);
     unreadable.rawFile = {
       size: unreadable.size,
-      slice: () => ({ arrayBuffer: () => Promise.reject(new Error('File was modified')) }),
+      slice: () => ({ arrayBuffer: () => Promise.reject(new DOMException('The requested file could not be read', 'NotReadableError')) }),
     } as unknown as File;
 
     pair.sender.start([unreadable]);
 
     expect(await waitFor(() => pair.record.receiverErrors.length > 0 && pair.record.senderErrors.length > 0)).toBe(true);
-    expect(pair.record.senderErrors).toEqual(['File was modified']);
+    expect(pair.record.senderErrors).toHaveLength(1);
+    expect(pair.record.senderErrors[0]).toMatch(/test-video\.mp4.*add it again/i);
   });
 });
 
