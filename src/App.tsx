@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { Settings } from 'lucide-react';
 import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
@@ -141,6 +142,7 @@ export const App: React.FC = () => {
         )}
       </main>
       </div>
+      <Analytics />
     </div>
   );
 };
