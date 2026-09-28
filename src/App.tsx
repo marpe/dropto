@@ -52,7 +52,7 @@ export const App: React.FC = () => {
 
   const isSenderBusy = countActiveReceivers(sender.state.receivers) > 0;
   const isTransferring =
-    sender.state.receivers.some((r) => r.stage === 'transferring') || receiver.state.status === 'transferring';
+    sender.state.receivers.some((r) => r.stage === 'transferring' || r.stage === 'interrupted') || receiver.state.status === 'transferring';
   // Switching modes tears down the other session, including a receiver still choosing where to save
   const isSessionBusy = isTransferring || isSenderBusy;
   useLeaveGuard(isTransferring);

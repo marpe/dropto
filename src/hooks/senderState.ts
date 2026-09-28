@@ -25,6 +25,8 @@ export interface SenderSessionState {
   receivers: SenderReceiver[];
 }
 
+export const CONNECTION_LOST_MESSAGE = 'Connection lost';
+
 export type SenderAction =
   | { type: 'ROOM_REQUESTED'; notice: string | null }
   | { type: 'ROOM_READY'; roomCode: string; shareKey: string; wasShared: boolean }
@@ -45,10 +47,11 @@ export type SenderAction =
   | { type: 'RECEIVER_QUEUED'; peerId: string }
   | { type: 'RECEIVER_ADMITTED'; peerId: string; details: PeerDetails; atMs: number }
   | { type: 'RECEIVER_RESUMED'; fromPeerId: string; peerId: string }
-  | { type: 'RECEIVER_STARTED'; peerId: string; fileIndices: number[] }
+  | { type: 'RECEIVER_STARTED'; peerId: string; fileIndices: number[]; startBytes: number }
   | { type: 'METRICS'; peerId: string; metrics: TransferMetrics }
   | { type: 'PAUSED'; peerId: string; isPaused: boolean }
   | { type: 'RECEIVER_COMPLETED'; peerId: string; result: TransferResult; atMs: number }
+  | { type: 'RECEIVER_INTERRUPTED'; peerId: string; finishedCount: number; corruptedFiles: string[] }
   | { type: 'RECEIVER_FAILED'; peerId: string; error: string }
   | { type: 'RECEIVER_REMOVED'; peerId: string }
   | { type: 'RECEIVER_LEFT'; peerId: string };
@@ -79,22 +82,47 @@ function newReceiver(peerId: string, details: PeerDetails, stage: ReceiverStage,
     sentFiles: [],
     finishedFiles: {},
     bytesSent: 0,
+    downloadStartBytes: 0,
     metrics: null,
     isPaused: false,
     error: null,
   };
 }
 
-function completeDownload(receiver: SenderReceiver, result: TransferResult, atMs: number): SenderReceiver {
+/** What went over the connection in the running download, beyond what an earlier cut-off one already counted. */
+function downloadBytesSent(receiver: SenderReceiver): number {
+  return Math.max((receiver.metrics?.bytesTransferred ?? 0) - receiver.downloadStartBytes, 0);
+}
+
+function withSentFiles(receiver: SenderReceiver, files: ManifestFile[]): ManifestFile[] {
   const sentIds = new Set(receiver.sentFiles.map((file) => file.id));
+  return [...receiver.sentFiles, ...files.filter((file) => !sentIds.has(file.id))];
+}
+
+function completeDownload(receiver: SenderReceiver, result: TransferResult, atMs: number): SenderReceiver {
+  const downloadBytes = receiver.downloadFiles.reduce((sum, file) => sum + file.size, 0);
   return {
     ...receiver,
     stage: 'completed',
     idleSinceMs: atMs,
     isPaused: false,
-    bytesSent: receiver.bytesSent + receiver.downloadFiles.reduce((sum, file) => sum + file.size, 0),
-    sentFiles: [...receiver.sentFiles, ...receiver.downloadFiles.filter((file) => !sentIds.has(file.id))],
+    bytesSent: receiver.bytesSent + downloadBytes - receiver.downloadStartBytes,
+    sentFiles: withSentFiles(receiver, receiver.downloadFiles),
     finishedFiles: { ...receiver.finishedFiles, ...finishedFilesOf(receiver.downloadFiles, receiver.metrics, result) },
+  };
+}
+
+/** Cut off mid-download: what went over counts as sent, and the files finished before the cut as downloaded. */
+function interruptDownload(receiver: SenderReceiver, finishedCount: number, corruptedFiles: string[]): SenderReceiver {
+  const finished = receiver.downloadFiles.slice(0, finishedCount);
+  return {
+    ...receiver,
+    stage: 'interrupted',
+    idleSinceMs: null,
+    isPaused: false,
+    bytesSent: receiver.bytesSent + downloadBytesSent(receiver),
+    sentFiles: withSentFiles(receiver, finished),
+    finishedFiles: { ...receiver.finishedFiles, ...finishedFilesOf(finished, receiver.metrics, { corruptedFiles }) },
   };
 }
 
@@ -229,6 +257,7 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
               idleSinceMs: null,
               // A snapshot: the sender may change its list while this download runs
               downloadFiles: pickFiles(state.files, action.fileIndices),
+              downloadStartBytes: action.startBytes,
               metrics: null,
             }
       );
@@ -238,13 +267,17 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
       return updateReceiver(state, action.peerId, (receiver) => ({ ...receiver, isPaused: action.isPaused }));
     case 'RECEIVER_COMPLETED':
       return updateReceiver(state, action.peerId, (receiver) => completeDownload(receiver, action.result, action.atMs));
+    case 'RECEIVER_INTERRUPTED':
+      return updateReceiver(state, action.peerId, (receiver) =>
+        interruptDownload(receiver, action.finishedCount, action.corruptedFiles)
+      );
     case 'RECEIVER_FAILED':
       return updateReceiver(state, action.peerId, (receiver) => ({
         ...receiver,
         stage: 'failed',
         idleSinceMs: null,
-        // What got through before it failed still went over the connection
-        bytesSent: receiver.bytesSent + (receiver.metrics?.bytesTransferred ?? 0),
+        // A cut-off download already counted what got through
+        bytesSent: receiver.bytesSent + (receiver.stage === 'interrupted' ? 0 : downloadBytesSent(receiver)),
         metrics: null,
         isPaused: false,
         error: action.error,
@@ -269,6 +302,7 @@ const STATUS_BY_STAGE: Record<ReceiverStage, SenderStatus> = {
   queued: 'waiting',
   choosing: 'awaiting_receiver',
   transferring: 'transferring',
+  interrupted: 'transferring',
   completed: 'completed',
   failed: 'failed',
 };
@@ -285,7 +319,9 @@ export function selectSenderStatus(state: SenderSessionState): SenderStatus {
 
 /** Receivers holding a download slot: choosing where to save or downloading. */
 export function countActiveReceivers(receivers: SenderReceiver[]): number {
-  return receivers.filter((receiver) => receiver.stage === 'choosing' || receiver.stage === 'transferring').length;
+  return receivers.filter(
+    (receiver) => receiver.stage === 'choosing' || receiver.stage === 'transferring' || receiver.stage === 'interrupted'
+  ).length;
 }
 
 /** Everyone still on the link, whatever they are doing: those who left or failed are only listed. */
