@@ -18,6 +18,7 @@ export class TransferMetricsTracker {
   private readonly totalBytes: number;
   private readonly totalFiles: number;
   private readonly now: () => number;
+  private readonly startBytes: number;
   // Set by the first byte: time spent before that (PIN entry, the save dialog) is not transfer time
   private startedTimestampMs: number | null = null;
   private bytesTransferred = 0;
@@ -26,10 +27,13 @@ export class TransferMetricsTracker {
   // First and latest byte per file position, for how long each file took
   private fileSpans: { firstMs: number; lastMs: number }[] = [];
 
-  constructor(totalBytes: number, totalFiles: number, now: () => number = Date.now) {
+  constructor(totalBytes: number, totalFiles: number, now: () => number = Date.now, startBytes = 0) {
     this.totalBytes = totalBytes;
     this.totalFiles = totalFiles;
     this.now = now;
+    this.startBytes = startBytes;
+    // A download carried on after a dropped connection starts where it stopped
+    this.bytesTransferred = startBytes;
   }
 
   /** `position` is the file's place in this transfer (not its manifest index). */
@@ -67,7 +71,7 @@ export class TransferMetricsTracker {
     const remainingBytes = Math.max(this.totalBytes - this.bytesTransferred, 0);
     return {
       currentSpeed,
-      averageSpeed: elapsedSeconds > 0 ? this.bytesTransferred / elapsedSeconds : 0,
+      averageSpeed: elapsedSeconds > 0 ? (this.bytesTransferred - this.startBytes) / elapsedSeconds : 0,
       elapsedSeconds,
       etaSeconds: currentSpeed > 0 ? Math.round(remainingBytes / currentSpeed) : 0,
       bytesTransferred: this.bytesTransferred,
