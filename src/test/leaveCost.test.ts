@@ -11,6 +11,7 @@ const receiver = (stage: ReceiverStage): SenderReceiver => ({
   downloadFiles: [],
   sentFiles: [],
   finishedFiles: {},
+  bytesSent: 0,
   metrics: null,
   isPaused: false,
   error: null,

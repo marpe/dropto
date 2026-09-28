@@ -49,6 +49,7 @@ function makeReceiver(overrides: Partial<SenderReceiver> = {}): SenderReceiver {
     downloadFiles: [],
     sentFiles: [],
     finishedFiles: {},
+    bytesSent: 0,
     metrics: null,
     isPaused: false,
     error: null,
@@ -438,6 +439,14 @@ describe('SenderView', () => {
     renderSenderView({ state: shared({ roomNotice: 'This is a new room.' }) });
 
     expect(screen.getByText('This is a new room.')).toBeDefined();
+  });
+
+  it('shows how much each person has received, the running download included', () => {
+    renderSenderView({
+      state: shared({ receivers: [makeReceiver({ stage: 'transferring', bytesSent: 2048, metrics: { ...metrics, bytesTransferred: 1024 } })] }),
+    });
+
+    expect(screen.getByTestId('bytes-sent').textContent).toBe('3 KB sent');
   });
 
   it('lists under each person the files sent to them, with how each went', () => {

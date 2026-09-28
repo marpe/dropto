@@ -43,6 +43,8 @@ export interface SenderReceiver {
   sentFiles: ManifestFile[];
   /** How each of `sentFiles` went the last time, by id */
   finishedFiles: Record<string, FinishedFile>;
+  /** Everything sent to them over finished (or failed) downloads, repeats included; the running one is in `metrics` */
+  bytesSent: number;
   metrics: TransferMetrics | null;
   isPaused: boolean;
   error: string | null;
