@@ -74,14 +74,23 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 							{missingFiles.length === 1 ? '1 file needs' : `${missingFiles.length} files need`} adding again after
 							the reload. {restorableCount > 0 ? 'Restore them, or pick' : 'Pick'} or drop them and they fill back in.
 						</span>
-						{restorableCount > 0 && onRestoreFiles && (
-							<Button data-testid="restore-files"
-							        variant="secondary"
+						<span className="flex shrink-0 items-center gap-2">
+							{/* Missing files were never offered to anyone, so they go without asking */}
+							<Button data-testid="remove-missing"
+							        variant="danger"
 							        size="sm"
-							        onClick={onRestoreFiles}>
-								Restore
+							        onClick={() => onRemoveFiles(missingFiles.map((file) => file.id))}>
+								Remove
 							</Button>
-						)}
+							{restorableCount > 0 && onRestoreFiles && (
+								<Button data-testid="restore-files"
+								        variant="secondary"
+								        size="sm"
+								        onClick={onRestoreFiles}>
+									Restore
+								</Button>
+							)}
+						</span>
 					</span>
 				</Notice>
 			)}
