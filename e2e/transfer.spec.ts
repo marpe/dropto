@@ -58,14 +58,16 @@ test.describe('dropto.space Application End-to-End Tests', () => {
     await expect(page.getByTestId('room-code-form')).toHaveCount(0);
   });
 
-  test('uses the orange palette and DT- room codes', async ({ page, context }) => {
+  test('uses the blue palette and DT- room codes', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('/');
-    const brand500 = await page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue('--color-brand-500').trim()
-    );
-    expect(brand500).toBe('#f97316');
-    await addFile(page, 'brand.txt', 'orange');
+    const [brand500, blue500] = await page.evaluate(() => {
+      const style = getComputedStyle(document.documentElement);
+      return [style.getPropertyValue('--color-brand-500').trim(), style.getPropertyValue('--color-blue-500').trim()];
+    });
+    expect(brand500).not.toBe('');
+    expect(brand500).toBe(blue500);
+    await addFile(page, 'brand.txt', 'blue');
     expect(await shareFiles(page)).toMatch(/[?]room=DT-[A-Z0-9]{6}#/);
   });
 

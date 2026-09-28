@@ -33,7 +33,7 @@ export default defineConfig({
         name: 'dropto.space - 10GB P2P WebRTC Transfer',
         short_name: 'dropto.space',
         description: 'Direct browser-to-browser WebRTC file transfer supporting up to 10GB+ with zero memory bloat.',
-        theme_color: '#F97316',
+        theme_color: '#2B7FFF',
         background_color: '#121212',
         display: 'standalone',
         icons: [

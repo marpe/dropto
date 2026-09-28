@@ -79,7 +79,7 @@ Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/
 | Borders | `border-border-1` dividers · `border-2` panels · `border-3` inputs | A bare `border` already uses `border-2` |
 | Text | `text-text-1` headings → `text-text-5` faint captions; `text-text-on-accent` on `bg-brand-500` | |
 | Status | `text-text-danger-1`, `bg-surface-danger-1`, `border-border-danger-1`, `text-text-warning-1` | Tinted fills like `bg-red-500/10` read the same in both themes and are fine |
-| Brand accent | `brand-50` … `brand-950` | orange |
+| Brand accent | `brand-50` … `brand-950` | Tailwind `blue-*` (`--color-brand-N: var(--color-blue-N)`) |
 | File-type accents | `ctp-*` (Catppuccin) | Latte, Mocha under `.dark`; use `components/ui/FileTypeIcon` |
 | Micro-labels | `text-2xs` | the only size below `text-xs` |
 
@@ -89,7 +89,7 @@ Light and dark themes are **sets of CSS variables**, not `dark:` variants. `src/
 - **No arbitrary colour values** (`bg-[#3ECF8E]`). Colours that must be JS values (confetti palette, theme-color) live in `src/branding.ts`; SVG fills use `style={{ stopColor: 'var(--color-brand-500)' }}`.
 - **Never hardcode the brand.** The name, room-code prefix and brand colours come from `BRAND` (`src/branding.ts`) / `brand-*`.
 - **Nothing smaller than `text-xs`** except `text-2xs`. No `text-[Npx]`.
-- **Filled controls:** use `bg-accent hover:bg-accent-hover text-text-on-accent`, not `bg-brand-500`. The text colour comes from `contrast-color()` (black on orange). Don't use `text-white` there.
+- **Filled controls:** use `bg-accent hover:bg-accent-hover text-text-on-accent`, not `bg-brand-500`. The text colour comes from `contrast-color()` (white on blue). Don't use `text-white` there.
 - **Copy:** sentence case for headings and buttons ("Receive files", "Copy link"); no protocol jargon (P2P, peer, stream) in the UI.
 - **Motion:** new list rows and tiles enter with `starting:opacity-0 starting:translate-y-1`; buttons press (`active:scale`) rather than grow on hover.
 - **Motion:** use `motion-safe:` for scale, bounce or float. List transition properties (`transition-[transform,background-color]`, `transition-colors`), not `transition-all`.

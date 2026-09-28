@@ -24,11 +24,11 @@
   --color-text-5: #a1a1aa;
   /* Filled controls (primary buttons, selected segments) and their text. Without contrast-color() support
      the text colour is fixed; with it, the browser picks black or white (see the end of this file) */
-  --color-accent: #f97316;
-  --color-accent-hover: #ea580c;
+  --color-accent: var(--color-blue-600);
+  --color-accent-hover: var(--color-blue-700);
   /* A primary button's edge: one step lighter than its fill */
-  --color-border-accent-1: #fb923c;
-  --color-text-on-accent: #121212;
+  --color-border-accent-1: var(--color-blue-500);
+  --color-text-on-accent: #ffffff;
 
   --color-text-muted: color-mix(in oklab, currentColor, contrast-color(currentColor) 20%);
 
@@ -38,18 +38,18 @@
   --color-border-danger-1: #fecaca;
   --color-text-warning-1: #d97706;
 
-  /* Brand accent: orange */
-  --color-brand-50: #fff7ed;
-  --color-brand-100: #ffedd5;
-  --color-brand-200: #fed7aa;
-  --color-brand-300: #fdba74;
-  --color-brand-400: #fb923c;
-  --color-brand-500: #f97316;
-  --color-brand-600: #ea580c;
-  --color-brand-700: #c2410c;
-  --color-brand-800: #9a3412;
-  --color-brand-900: #7c2d12;
-  --color-brand-950: #431407;
+  /* Brand accent: Tailwind's blue */
+  --color-brand-50: var(--color-blue-50);
+  --color-brand-100: var(--color-blue-100);
+  --color-brand-200: var(--color-blue-200);
+  --color-brand-300: var(--color-blue-300);
+  --color-brand-400: var(--color-blue-400);
+  --color-brand-500: var(--color-blue-500);
+  --color-brand-600: var(--color-blue-600);
+  --color-brand-700: var(--color-blue-700);
+  --color-brand-800: var(--color-blue-800);
+  --color-brand-900: var(--color-blue-900);
+  --color-brand-950: var(--color-blue-950);
 
   /* Catppuccin accents for file-type icons: Latte here, Mocha in the dark theme */
   --color-ctp-red: #d20f39;

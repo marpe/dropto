@@ -62,7 +62,7 @@ The output will be generated in `dist/`. Since dropto.space is 100% static, you 
 
 ## 🎨 Branding
 
-The name, room-code prefix (`DT-`) and confetti palette live in `src/branding.ts`; the orange colour scale in `src/styles/tokens.css`; the static title, theme colour and favicon in `index.html`; the PWA manifest in `vite.config.ts`.
+The name, room-code prefix (`DT-`) and confetti palette live in `src/branding.ts`; the brand colour scale (Tailwind's blue) in `src/styles/tokens.css`; the static title, theme colour and favicon in `index.html`; the PWA manifest in `vite.config.ts`.
 
 If you edit the inline theme script in `index.html`, regenerate its hash in the `vercel.json` CSP (`src/test/csp.test.ts` fails until you do).
 

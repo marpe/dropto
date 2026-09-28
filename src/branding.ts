@@ -8,5 +8,5 @@ export const BRAND = {
   roomPrefix: 'DT',
   favicon: '/favicon.svg',
   /** Canvas confetti cannot read CSS variables, so its palette is listed explicitly */
-  confettiColors: ['#F97316', '#ea580c', '#fb923c', '#ffffff', '#fde047'],
+  confettiColors: ['#2b7fff', '#155dfc', '#51a2ff', '#ffffff', '#8ec5ff'],
 };

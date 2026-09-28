@@ -49,9 +49,9 @@ Invariants that tests rely on:
 
 ### Branding and styles
 
-One brand everywhere: dropto.space (orange, `DT-` room codes).
+One brand everywhere: dropto.space (Tailwind blue accent, `DT-` room codes).
 - `BRAND` in `src/branding.ts` holds what JS needs (name, room prefix, favicon, confetti palette). The static title, theme-color and favicon are in `index.html`, the PWA manifest in `vite.config.ts`.
-- Tailwind 4 (via `@tailwindcss/vite`; no config file). Stylesheets: `src/index.css` only imports `src/styles/` — `tokens.css` (colour tokens and themes), `base.css` (element defaults: cursors, focus ring, selection, scrollbars) and `scroll-fade.css` (the `scroll-fade` class: edge fades on scroll areas via scroll-state container queries). All colours are CSS-variable tokens in `tokens.css`: `@theme` holds the light theme and orange brand, `.dark` overrides the theme. Filled controls use `bg-accent` / `hover:bg-accent-hover` with `text-text-on-accent`, which `contrast-color()` picks (black on orange; fixed fallback without support), edged with `border-border-accent-1` (one step lighter; named `--color-{text,surface,border}-accent-N` like botbuilder). Use token classes (`bg-surface-1`, `text-text-4`, `brand-500`, …) rather than raw colours or `dark:` variants.
+- Tailwind 4 (via `@tailwindcss/vite`; no config file). Stylesheets: `src/index.css` only imports `src/styles/` — `tokens.css` (colour tokens and themes), `base.css` (element defaults: cursors, focus ring, selection, scrollbars) and `scroll-fade.css` (the `scroll-fade` class: edge fades on scroll areas via scroll-state container queries). All colours are CSS-variable tokens in `tokens.css`: `@theme` holds the light theme and the brand scale (`brand-*` = Tailwind's `blue-*`), `.dark` overrides the theme. Filled controls use `bg-accent` / `hover:bg-accent-hover` with `text-text-on-accent`, which `contrast-color()` picks (white on blue-600; fixed fallback without support), edged with `border-border-accent-1` (one step lighter; named `--color-{text,surface,border}-accent-N` like botbuilder). Use token classes (`bg-surface-1`, `text-text-4`, `brand-500`, …) rather than raw colours or `dark:` variants.
 - **If you edit the inline script in `index.html`, update its `sha256-` hash in the `vercel.json` CSP** (it's currently Report-Only). `src/test/csp.test.ts` fails until you do.
 
 ## Conventions
