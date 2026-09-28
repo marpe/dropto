@@ -9,6 +9,7 @@ import { Notice } from './ui/Notice';
 import { Screen } from './ui/Screen';
 import type { TransferFile } from '../types/transfer';
 import type { SenderSession } from '../hooks/useSenderSession';
+import { isAnyoneBrowsing } from '../hooks/senderState';
 import { buildShareUrl } from '../utils/shareLink';
 import { displayPath } from '../utils/filePath';
 import { FileDropZone } from './FileDropZone';
@@ -16,7 +17,7 @@ import { FileQueue } from './FileQueue';
 import { CopyLinkButton } from './CopyLinkButton';
 import { ReceiverList } from './ReceiverList';
 import { WaitingForPeopleCard } from './WaitingForPeopleCard';
-import { BottomBar } from './ui/BottomBar.tsx';
+import { BottomBar } from './ui/BottomBar';
 
 interface SenderViewProps {
   session: SenderSession;
@@ -49,8 +50,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
 
   const shareUrl = roomCode && shareKey ? buildShareUrl(window.location.href, roomCode, shareKey) : '';
   const isAwaitingReceiver = status === 'awaiting_receiver';
-  // Someone connected and not downloading may be choosing from this list, so removing things changes what they see
-  const isSomeoneChoosing = receivers.some((receiver) => receiver.idleSinceMs !== null);
+  const isSomeoneChoosing = isAnyoneBrowsing(receivers);
   // Link holders are let in once there are shared files; until then they are listed with what they wait for
   const waitingFor = files.length === 0 ? 'Waiting for files' : 'Joins when you share';
   const hasRoomError = !roomCode && !!state.roomError;

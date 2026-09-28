@@ -110,7 +110,7 @@ export const LinkBar: React.FC<LinkBarProps> = ({
       {openDialog === 'settings' && (
         <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} onClose={close} />
       )}
-      {openDialog === 'qr' && <QrModal onClose={close} roomCode={roomCode} url={shareUrl} />}
+      {openDialog === 'qr' && <QrModal onClose={close} url={shareUrl} />}
       {openDialog === 'stop' && (
         <ConfirmDialog
           title="Stop sharing?"

@@ -25,23 +25,33 @@ describe('describeLeaveCost', () => {
   });
 
   it('warns that a shared link stops working', () => {
-    expect(describeLeaveCost({ ...sending, isShared: true, receivers: [receiver('completed')] })).toMatch(/link stops working/i);
+    expect(describeLeaveCost({ ...sending, isShared: true, receivers: [receiver('completed')] })?.body).toMatch(/link stops working/i);
+  });
+
+  it('counts someone still connected after finishing, but not those who left', () => {
+    const done = receiver('completed');
+    const gone = { ...receiver('completed'), peerId: 'gone', hasLeft: true };
+
+    expect(describeLeaveCost({ ...sending, isShared: true, receivers: [done, gone] })?.body).toMatch(/^someone is connected/i);
   });
 
   it('counts the people whose downloads stop', () => {
     const cost = describeLeaveCost({ ...sending, isShared: true, receivers: [receiver('transferring'), receiver('queued')] });
 
-    expect(cost).toMatch(/2 people/i);
+    expect(cost?.body).toMatch(/2 people/i);
+    expect(cost?.title).toBe('Stop sharing?');
   });
 
   it('warns a receiver that their download stops', () => {
-    expect(describeLeaveCost({ mode: 'receive', receiverStatus: 'transferring', isShared: false, receivers: [] })).toMatch(
-      /download stops/i
-    );
+    expect(describeLeaveCost({ mode: 'receive', receiverStatus: 'transferring', isShared: false, receivers: [] })).toEqual({
+      title: 'Stop download?',
+      body: 'Your download stops.',
+      confirmLabel: 'Stop',
+    });
   });
 
   it('warns a connected receiver that they disconnect', () => {
-    expect(describeLeaveCost({ mode: 'receive', receiverStatus: 'connected', isShared: false, receivers: [] })).toMatch(
+    expect(describeLeaveCost({ mode: 'receive', receiverStatus: 'connected', isShared: false, receivers: [] })?.title).toMatch(
       /disconnect/i
     );
   });

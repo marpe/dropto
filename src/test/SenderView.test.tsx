@@ -249,10 +249,9 @@ describe('SenderView', () => {
       }),
     });
 
-    // The system leads, with its logo; the browser follows on the detail line
-    expect(screen.getByRole('img', { name: 'Linux' })).toBeDefined();
-    expect(screen.getByRole('img', { name: 'Firefox' })).toBeDefined();
-    expect(screen.getByText(/198.51.100.4 · Time zone: Oslo/)).toBeDefined();
+    // The system leads; the browser follows on the detail line
+    expect(screen.getByText('Linux')).toBeDefined();
+    expect(screen.getByText(/Firefox · 198.51.100.4 · Time zone: Oslo/)).toBeDefined();
   });
 
   it('marks queued files with an icon for their type', () => {
@@ -499,9 +498,8 @@ describe('SenderView', () => {
       });
 
       const row = screen.getByTestId('receiver-row');
-      expect(within(row).getByRole('img', { name: 'Android' })).toBeDefined();
-      expect(within(row).getByRole('img', { name: 'Chrome' })).toBeDefined();
-      expect(within(row).getByText(/203.0.113.7 · Time zone: Stockholm/)).toBeDefined();
+      expect(within(row).getByText('Android')).toBeDefined();
+      expect(within(row).getByText(/Chrome · 203.0.113.7 · Time zone: Stockholm/)).toBeDefined();
     });
 
     it('removes people who left from the list without asking', () => {

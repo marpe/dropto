@@ -287,3 +287,13 @@ export function selectSenderStatus(state: SenderSessionState): SenderStatus {
 export function countActiveReceivers(receivers: SenderReceiver[]): number {
   return receivers.filter((receiver) => receiver.stage === 'choosing' || receiver.stage === 'transferring').length;
 }
+
+/** Everyone still on the link, whatever they are doing: those who left or failed are only listed. */
+export function countConnectedReceivers(receivers: SenderReceiver[]): number {
+  return receivers.filter((receiver) => !receiver.hasLeft && receiver.stage !== 'failed').length;
+}
+
+/** Someone connected and not downloading may be looking at the file list, so changing it changes what they see. */
+export function isAnyoneBrowsing(receivers: SenderReceiver[]): boolean {
+  return receivers.some((receiver) => receiver.idleSinceMs !== null);
+}

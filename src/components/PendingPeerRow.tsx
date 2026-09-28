@@ -26,7 +26,7 @@ export const PendingPeerRow: React.FC<PendingPeerRowProps> = ({ peer, waitingFor
     <PeerIdentity
       details={peer.details}
       presence="waiting"
-      status={peer.isTrusted && <span className="shrink-0 text-xs text-text-4">{waitingFor}</span>}
+      status={peer.isTrusted && waitingFor}
     />
     {!peer.isTrusted && (
       <div className="flex shrink-0 items-center gap-1">
