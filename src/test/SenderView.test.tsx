@@ -159,10 +159,27 @@ describe('SenderView', () => {
     expect(writeText).toHaveBeenCalledTimes(1);
   });
 
-  it('offers Copy link even before any files are added', () => {
+  it('hides Copy link until there is a file to share', () => {
     renderSenderView();
 
-    expect((screen.getByTestId('copy-link') as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId('copy-link')).toBeNull();
+  });
+
+  it('hides Copy link while the list only holds files to add again after a reload', () => {
+    const missing = { id: 'm1', name: 'holiday.jpg', size: 4096, type: 'image/jpeg', lastModified: 1 };
+    renderSenderView({ state: { isShared: true, missingFiles: [missing] } });
+
+    expect(screen.queryByTestId('copy-link')).toBeNull();
+  });
+
+  it('places Copy link right after the file list, before the connections', () => {
+    renderSenderView({ state: shared({ receivers: [makeReceiver()] }) });
+
+    const copyLink = screen.getByTestId('copy-link');
+    const fileList = screen.getByTestId('file-row');
+    const connections = screen.getByTestId('receiver-row');
+    expect(fileList.compareDocumentPosition(copyLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(copyLink.compareDocumentPosition(connections) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('lists each file with its size and, where there is room, when it was last modified', () => {

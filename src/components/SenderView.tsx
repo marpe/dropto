@@ -138,6 +138,21 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         />
       )}
 
+      {/* Pinned on phones; on desktop it sits under the files. Nothing to share, no link to hand out */}
+      {files.length > 0 && (
+        <BottomBar>
+          <CopyLinkButton
+            shareUrl={shareUrl}
+            hasFailed={hasRoomError}
+            onBeforeCopy={() => {
+              if (!isShared) {
+                actions.createLink();
+              }
+            }}
+          />
+        </BottomBar>
+      )}
+
       {/* Whoever is connected is listed, from the moment they arrive (even on an empty page after a reload) */}
       {receivers.length > 0 || pendingPeers.length > 0 ? (
         <>
@@ -170,18 +185,6 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
           </Notice>
         </Inset>
       )}
-
-      <BottomBar>
-        <CopyLinkButton
-          shareUrl={shareUrl}
-          hasFailed={hasRoomError}
-          onBeforeCopy={() => {
-            if (!isShared) {
-              actions.createLink();
-            }
-          }}
-        />
-      </BottomBar>
 
       {isLanding && onSwitchToReceive && (
         <Inset className="text-center">
