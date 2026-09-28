@@ -4,7 +4,7 @@ import { RotateCcw, Trash2, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { IconButton } from './ui/IconButton';
-import { LinkButton } from './ui/LinkButton';
+import { Checkbox } from './ui/Checkbox';
 import { Notice } from './ui/Notice';
 import { FilePickerButtons } from './FilePickerButtons';
 import { FileTable, FileTableRow } from './FileTable';
@@ -87,16 +87,20 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 			)}
 			<FileTable files={allFiles}
 			           hasLead={canTick}
+			           headerLead={
+				           <Checkbox aria-label="Select all"
+				                     checked={isAllTicked}
+				                     isIndeterminate={ticked.length > 0 && !isAllTicked}
+				                     onChange={() => setTickedIds(isAllTicked ? new Set() : new Set(allFiles.map((file) => file.id)))} />
+			           }
 			           trailClassName="w-9"
 			           renderRow={(file) => (
 				           <FileTableRow key={file.id}
 				                         file={file}
 				                         isLabel={canTick}
 				                         lead={canTick && (
-					                         <input type="checkbox"
-					                                checked={tickedIds.has(file.id)}
-					                                onChange={() => toggle(file.id)}
-					                                className="w-4 h-4 shrink-0 accent-brand-500" />
+					                         <Checkbox checked={tickedIds.has(file.id)}
+					                                   onChange={() => toggle(file.id)} />
 				                         )}
 				                         data-missing={missingIds.has(file.id) || undefined}
 				                         title={missingIds.has(file.id) ? 'Add this file again' : undefined}
@@ -115,15 +119,9 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 			<div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1 sm:rounded-xl">
 				{ticked.length > 0 ? (
 					<>
-						<span className="flex items-center gap-3 text-xs">
-							<span data-testid="ticked-count"
-							      className="font-semibold text-text-3 tabular-nums">
-								{ticked.length} selected
-							</span>
-							<LinkButton onClick={() => setTickedIds(isAllTicked ? new Set() : new Set(allFiles.map((file) => file.id)))}
-							            className="text-xs">
-								{isAllTicked ? 'Select none' : 'Select all'}
-							</LinkButton>
+						<span data-testid="ticked-count"
+						      className="text-xs font-semibold text-text-3 tabular-nums">
+							{ticked.length} selected
 						</span>
 						<div className="flex items-center gap-2">
 							<Button variant="ghost"

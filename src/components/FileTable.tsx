@@ -5,10 +5,10 @@ import { FileProgressCell } from './FileProgressCell';
 import type { ManifestFile } from '../types/transfer';
 import type { FileProgress } from '../utils/transferProgress';
 import { formatBytes, formatModified } from '../utils/format';
-import { displayPath } from '../utils/filePath';
+import { displayPath, fileExtension } from '../utils/filePath';
 import { cn } from '../utils/cn';
 
-type SortKey = 'name' | 'size' | 'modified';
+type SortKey = 'name' | 'type' | 'size' | 'modified';
 
 interface Sort {
   key: SortKey;
@@ -17,6 +17,7 @@ interface Sort {
 
 const COMPARE: Record<SortKey, (a: ManifestFile, b: ManifestFile) => number> = {
   name: (a, b) => displayPath(a).localeCompare(displayPath(b), undefined, { numeric: true, sensitivity: 'base' }),
+  type: (a, b) => fileExtension(a.name).localeCompare(fileExtension(b.name)),
   size: (a, b) => a.size - b.size,
   modified: (a, b) => (a.lastModified ?? 0) - (b.lastModified ?? 0),
 };
@@ -49,12 +50,13 @@ interface Columns {
   trailClassName?: string;
 }
 
-// Header and rows render the same fixed-width cells, so the columns line up; "Modified" only when the table is wide enough
+// Header and rows render the same fixed-width cells, so the columns line up; "Type" and "Modified" only when the table is wide enough
 const ColumnsContext = createContext<Columns>({ hasLead: false });
 
 const CELL = {
   lead: 'flex shrink-0 w-4',
   name: 'flex-1 min-w-0 truncate',
+  type: 'hidden @sm:block shrink-0 w-12 truncate uppercase',
   size: 'shrink-0 w-18 text-right tabular-nums',
   modified: 'hidden @md:block shrink-0 w-26 text-right tabular-nums',
   trail: 'flex shrink-0 items-center justify-end gap-3',
@@ -132,6 +134,7 @@ export const FileTableRow: React.FC<FileTableRowProps> = ({
         >
           {displayPath(file)}
         </span>
+        <span className={cn(CELL.type, 'text-text-5')}>{fileExtension(file.name)}</span>
         <span className={cn(CELL.size, 'text-text-4')}>{formatBytes(file.size)}</span>
         <span data-testid="file-modified" className={cn(CELL.modified, 'text-text-5')}>
           {formatModified(file.lastModified)}
@@ -150,6 +153,8 @@ interface FileTableProps<F extends ManifestFile> {
   files: readonly F[];
   /** A column before the icon, for each row's `lead` */
   hasLead?: boolean;
+  /** The lead column's header, e.g. a checkbox that ticks every row */
+  headerLead?: React.ReactNode;
   /** Width of a column after the sizes, for each row's `trail`; none when omitted */
   trailClassName?: string;
   /** A `FileTableRow`, keyed; `index` is the file's position in `files`, whatever order it is shown in */
@@ -157,11 +162,12 @@ interface FileTableProps<F extends ManifestFile> {
   className?: string;
 }
 
-/** A file list with sortable Name, Size and Modified columns, and optional columns before and after them. */
+/** A file list with sortable Name, Type, Size and Modified columns, and optional columns before and after them. */
 export function FileTable<F extends ManifestFile>({
   files,
   renderRow,
   hasLead = false,
+  headerLead,
   trailClassName,
   className,
 }: FileTableProps<F>) {
@@ -172,9 +178,10 @@ export function FileTable<F extends ManifestFile>({
     <ColumnsContext.Provider value={{ hasLead, trailClassName }}>
       <div className={cn('@container', className)}>
         <div className={cn(ROW, 'pb-1 border-b border-border-1 text-2xs font-semibold text-text-5')}>
-          {hasLead && <span className={CELL.lead} />}
+          {hasLead && <span className={CELL.lead}>{headerLead}</span>}
           <span className="w-4 shrink-0" />
           <SortHeader label="Name" sortKey="name" sort={sort} onSort={onSort} className={CELL.name} />
+          <SortHeader label="Type" sortKey="type" sort={sort} onSort={onSort} className={cn(CELL.type, '@sm:inline-flex')} />
           <SortHeader label="Size" sortKey="size" sort={sort} onSort={onSort} className={cn(CELL.size, 'justify-end')} />
           <SortHeader
             label="Modified"

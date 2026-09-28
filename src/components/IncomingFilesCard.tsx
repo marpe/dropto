@@ -4,7 +4,7 @@ import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { Card } from './ui/Card';
 import { BottomBar } from './ui/BottomBar';
-import { LinkButton } from './ui/LinkButton';
+import { Checkbox } from './ui/Checkbox';
 import { Notice } from './ui/Notice';
 import { FILE_PROGRESS_COLUMN } from './FileProgressCell';
 import { FileTable, FileTableRow } from './FileTable';
@@ -48,7 +48,7 @@ const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, i
     className={cn(isDimmed && 'opacity-50')}
     lead={
       isSelectable && (
-        <input type="checkbox" checked={isSelected} onChange={onToggle} className="w-4 h-4 shrink-0 accent-brand-500" />
+        <Checkbox checked={isSelected} onChange={onToggle} />
       )
     }
   />
@@ -103,6 +103,14 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({
       <FileTable
         files={manifest.files}
         hasLead={isSelectable}
+        headerLead={
+          <Checkbox
+            aria-label="Select all"
+            checked={isEverythingSelected}
+            isIndeterminate={selectedIndices.length > 0 && !isEverythingSelected}
+            onChange={() => setExcludedIds(isEverythingSelected ? new Set(manifest.files.map((file) => file.id)) : new Set())}
+          />
+        }
         trailClassName={progress.some(Boolean) ? FILE_PROGRESS_COLUMN : undefined}
         renderRow={(file, index) => (
           <IncomingFileRow
@@ -118,17 +126,9 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({
         )}
       />
 
-      {/* Like the sender's list: totals under it, with the list's own controls on the right */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1">
+      {/* Like the sender's list: totals under it */}
+      <div className="pt-3 border-t border-border-1">
         <FileTotals count={selectedIndices.length} ofCount={manifest.files.length} totalBytes={selectedBytes} />
-        {isSelectable && (
-          <LinkButton
-            onClick={() => setExcludedIds(isEverythingSelected ? new Set(manifest.files.map((file) => file.id)) : new Set())}
-            className="text-xs shrink-0"
-          >
-            {isEverythingSelected ? 'Select none' : 'Select all'}
-          </LinkButton>
-        )}
       </div>
 
       {hasSenderLeft && (

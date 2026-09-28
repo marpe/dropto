@@ -377,6 +377,22 @@ describe('SenderView', () => {
       expect(actions.removeFiles).toHaveBeenCalledWith(['f1', 'f2']);
     });
 
+    it('ticks and unticks every file from the box in the header', () => {
+      renderSenderView({ state: { files: [queuedFile, second] } });
+      const selectAll = screen.getByRole('checkbox', { name: 'Select all' }) as HTMLInputElement;
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /report.pdf/ }));
+      // Some ticked: the header box shows it is partly on
+      expect(selectAll.indeterminate).toBe(true);
+
+      fireEvent.click(selectAll);
+      expect(screen.getByTestId('ticked-count').textContent).toBe('2 selected');
+      expect(selectAll.indeterminate).toBe(false);
+
+      fireEvent.click(selectAll);
+      expect(screen.queryByTestId('ticked-count')).toBeNull();
+    });
+
     it('offers no ticking with a single file', () => {
       renderSenderView({ state: { files: [queuedFile] } });
 
