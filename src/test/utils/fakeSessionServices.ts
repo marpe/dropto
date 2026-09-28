@@ -71,6 +71,7 @@ export function createFakeServices() {
     },
     readAddress: async () => null,
     effects,
+    fileHandles: null,
   };
   return { services, connections, engines, effects };
 }

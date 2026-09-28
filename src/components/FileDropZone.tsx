@@ -2,9 +2,10 @@ import React from 'react';
 import type { RefObject } from 'react';
 import { UploadCloud } from 'lucide-react';
 import { FilePickerButtons } from './FilePickerButtons';
+import type { AddFiles } from '../types/transfer';
 
 interface FileDropZoneProps {
-  onAddFiles: (files: File[]) => void;
+  onAddFiles: AddFiles;
   /** Lets other controls (e.g. the approval dialog) open the file picker */
   fileInputRef: RefObject<HTMLInputElement | null>;
 }

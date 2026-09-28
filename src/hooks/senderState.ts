@@ -1,6 +1,7 @@
 import type { ManifestFile, SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
 import type { PeerDetails, PendingPeer, ReceiverStage, SenderReceiver, SharingOptions } from '../types/sharing';
 import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
+import { fileIdentity } from '../utils/fileMemory';
 import { pickFiles } from '../utils/fileSelection';
 import { finishedFilesOf } from '../utils/transferProgress';
 
@@ -125,6 +126,32 @@ function resumeReceiver(state: SenderSessionState, fromPeerId: string, peerId: s
   }));
 }
 
+/**
+ * Adds files not already listed (the same file picked twice counts once). A file listed before a reload takes
+ * its old id back and leaves the missing list, so receivers' records of it still match.
+ */
+function addFiles(state: SenderSessionState, incoming: TransferFile[]): SenderSessionState {
+  const known = new Set(state.files.map(fileIdentity));
+  const missingIds = new Map(state.missingFiles.map((file) => [fileIdentity(file), file.id]));
+  const added = incoming.flatMap((file) => {
+    const identity = fileIdentity(file);
+    if (known.has(identity)) {
+      return [];
+    }
+    known.add(identity);
+    return [{ ...file, id: missingIds.get(identity) ?? file.id }];
+  });
+  if (added.length === 0) {
+    return state;
+  }
+  const restored = new Set(added.map((file) => file.id));
+  return {
+    ...state,
+    files: [...state.files, ...added],
+    missingFiles: state.missingFiles.filter((file) => !restored.has(file.id)),
+  };
+}
+
 // Leaving the room forgets everyone in it; the next room starts counting again
 const emptyRoom: Pick<SenderSessionState, 'pendingPeers' | 'receivers'> = { pendingPeers: [], receivers: [] };
 
@@ -141,15 +168,8 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
       return { ...state, ...emptyRoom, roomCode: '', shareKey: '', roomError: null, isShared: false };
     case 'LOCKED_DOWN':
       return { ...state, options: { ...state.options, requireApproval: true }, roomNotice: action.notice };
-    case 'FILES_ADDED': {
-      // Files added again after a reload (with their old ids) leave the missing list
-      const added = new Set(action.files.map((file) => file.id));
-      return {
-        ...state,
-        files: [...state.files, ...action.files],
-        missingFiles: state.missingFiles.filter((file) => !added.has(file.id)),
-      };
-    }
+    case 'FILES_ADDED':
+      return addFiles(state, action.files);
     case 'FILE_REMOVED':
       return {
         ...state,

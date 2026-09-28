@@ -9,6 +9,19 @@ export interface TransferFile {
   rawFile: File;
 }
 
+/**
+ * A file being added to the sender's list, with what is known about where it came from: its path inside a
+ * picked or dropped folder, and (Chromium) a handle that can read it again after a reload.
+ */
+export interface IncomingFile {
+  file: File;
+  relativePath?: string;
+  handle?: FileSystemFileHandle;
+}
+
+/** Adds files picked, dropped or pasted to the sender's list */
+export type AddFiles = (files: (File | IncomingFile)[]) => void;
+
 /** What the receiver learns about each file (no file contents). */
 export type ManifestFile = Omit<TransferFile, 'rawFile'>;
 
