@@ -19,10 +19,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
     className="group text-center bg-surface-1 border-y border-border-1 px-4 py-10 sm:my-5 sm:py-10 sm:border-2 sm:border-dashed sm:border-border-2 sm:rounded-xl sm:hover:border-brand-500/60 sm:transition-colors"
   >
     <UploadCloud className="mx-auto mb-3 w-10 h-10 text-brand-500" strokeWidth={1.5} />
-    <h2 className="text-lg sm:text-base font-semibold text-text-1 mb-1">
-      <span>No-fuss P2P File Sharing</span>
-    </h2>
-    <p className="text-xs text-text-4 mb-6">Resumable transfer of any number of files without any size limits</p>
+    <h2 className="text-lg sm:text-base font-semibold text-text-1 mb-6">Drop files to send</h2>
     <div className="flex flex-wrap items-center justify-center gap-3">
       <FilePickerButtons onAddFiles={onAddFiles} fileInputRef={fileInputRef} />
     </div>

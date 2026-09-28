@@ -7,6 +7,7 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { LinkButton } from './ui/LinkButton';
 import { Notice } from './ui/Notice';
 import { Screen } from './ui/Screen';
+import { SectionLabel } from './ui/SectionLabel';
 import type { TransferFile } from '../types/transfer';
 import type { SenderSession } from '../hooks/useSenderSession';
 import { isAnyoneBrowsing } from '../hooks/senderState';
@@ -140,7 +141,9 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       {/* Whoever is connected is listed, from the moment they arrive (even on an empty page after a reload) */}
       {receivers.length > 0 || pendingPeers.length > 0 ? (
         <>
-          <div className="uppercase text-xs font-bold text-text-muted">Connections</div>
+          <Inset className="pt-2 sm:pb-0">
+            <SectionLabel as="h2">Connections</SectionLabel>
+          </Inset>
           <Card padding="sm">
             <ReceiverList
               requests={pendingPeers}
@@ -160,15 +163,18 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
 
       {/* The link bar (settings, QR code, stop sharing) is hidden for now; copying the link is the way to share */}
       {state.roomNotice && (
-        <Notice tone="warning"
-                icon={ShieldAlert}>
-          {state.roomNotice}
-        </Notice>
+        <Inset>
+          <Notice tone="warning"
+                  icon={ShieldAlert}>
+            {state.roomNotice}
+          </Notice>
+        </Inset>
       )}
 
       <BottomBar>
         <CopyLinkButton
           shareUrl={shareUrl}
+          hasFailed={hasRoomError}
           onBeforeCopy={() => {
             if (!isShared) {
               actions.createLink();

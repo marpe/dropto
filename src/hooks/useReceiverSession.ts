@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
-import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
 import { parseShareUrl } from '../utils/shareLink';
 import { introduceThisDevice } from '../utils/deviceInfo';
@@ -187,7 +186,7 @@ export function useReceiverSession({
           { shareKey, introduction }
         );
         engineRef.current = engine;
-        soundService.playConnect();
+        services.effects.onPeerConnected();
         dispatch({ type: 'CONNECTED', isInvited: shareKey !== null });
       } catch (err) {
         if (connectionRef.current !== connection) {

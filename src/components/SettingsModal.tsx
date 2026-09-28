@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { ChevronDown, Server, Settings, Volume2, Plus, Radio, Palette, Monitor, Sun, Moon, Info, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Checkbox } from './ui/Checkbox';
 import { Modal } from './ui/Modal';
+import { SectionLabel } from './ui/SectionLabel';
 import { TextInput } from './ui/TextInput';
 import { ToggleRow } from './ui/ToggleRow';
 import { SegmentedControl } from './ui/SegmentedControl';
@@ -60,9 +62,9 @@ interface SettingsSectionProps {
 
 const SettingsSection: React.FC<SettingsSectionProps> = ({ icon: Icon, title, children }) => (
   <section className="space-y-3">
-    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-5 flex items-center gap-1.5">
-      <Icon className="w-3.5 h-3.5 text-brand-500" /> {title}
-    </h4>
+    <SectionLabel as="h4" icon={Icon}>
+      {title}
+    </SectionLabel>
     {children}
   </section>
 );
@@ -193,11 +195,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </LabeledField>
                   </div>
                   <label className="flex items-center gap-2 pt-1 cursor-pointer">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={form.signalingSecure}
                       onChange={(e) => update({ signalingSecure: e.target.checked })}
-                      className="rounded-sm accent-brand-500"
                     />
                     <span className="text-text-3">Secure (SSL/WSS)</span>
                   </label>

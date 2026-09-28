@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { SectionLabel } from './ui/SectionLabel';
 import { TextInput } from './ui/TextInput';
 import { getActiveBrand } from '../branding';
 
@@ -35,7 +36,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
-          <span className="block text-xs font-semibold uppercase tracking-wider text-text-5 mb-1.5">Room code</span>
+          <SectionLabel className="mb-1.5">Room code</SectionLabel>
           <TextInput
             size="lg"
             autoComplete="off"

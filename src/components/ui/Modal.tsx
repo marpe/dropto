@@ -171,7 +171,7 @@ export const Modal: React.FC<ModalProps> = ({
         )}
       </header>}
 
-      {!Icon && !title &&  onClose && (
+      {!Icon && !title && onClose && (
         <IconButton title="Close" size="sm" onClick={() => close()} className="absolute right-0 top-0">
           <X className="w-5 h-5" />
         </IconButton>

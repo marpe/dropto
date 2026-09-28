@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 
-type CardPadding = 'sm' | 'md' | 'lg';
+type CardPadding = 'sm' | 'lg';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   padding?: CardPadding;
@@ -9,7 +9,6 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const paddingClasses: Record<CardPadding, string> = {
   sm: 'p-4 sm:p-5',
-  md: 'p-4 sm:p-5',
   lg: 'px-4 py-6 sm:p-6',
 };
 

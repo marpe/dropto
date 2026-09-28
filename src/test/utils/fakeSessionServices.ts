@@ -52,7 +52,7 @@ export function sentMessages(conn: DataConnection): { type: string; payload?: Re
 export function createFakeServices() {
   const connections: FakeConnection[] = [];
   const engines: FakeTransfer[] = [];
-  const effects = { onTransferRequested: vi.fn(), onTransferStarted: vi.fn(), onTransferEnded: vi.fn() };
+  const effects = { onPeerConnected: vi.fn(), onTransferRequested: vi.fn(), onTransferStarted: vi.fn(), onTransferEnded: vi.fn() };
   const services: SessionServices = {
     createConnection: (handlers) => {
       const connection = new FakeConnection(handlers);
