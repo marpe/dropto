@@ -60,6 +60,8 @@ export function useReceiverSession({
   // From a download being cut off until it carries on or cannot; reconnecting keeps it (and device effects) going
   const isInterruptedRef = useRef(false);
   const pinRef = useRef(state.pin);
+  // Files that failed their check earlier in the running download, before a cut it carried on from
+  const corruptedFilesRef = useRef(state.corruptedFiles);
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -68,6 +70,10 @@ export function useReceiverSession({
   useEffect(() => {
     pinRef.current = state.pin;
   }, [state.pin]);
+
+  useEffect(() => {
+    corruptedFilesRef.current = state.corruptedFiles;
+  }, [state.corruptedFiles]);
 
   /** Gives up on carrying on a cut-off download, closing its half-written file. */
   const dropResume = useCallback(() => {
@@ -224,7 +230,7 @@ export function useReceiverSession({
             onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
             onAllCompleted: ifCurrent((result) => {
               // Still connected: the user may download more, or the same files again
-              endRun(true);
+              endRun(result.corruptedFiles.length === 0 && corruptedFilesRef.current.length === 0);
               hasStartedSavingRef.current = false;
               dispatch({ type: 'COMPLETED', result });
             }),
