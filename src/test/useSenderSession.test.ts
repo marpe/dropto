@@ -15,6 +15,7 @@ import {
   FakeConnection,
   sentMessages,
 } from './utils/fakeSessionServices';
+import type { FakeTransfer } from './utils/fakeSessionServices';
 
 // A receiver that typed the room code in, rather than opening the sender's link
 const typedCode = { shareKey: null };
@@ -986,6 +987,80 @@ describe('useSenderSession', () => {
           session.engines[1].events.onReceiverStarted?.([0], 64 * 1024);
         });
         expect(stages(session)).toEqual(['transferring']);
+      });
+
+      /** p1 cut off holding the only slot, p2 waiting in line behind them, and p1's tab back on a new connection. */
+      async function cutOffAndBack() {
+        const session = await shareWithLimit(1);
+        const first = connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        connectPeer(session, 'p2', linkGreeting(session));
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+        Object.assign(first, { open: false });
+        startDownloading(session, 1);
+        const again = connectPeer(session, 'p1-again', fromTab(session, tab));
+        expect(stages(session)).toEqual(['choosing', 'queued']);
+        return { session, again };
+      }
+
+      /** p1's tab back once more, carrying on its download. */
+      function backAgainAndCarryOn(session: Session) {
+        connectPeer(session, 'p1-third', fromTab(session, tab));
+        const engine = session.engines.at(-1)!;
+        act(() => {
+          engine.events.onReceiverStarted?.([0], 64 * 1024);
+        });
+        return engine;
+      }
+
+      it.each([
+        ['leaves', (engine: FakeTransfer) => engine.events.onPeerLeft?.()],
+        ['fails', (engine: FakeTransfer) => engine.events.onError?.('Connection to peer lost')],
+      ])('keeps the slot when they drop again before carrying on (the new connection %s)', async (_, drop) => {
+        const { session, again } = await cutOffAndBack();
+
+        Object.assign(again, { open: false });
+        act(() => {
+          drop(session.engines[2]);
+        });
+
+        expect(session.result.current.state.receivers.map((receiver) => receiver.peerId)).toEqual(['p1-again', 'p2']);
+        expect(stages(session)).toEqual(['interrupted', 'queued']);
+        expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
+
+        const engine = backAgainAndCarryOn(session);
+
+        expect(stages(session)).toEqual(['transferring', 'queued']);
+        expect(engine.holdUntil).not.toHaveBeenCalled();
+      });
+
+      it('gives up the kept slot when the connection back to carry on fails while still open', async () => {
+        const { session, again } = await cutOffAndBack();
+
+        act(() => {
+          session.engines[2].events.onError?.('Received an invalid message from the peer');
+        });
+        expect(stages(session)).toEqual(['failed', 'transferring']);
+        // Closed by the sender
+        Object.assign(again, { open: false });
+
+        const engine = backAgainAndCarryOn(session);
+
+        expect(stages(session)).toEqual(['queued', 'transferring']);
+        expect(engine.holdUntil).toHaveBeenCalledTimes(1);
+      });
+
+      it('keeps the slot when a connection back to carry on is replaced before its drop was noticed', async () => {
+        const { session, again } = await cutOffAndBack();
+        Object.assign(again, { open: false });
+
+        const engine = backAgainAndCarryOn(session);
+
+        expect(stages(session)).toEqual(['transferring', 'queued']);
+        expect(engine.holdUntil).not.toHaveBeenCalled();
+        expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
       });
 
       it('stops someone while they reconnect, freeing their slot', async () => {

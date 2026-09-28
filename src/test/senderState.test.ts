@@ -53,6 +53,23 @@ describe('senderReducer: a download cut off by a dropped connection', () => {
     expect(state.receivers[0].bytesSent).toBe(150);
   });
 
+  it('does not count the same bytes again when they come back and drop before carrying on', () => {
+    let state = senderReducer(downloading(), { type: 'RECEIVER_INTERRUPTED', peerId: 'p1', finishedCount: 1, corruptedFiles: [] });
+    state = senderReducer(state, { type: 'RECEIVER_RESUMED', fromPeerId: 'p1', peerId: 'p1-again' });
+    state = senderReducer(state, {
+      type: 'RECEIVER_ADMITTED',
+      peerId: 'p1-again',
+      details: { device: null, timeZone: null, ip: null },
+      atMs: 1,
+    });
+    state = senderReducer(state, { type: 'RECEIVER_INTERRUPTED', peerId: 'p1-again', finishedCount: 0, corruptedFiles: [] });
+
+    const [receiver] = state.receivers;
+    expect(receiver.stage).toBe('interrupted');
+    expect(receiver.bytesSent).toBe(150);
+    expect(receiver.sentFiles.map((sent) => sent.id)).toEqual(['a']);
+  });
+
   it('counts a download carried on from partway only for what it sent', () => {
     let state = senderReducer(downloading(), { type: 'RECEIVER_INTERRUPTED', peerId: 'p1', finishedCount: 1, corruptedFiles: [] });
     state = senderReducer(state, { type: 'RECEIVER_STARTED', peerId: 'p1', fileIndices: [1], startBytes: 50 });
