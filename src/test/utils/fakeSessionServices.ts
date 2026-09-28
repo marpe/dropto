@@ -31,6 +31,7 @@ export class FakeTransfer {
   public submitPin = vi.fn();
   public togglePause = vi.fn().mockReturnValue(true);
   public cancel = vi.fn();
+  public interrupt = vi.fn().mockReturnValue(null);
 
   constructor(conn: DataConnection, events: SenderEvents | ReceiverEvents, options: ReceiverOptions = {}) {
     this.conn = conn;

@@ -14,9 +14,9 @@ import type { HandleReadResult } from '../utils/fileHandles';
 
 export type SessionConnection = Pick<WebRtcService, 'initSender' | 'initReceiver' | 'disconnectPeer' | 'destroy'>;
 
-export type SessionSender = Pick<TransferSender, 'start' | 'updateFiles' | 'holdUntil' | 'togglePause' | 'cancel'>;
+export type SessionSender = Pick<TransferSender, 'start' | 'updateFiles' | 'holdUntil' | 'togglePause' | 'cancel' | 'interrupt'>;
 
-export type SessionReceiver = Pick<TransferReceiver, 'startReceiving' | 'submitPin' | 'togglePause' | 'cancel'>;
+export type SessionReceiver = Pick<TransferReceiver, 'startReceiving' | 'submitPin' | 'togglePause' | 'cancel' | 'interrupt'>;
 
 /** Handles to the sender's files, kept (Chromium only) so a reload can read the same files again. */
 export interface FileHandleServices {

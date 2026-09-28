@@ -1,11 +1,25 @@
 import type { DataConnection } from 'peerjs';
-import type { ControlMessage, ManifestFile, ReceiverEvents, TransferManifest } from '../../types/transfer';
+import type { ControlMessage, DownloadInterruption, ManifestFile, ReceiverEvents, TransferManifest } from '../../types/transfer';
 import { FastStreamingChecksum } from '../checksum';
 import { chooseWriterFactory } from '../storage';
 import type { StorageWriter, WriterFactory } from '../storage';
 import { TransferPeer } from './peer';
 import { decodeChunk } from './protocol';
 import type { DeviceIntroduction } from '../../utils/deviceInfo';
+
+/** A file cut off by a dropped connection, still open, for the next connection's receiver to carry on with. */
+export interface ResumePoint {
+  createWriter: WriterFactory;
+  writer: StorageWriter;
+  /** Covers bytes 0..receivedBytes */
+  checksum: FastStreamingChecksum;
+  fileId: string;
+  fileSize: number;
+  nextChunk: number;
+  receivedBytes: number;
+  /** The cut-off file first, then the rest of the download not finished yet */
+  remainingIds: string[];
+}
 
 export interface ReceiverOptions {
   /** Picks where files are written; must run inside a user gesture (file pickers). */
@@ -134,13 +148,15 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     }
 
     this.checksum.update(payload);
-    await this.writer.writeChunk(payload);
     this.expectedChunkIndex++;
     this.receivedBytesForFile += payload.length;
+    // Counted before the write finishes: a cut meanwhile keeps the stream open and this write lands on it
+    const writing = this.writer.writeChunk(payload);
 
     const position = this.selection.indexOf(fileIndex);
     this.metrics?.recordBytes(payload.length, position);
     this.emitMetrics(this.metrics?.snapshot(position, file.name, (this.receivedBytesForFile / file.size) * 100));
+    await writing;
   }
 
   protected onStop() {
@@ -151,6 +167,29 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   protected onDownloadFinished() {
     // The next download asks where to save again and may come from an updated list
     this.createWriter = null;
+  }
+
+  protected captureInterruption(): DownloadInterruption {
+    const interruption = super.captureInterruption();
+    const manifest = this.manifest;
+    const file = manifest?.files[this.fileIndex];
+    if (!manifest || !file || !this.writer || !this.createWriter) {
+      return interruption;
+    }
+    const position = this.selection.indexOf(this.fileIndex);
+    const resume: ResumePoint = {
+      createWriter: this.createWriter,
+      writer: this.writer,
+      checksum: this.checksum,
+      fileId: file.id,
+      fileSize: file.size,
+      nextChunk: this.expectedChunkIndex,
+      receivedBytes: this.receivedBytesForFile,
+      remainingIds: this.selection.slice(position).map((index) => manifest.files[index].id),
+    };
+    // Handed over open: stopping must not abort it
+    this.writer = null;
+    return { ...interruption, resume };
   }
 
   private async startFile(fileIndex: number): Promise<boolean> {
