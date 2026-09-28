@@ -44,6 +44,7 @@ Coding, UI and naming standards for this React 19 + TypeScript + Tailwind 4 code
 - `components/ui/ProgressBar` — `primary` | `subtle`; animates `transform`, not `width`.
 - `components/ui/ToggleRow` — labelled on/off option; children (e.g. an input) show inside the row while it is on.
 - `components/ui/ProgressRing` — circular overall progress with content in the middle (live transfer).
+- Corner radii come from the `--radius-*` overrides in `styles/tokens.css` (flatter than Tailwind's defaults); use the `rounded-*` scale, never arbitrary radii. `Card` runs edge to edge on phones (no side border or radius), so don't give cards their own horizontal margins.
 - `components/ui/StatTile` — one labelled number in transfer stats (live dashboard and completion card).
 - `components/ui/NumberStepper` — a bare − / + number control (its label is the accessible name); place it in an `OptionRow`.
 - `components/ui/OptionRow` — a settings row with a label, description and any control on the right; `ToggleRow` is the on/off variant (same box, `optionRowStyles.ts`).
