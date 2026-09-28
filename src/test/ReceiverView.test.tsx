@@ -333,6 +333,15 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
+  it('offers to retry straight away while reconnecting', () => {
+    const onRetryNow = vi.fn();
+    renderWaiting('reconnecting', { isInvited: true, onRetryNow });
+
+    fireEvent.click(screen.getByTestId('retry-now'));
+
+    expect(onRetryNow).toHaveBeenCalledTimes(1);
+  });
+
   it('shows that it is reconnecting while the sender is briefly away', () => {
     const { onCancelTransfer } = renderWaiting('reconnecting', { isInvited: true });
 

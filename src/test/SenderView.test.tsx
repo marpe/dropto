@@ -441,6 +441,21 @@ describe('SenderView', () => {
     expect(screen.getByText('This is a new room.')).toBeDefined();
   });
 
+  it('shows the whole download as one bar for someone downloading or waiting in line', () => {
+    renderSenderView({
+      state: shared({
+        receivers: [
+          makeReceiver({ peerId: 'a', stage: 'transferring', metrics: { ...metrics, overallPercent: 42 } }),
+          makeReceiver({ peerId: 'b', stage: 'queued' }),
+          makeReceiver({ peerId: 'c', stage: 'choosing' }),
+        ],
+      }),
+    });
+
+    const bars = screen.getAllByTestId('download-progress');
+    expect(bars.map((bar) => bar.dataset.percent)).toEqual(['42', '0']);
+  });
+
   it('shows how much each person has received, the running download included', () => {
     renderSenderView({
       state: shared({ receivers: [makeReceiver({ stage: 'transferring', bytesSent: 2048, metrics: { ...metrics, bytesTransferred: 1024 } })] }),

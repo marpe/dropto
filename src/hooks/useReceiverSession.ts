@@ -76,9 +76,11 @@ const AWAITING_SENDER: ReceiverStatus[] = [
   'connected',
 ];
 
-// Link receivers retry for about half a minute: long enough for the sender's page to reload
+// A sender that went away is retried, waiting a little longer each time (3 s, 6 s … 15 s): about four minutes
+// in all, long enough for a reload or a flaky network, after which Try again is up to the user
 const RECONNECT_DELAY_MS = 3_000;
-const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_RECONNECT_BACKOFF = 5;
+const MAX_RECONNECT_ATTEMPTS = 20;
 
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
   switch (action.type) {
@@ -235,11 +237,13 @@ export function useReceiverSession({
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
   const isRunningRef = useRef(false);
-  // While a download runs, a dropped connection is a failed transfer, not a reason to reconnect
+  // While a download runs, a dropped connection cuts it off; it is cancelled before reconnecting
   const hasStartedSavingRef = useRef(false);
   // After leaving (done, failed, cancelled), the connection closing is expected, not a reason to reconnect
   const hasLeftRef = useRef(false);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // What a reconnect goes back to, so Retry now can skip the wait
+  const reconnectTargetRef = useRef<{ roomCode: string; link: ShareLink } | null>(null);
   const settingsRef = useRef(settings);
 
   useEffect(() => {
@@ -300,20 +304,21 @@ export function useReceiverSession({
       const scheduleReconnect = (attempt: number) => {
         teardown();
         dispatch({ type: 'RECONNECTING' });
-        reconnectTimerRef.current = setTimeout(() => connectToRoom(roomCode, link, attempt), reconnectDelayMs);
+        reconnectTargetRef.current = { roomCode, link };
+        const delayMs = reconnectDelayMs * Math.min(attempt, MAX_RECONNECT_BACKOFF);
+        reconnectTimerRef.current = setTimeout(() => connectToRoom(roomCode, link, attempt), delayMs);
       };
-      // Reached from both the signalling connection closing and the engine losing its data channel
+      // Reached from both the signalling connection closing and the engine losing its data channel. Unless this
+      // side left on purpose, the sender is tried again: a reload or a network blip should not end the session
       const handleSenderGone = () => {
         if (connectionRef.current !== connection || hasLeftRef.current) {
           return;
         }
-        if (shareKey !== null && !hasStartedSavingRef.current) {
-          scheduleReconnect(1);
-          return;
+        if (hasStartedSavingRef.current) {
+          // The cut-off download cannot resume; cancelling closes its half-written file
+          engineRef.current?.cancel();
         }
-        endRun(false);
-        leave();
-        dispatch({ type: 'SENDER_LOST' });
+        scheduleReconnect(1);
       };
 
       const connection = services.createConnection({
@@ -448,6 +453,13 @@ export function useReceiverSession({
       },
       setPin: (pin: string) => dispatch({ type: 'PIN_CHANGED', pin }),
       connect: () => connectTo(state.roomCode, state.link),
+      /** Skips the wait before the next reconnect attempt */
+      retryNow: () => {
+        const target = reconnectTargetRef.current;
+        if (target) {
+          connectTo(target.roomCode, target.link, 1);
+        }
+      },
       submitPin: () => {
         engineRef.current?.submitPin(state.pin);
         dispatch({ type: 'PIN_SUBMITTED' });

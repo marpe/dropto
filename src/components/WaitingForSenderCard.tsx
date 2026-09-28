@@ -11,6 +11,8 @@ interface WaitingForSenderCardProps {
   stage: WaitingStage;
   roomCode: string;
   onCancel: () => void;
+  /** While reconnecting: try again now instead of waiting for the next attempt */
+  onRetry?: () => void;
 }
 
 const STAGE_COPY: Record<WaitingStage, { title: string; description: string; icon: LucideIcon }> = {
@@ -31,7 +33,7 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; ico
   },
   reconnecting: {
     title: 'The sender went offline, reconnecting…',
-    description: 'Reconnects when they’re back.',
+    description: 'Trying again by itself; reconnects when they’re back.',
     icon: RefreshCw,
   },
   pin: {
@@ -41,7 +43,7 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; ico
   },
 };
 
-export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stage, roomCode, onCancel }) => {
+export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stage, roomCode, onCancel, onRetry }) => {
   const { title, description, icon } = STAGE_COPY[stage];
 
   return (
@@ -49,9 +51,17 @@ export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stag
       <p className="mb-6 text-xs text-text-5">
         Room <span className="font-mono font-semibold tracking-wider text-text-3">{roomCode}</span>
       </p>
-      <Button variant="secondary" onClick={onCancel}>
-        Cancel
-      </Button>
+      <div className="flex flex-wrap justify-center gap-3">
+        <Button variant="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        {onRetry && (
+          <Button data-testid="retry-now" onClick={onRetry}>
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry</span>
+          </Button>
+        )}
+      </div>
     </StatusCard>
   );
 };

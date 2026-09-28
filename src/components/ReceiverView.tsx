@@ -28,6 +28,8 @@ interface ReceiverViewProps {
   onStartSaving: (fileIndices?: number[]) => void | Promise<void>;
   onTogglePause: () => void;
   onCancelTransfer: () => void;
+  /** While reconnecting to a sender that went away: try again now */
+  onRetryNow?: () => void;
   isPaused: boolean;
   errorMessage: string | null;
   isNativeFSA: boolean;
@@ -82,6 +84,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   onStartSaving,
   onTogglePause,
   onCancelTransfer,
+  onRetryNow,
   isPaused,
   errorMessage,
   isNativeFSA,
@@ -146,6 +149,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           roomCode={roomCode}
           // Still connecting there is no engine to cancel; starting over abandons the attempt
           onCancel={waitingStage === 'connecting' ? onReset : onCancelTransfer}
+          onRetry={waitingStage === 'reconnecting' ? onRetryNow : undefined}
         />
       ) : connectionState === 'pin_required' && pinPrompt ? (
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />

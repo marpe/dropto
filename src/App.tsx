@@ -152,6 +152,7 @@ export const App: React.FC = () => {
             onStartSaving={receiver.actions.startSaving}
             onTogglePause={receiver.actions.togglePause}
             onCancelTransfer={receiver.actions.cancel}
+            onRetryNow={receiver.actions.retryNow}
             isPaused={receiver.state.isPaused}
             errorMessage={receiver.state.error}
             isNativeFSA={isNativeFSA}

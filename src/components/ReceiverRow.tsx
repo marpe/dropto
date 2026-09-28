@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pause, Play, X } from 'lucide-react';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconButton } from './ui/IconButton';
+import { ProgressBar } from './ui/ProgressBar';
 import { FILE_PROGRESS_COLUMN } from './FileProgressCell';
 import { FileTable, FileTableRow } from './FileTable';
 import { PeerIdentity } from './PeerIdentity';
@@ -105,6 +106,13 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
           </IconButton>
         )}
       </div>
+
+      {/* The whole download at a glance, over the per-file bars below; empty while it waits for a slot */}
+      {(receiver.stage === 'transferring' || receiver.stage === 'queued') && (
+        <div data-testid="download-progress" data-percent={Math.floor(receiver.metrics?.overallPercent ?? 0)}>
+          <ProgressBar percent={receiver.stage === 'transferring' ? (receiver.metrics?.overallPercent ?? 0) : 0} variant="subtle" />
+        </div>
+      )}
 
       {sent.files.length > 0 && (
         <FileTable
