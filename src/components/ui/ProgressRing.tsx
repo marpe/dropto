@@ -17,7 +17,7 @@ const RADIUS = 44;
 export const ProgressRing: React.FC<ProgressRingProps> = ({ percent, isIdle = false, children, className }) => {
   const clamped = Math.min(Math.max(percent, 0), 100);
   return (
-    <div className={cn('relative grid place-items-center size-36 shrink-0', className)}>
+    <div className={cn('relative grid place-items-center size-28 sm:size-36 shrink-0', className)}>
       <svg viewBox="0 0 100 100" className="absolute inset-0 -rotate-90" aria-hidden="true">
         <circle cx="50" cy="50" r={RADIUS} pathLength="100" className="fill-none stroke-surface-3" strokeWidth="7" />
         <circle

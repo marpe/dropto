@@ -101,9 +101,9 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-6 my-6">
+      <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 my-4 sm:my-6">
         <ProgressRing percent={percent} isIdle={isPaused && !completion}>
-          <span data-testid="overall-percent" className="block text-4xl font-bold tracking-tight tabular-nums text-text-1">
+          <span data-testid="overall-percent" className="block text-3xl sm:text-4xl font-bold tracking-tight tabular-nums text-text-1">
             {percent}
             <span className="text-lg text-text-4">%</span>
           </span>
@@ -120,7 +120,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
             {metrics.elapsedSeconds >= 1 && (
               <>
                 <StatTile data-testid="stat-time" icon={Timer} label="Time taken" value={formatDuration(metrics.elapsedSeconds)} />
-                <StatTile data-testid="stat-speed" icon={TrendingUp} label="Average speed" value={formatSpeed(metrics.averageSpeed)} />
+                <StatTile data-testid="stat-speed" icon={TrendingUp} label="Average" value={formatSpeed(metrics.averageSpeed)} />
               </>
             )}
           </div>
@@ -146,7 +146,10 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         className="pt-4 border-t border-border-1"
       />
 
-      {completion && <div className="flex flex-wrap justify-center gap-3 mt-6">{completion.actions}</div>}
+      {/* Equal full-width buttons on a phone, a centred row otherwise */}
+      {completion && (
+        <div className="grid gap-2 mt-5 sm:flex sm:justify-center sm:gap-3 sm:mt-6 *:w-full sm:*:w-auto">{completion.actions}</div>
+      )}
     </Card>
   );
 };
