@@ -211,6 +211,8 @@ interface FileTableProps<F extends ManifestFile> {
   hasLead?: boolean;
   /** The lead column's header, e.g. a checkbox that ticks every row */
   headerLead?: React.ReactNode;
+  /** Column titles (with sorting and resizing); off for a short list whose columns speak for themselves */
+  hasHeader?: boolean;
   /** Width of a column after the sizes, for each row's `trail`; none when omitted */
   trailClassName?: string;
   /** A `FileTableRow`, keyed; `index` is the file's position in `files`, whatever order it is shown in */
@@ -227,6 +229,7 @@ export function FileTable<F extends ManifestFile>({
   renderRow,
   hasLead = false,
   headerLead,
+  hasHeader = true,
   trailClassName,
   className,
 }: FileTableProps<F>) {
@@ -240,24 +243,26 @@ export function FileTable<F extends ManifestFile>({
   return (
     <ColumnsContext.Provider value={{ hasLead, trailClassName, widths }}>
       <div className={cn('@container', className)}>
-        <div className={cn(ROW, 'pb-1 border-b border-border-1 text-2xs font-semibold text-text-5')}>
-          {hasLead && <span className={CELL.lead}>{headerLead}</span>}
-          <span className="w-4 shrink-0" />
-          <SortHeader label="Name" sortKey="name" sort={sort} onSort={onSort} className={CELL.name} />
-          <span className={cn(CELL.type, 'relative @sm:flex')} style={widthStyle(widths.type)}>
-            {resizer('type')}
-            <SortHeader label="Type" sortKey="type" sort={sort} onSort={onSort} className="min-w-0" />
-          </span>
-          <span className={cn(CELL.size, 'relative flex justify-end')} style={widthStyle(widths.size)}>
-            {resizer('size')}
-            <SortHeader label="Size" sortKey="size" sort={sort} onSort={onSort} />
-          </span>
-          <span className={cn(CELL.modified, 'relative @md:flex justify-end')} style={widthStyle(widths.modified)}>
-            {resizer('modified')}
-            <SortHeader label="Modified" sortKey="modified" sort={sort} onSort={onSort} />
-          </span>
-          {trailClassName !== undefined && <span className={cn(CELL.trail, trailClassName)} />}
-        </div>
+        {hasHeader && (
+          <div className={cn(ROW, 'pb-1 border-b border-border-1 text-2xs font-semibold text-text-5')}>
+            {hasLead && <span className={CELL.lead}>{headerLead}</span>}
+            <span className="w-4 shrink-0" />
+            <SortHeader label="Name" sortKey="name" sort={sort} onSort={onSort} className={CELL.name} />
+            <span className={cn(CELL.type, 'relative @sm:flex')} style={widthStyle(widths.type)}>
+              {resizer('type')}
+              <SortHeader label="Type" sortKey="type" sort={sort} onSort={onSort} className="min-w-0" />
+            </span>
+            <span className={cn(CELL.size, 'relative flex justify-end')} style={widthStyle(widths.size)}>
+              {resizer('size')}
+              <SortHeader label="Size" sortKey="size" sort={sort} onSort={onSort} />
+            </span>
+            <span className={cn(CELL.modified, 'relative @md:flex justify-end')} style={widthStyle(widths.modified)}>
+              {resizer('modified')}
+              <SortHeader label="Modified" sortKey="modified" sort={sort} onSort={onSort} />
+            </span>
+            {trailClassName !== undefined && <span className={cn(CELL.trail, trailClassName)} />}
+          </div>
+        )}
         <ul className="scroll-fade max-h-80 overflow-y-auto overscroll-contain divide-y divide-border-1">
           {sortFiles(files, sort).map(({ file, index }) => renderRow(file, index))}
         </ul>

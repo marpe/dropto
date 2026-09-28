@@ -449,6 +449,8 @@ describe('SenderView', () => {
     const row = screen.getByTestId('receiver-row');
     expect(within(row).getAllByTestId('file-row').map((file) => file.dataset.status)).toEqual(['done', 'corrupted']);
     expect(row.textContent).not.toMatch(/done/i);
+    // A short list under a person: no column titles
+    expect(within(row).queryByRole('button', { name: /^name/i })).toBeNull();
   });
 
   describe('sharing with several people', () => {
