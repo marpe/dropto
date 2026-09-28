@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { DataConnection } from 'peerjs';
 import { useSenderSession } from '../hooks/useSenderSession';
+import { DECLINED_MESSAGE } from '../hooks/senderRoom';
 import type { AppSettings } from '../types/transfer';
 import type { ReceiverGreeting } from '../services/webrtc';
 import type { FileHandleServices, SessionServices } from '../hooks/sessionServices';
@@ -170,7 +171,7 @@ describe('useSenderSession', () => {
     expect(session.engines[0].updateFiles).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt' })]);
   });
 
-  it('closes a rejected receiver without starting a transfer', async () => {
+  it('tells a declined receiver so, then disconnects it, without starting a transfer', async () => {
     const session = await renderSenderSession();
     const peerConn = connectPeer(session, 'receiver-1');
 
@@ -178,7 +179,9 @@ describe('useSenderSession', () => {
       session.result.current.actions.rejectPeer('receiver-1');
     });
 
-    expect(peerConn.close).toHaveBeenCalled();
+    // Said before closing, so the receiver does not take it for the sender going away and retry
+    expect(sentMessages(peerConn)).toEqual([{ type: 'ERROR', payload: { message: DECLINED_MESSAGE } }]);
+    expect(session.connection.disconnectPeer).toHaveBeenCalledWith('receiver-1');
     expect(session.engines).toHaveLength(0);
     expect(session.result.current.state.pendingPeers).toEqual([]);
   });

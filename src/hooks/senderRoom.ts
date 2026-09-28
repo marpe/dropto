@@ -33,6 +33,7 @@ interface QueuedReceiver {
 const MAX_PIN_LOCKOUTS_PER_ROOM = 3;
 export const PIN_LOCKOUT_NOTICE =
   'Too many wrong PINs, so the link changed. Share the new one.';
+export const DECLINED_MESSAGE = 'The sender declined your request.';
 export const PIN_LOCKDOWN_NOTICE =
   'Too many wrong PINs. New connections now need your approval.';
 
@@ -149,7 +150,11 @@ export class SenderRoom {
   public reject(peerId: string) {
     const held = this.pending.get(peerId);
     this.pending.delete(peerId);
-    held?.conn.close();
+    if (held) {
+      // Said out loud before closing: a plain close looks like the sender going away, which receivers retry
+      sendControlMessage(held.conn, { type: 'ERROR', payload: { message: DECLINED_MESSAGE } });
+      this.connection?.disconnectPeer(peerId);
+    }
     this.dispatch({ type: 'PEER_ANSWERED', peerId });
   }
 
@@ -162,6 +167,11 @@ export class SenderRoom {
     const engine = this.engines.get(peerId);
     if (!engine) {
       return;
+    }
+    // Sent away on purpose: coming back from the same tab must not skip the approval they would otherwise need
+    const sessionId = this.sessionOf.get(peerId);
+    if (sessionId) {
+      this.lastConnOfSession.delete(sessionId);
     }
     engine.cancel();
     this.connection?.disconnectPeer(peerId);
@@ -212,7 +222,9 @@ export class SenderRoom {
     }
     void this.lookUpAddress(conn);
     const hasLinkKey = greeting.shareKey !== null && greeting.shareKey === this.shareKey;
-    const isTrusted = hasLinkKey && !options.requireApproval;
+    // A tab let in before, coming back (a reload, a dropped connection), was already accepted
+    const isReturning = !!greeting.sessionId && this.lastConnOfSession.has(greeting.sessionId);
+    const isTrusted = isReturning || (hasLinkKey && !options.requireApproval);
     if (isTrusted && isShared && files.length > 0) {
       this.admit(conn);
       return;

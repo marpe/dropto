@@ -19,10 +19,15 @@ const manifest: TransferManifest = {
   files: [{ id: 'f1', name: 'hello.txt', size: 5, type: 'text/plain' }],
 };
 
-function renderReceiverSession(roomCode = '', shareKey: string | null = null, fakes = createFakeServices()) {
+function renderReceiverSession(
+  roomCode = '',
+  shareKey: string | null = null,
+  fakes = createFakeServices(),
+  reconnectDelayMs = 0
+) {
   const shareLink = { roomCode, shareKey };
   const hook = renderHook(
-    ({ active }) => useReceiverSession({ active, settings, shareLink, services: fakes.services, reconnectDelayMs: 0 }),
+    ({ active }) => useReceiverSession({ active, settings, shareLink, services: fakes.services, reconnectDelayMs }),
     { initialProps: { active: true } }
   );
   return { ...fakes, ...hook };
@@ -119,7 +124,7 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.status).toBe('verifying_pin');
   });
 
-  it('reports a sender that goes away while the PIN is being checked', async () => {
+  it('retries a sender that goes away while the PIN is being checked', async () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connect(session);
     act(() => {
@@ -133,7 +138,8 @@ describe('useReceiverSession', () => {
       connection.handlers.onDisconnected?.();
     });
 
-    expect(session.result.current.state.status).toBe('error');
+    expect(session.result.current.state.status).toBe('reconnecting');
+    await waitFor(() => expect(session.connections).toHaveLength(2));
   });
 
   it('can stop waiting for approval, leaving the room and returning to the form', async () => {
@@ -170,7 +176,7 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.pinPrompt).toEqual({ attemptsLeft: 2, isIncorrect: true });
   });
 
-  it('reports a sender that goes away while the PIN is being entered', async () => {
+  it('retries a sender that goes away while the PIN is being entered', async () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connect(session);
     act(() => {
@@ -181,10 +187,10 @@ describe('useReceiverSession', () => {
       connection.handlers.onDisconnected?.();
     });
 
-    expect(session.result.current.state.status).toBe('error');
+    expect(session.result.current.state.status).toBe('reconnecting');
   });
 
-  it('reports a sender that declines or goes away before approving', async () => {
+  it('retries a sender that goes away before approving, even with a typed room code', async () => {
     const session = renderReceiverSession();
     const { connection } = await connect(session);
 
@@ -192,8 +198,39 @@ describe('useReceiverSession', () => {
       connection.handlers.onDisconnected?.();
     });
 
+    expect(session.result.current.state.status).toBe('reconnecting');
+    await waitFor(() => expect(session.connections).toHaveLength(2));
+  });
+
+  it('stops, with the reason, when the sender declines', async () => {
+    const session = renderReceiverSession();
+    const { engine, connection } = await connect(session);
+
+    act(() => {
+      engine.events.onError?.('The sender declined your request.');
+    });
+    act(() => {
+      connection.handlers.onDisconnected?.();
+    });
+
     expect(session.result.current.state.status).toBe('error');
-    expect(session.result.current.state.error).toMatch(/declined|offline/i);
+    expect(session.result.current.state.error).toMatch(/declined/i);
+    expect(session.connections).toHaveLength(1);
+  });
+
+  it('retries straight away when asked, instead of waiting for the next attempt', async () => {
+    const session = renderReceiverSession('', null, createFakeServices(), 60_000);
+    const { connection } = await connect(session);
+    act(() => {
+      connection.handlers.onDisconnected?.();
+    });
+    expect(session.connections).toHaveLength(1);
+
+    act(() => {
+      session.result.current.actions.retryNow();
+    });
+
+    await waitFor(() => expect(session.connections).toHaveLength(2));
   });
 
   it('reports a room that cannot be reached', async () => {
@@ -344,9 +381,12 @@ describe('useReceiverSession', () => {
     expect(Object.keys(session.result.current.state.finishedFiles)).toEqual(['f1']);
   });
 
-  it('keeps the finished list, but says so, when the sender leaves afterwards', async () => {
+  it('retries a sender that leaves after a finished download, remembering what was downloaded', async () => {
     const session = renderReceiverSession();
     const { engine } = await connectWithManifest(session);
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
     act(() => {
       engine.events.onAllCompleted?.({ corruptedFiles: [] });
     });
@@ -355,9 +395,9 @@ describe('useReceiverSession', () => {
       engine.events.onPeerLeft?.();
     });
 
-    expect(session.result.current.state.status).toBe('completed');
-    expect(session.result.current.state.hasSenderLeft).toBe(true);
-    expect(session.result.current.state.manifest).toEqual(manifest);
+    expect(session.result.current.state.status).toBe('reconnecting');
+    expect(Object.keys(session.result.current.state.finishedFiles).length).toBeGreaterThan(0);
+    await waitFor(() => expect(session.connections).toHaveLength(2));
   });
 
   it('shows its place in line within the download when the sender is busy', async () => {
@@ -640,7 +680,7 @@ describe('useReceiverSession', () => {
       await waitFor(() => expect(session.engines).toHaveLength(2));
     });
 
-    it('does not reconnect once saving has started', async () => {
+    it('cancels a download the connection cut off, then reconnects so it can be started again', async () => {
       const session = await openLink();
       act(() => {
         session.engines[0].events.onManifest?.(manifest);
@@ -653,8 +693,9 @@ describe('useReceiverSession', () => {
         session.engines[0].events.onConnectionLost?.();
       });
 
-      expect(session.result.current.state.status).toBe('error');
-      expect(session.connections).toHaveLength(1);
+      expect(session.engines[0].cancel).toHaveBeenCalled();
+      expect(session.result.current.state.status).toBe('reconnecting');
+      await waitFor(() => expect(session.engines).toHaveLength(2));
     });
   });
 });
