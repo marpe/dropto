@@ -3,9 +3,12 @@ import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
 import { parseShareUrl } from '../utils/shareLink';
 import { introduceThisDevice } from '../utils/deviceInfo';
+import { pickFiles } from '../utils/fileSelection';
+import { finishedFilesOf } from '../utils/transferProgress';
 import type { ShareLink } from '../utils/shareLink';
 import type {
   AppSettings,
+  FinishedFile,
   PinPrompt,
   ReceiverStatus,
   TransferManifest,
@@ -26,13 +29,17 @@ export interface ReceiverSessionState {
   selectedFileIndices: number[] | null;
   pin: string;
   pinPrompt: PinPrompt | null;
-  /** Place in the sender's line while it is busy with others; 1 means next */
+  /** Place in the sender's line while a download waits for a free slot; 1 means next */
   queuePosition: number | null;
   manifest: TransferManifest | null;
   metrics: TransferMetrics | null;
   isPaused: boolean;
   error: string | null;
   corruptedFiles: string[];
+  /** Files downloaded so far on this connection, by file id; a finished download stays connected for more */
+  finishedFiles: Record<string, FinishedFile>;
+  /** The sender went away after a finished download; the list stays, but nothing more can be downloaded */
+  hasSenderLeft: boolean;
 }
 
 type ReceiverAction =
@@ -64,7 +71,6 @@ const AWAITING_SENDER: ReceiverStatus[] = [
   'connecting',
   'reconnecting',
   'waiting_approval',
-  'queued',
   'pin_required',
   'verifying_pin',
   'connected',
@@ -92,13 +98,16 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         error: null,
         manifest: null,
         corruptedFiles: [],
+        finishedFiles: {},
+        hasSenderLeft: false,
       };
     case 'CONNECTED':
       return { ...state, status: 'waiting_approval', isInvited: action.isInvited };
     case 'CONNECT_FAILED':
       return { ...state, status: 'error', error: action.error };
     case 'QUEUED':
-      return { ...state, status: 'queued', queuePosition: action.position };
+      // Only a download waits for a slot, so the place in line shows within it
+      return state.status === 'transferring' ? { ...state, queuePosition: action.position } : state;
     case 'PIN_REQUIRED':
       // After a wrong attempt, clear the field so the next try starts fresh
       return {
@@ -111,8 +120,19 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
     case 'PIN_SUBMITTED':
       return { ...state, status: 'verifying_pin' };
     case 'MANIFEST_RECEIVED':
-      return { ...state, status: 'connected', manifest: action.manifest, pinPrompt: null, queuePosition: null };
+      return {
+        ...state,
+        // After a finished download the sender may still change the list; it stays on the finished screen
+        status: state.status === 'completed' ? 'completed' : 'connected',
+        manifest: action.manifest,
+        pinPrompt: null,
+        queuePosition: null,
+        hasSenderLeft: false,
+      };
     case 'SENDER_LOST':
+      if (state.status === 'completed') {
+        return { ...state, hasSenderLeft: true };
+      }
       if (state.status === 'transferring') {
         return { ...state, ...noProgress, status: 'error', error: 'The connection to the sender was lost.' };
       }
@@ -128,16 +148,37 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
     case 'RECONNECTING':
       return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null, queuePosition: null };
     case 'SAVING_STARTED':
-      return { ...state, ...noProgress, status: 'transferring', selectedFileIndices: action.fileIndices };
+      return {
+        ...state,
+        ...noProgress,
+        status: 'transferring',
+        selectedFileIndices: action.fileIndices,
+        queuePosition: null,
+        corruptedFiles: [],
+      };
     case 'SAVING_ABORTED':
       return { ...state, status: 'connected' };
     case 'METRICS':
-      return { ...state, metrics: action.metrics };
+      return { ...state, metrics: action.metrics, queuePosition: null };
     case 'PAUSED':
       return { ...state, isPaused: action.isPaused };
     case 'COMPLETED':
-      return { ...state, status: 'completed', isPaused: false, corruptedFiles: action.result.corruptedFiles };
+      return {
+        ...state,
+        status: 'completed',
+        isPaused: false,
+        queuePosition: null,
+        corruptedFiles: action.result.corruptedFiles,
+        finishedFiles: {
+          ...state.finishedFiles,
+          ...finishedFilesOf(pickFiles(state.manifest?.files ?? [], state.selectedFileIndices), state.metrics, action.result),
+        },
+      };
     case 'FAILED':
+      // Stopped by the sender after a finished download: what was downloaded stays listed
+      if (state.status === 'completed') {
+        return { ...state, hasSenderLeft: true };
+      }
       return { ...state, ...noProgress, status: 'error', error: action.error, manifest: null };
     case 'CANCELLED':
       return { ...state, ...noProgress, status: 'idle', error: null, manifest: null };
@@ -160,6 +201,8 @@ export const initialReceiverState: ReceiverSessionState = {
   isPaused: false,
   error: null,
   corruptedFiles: [],
+  finishedFiles: {},
+  hasSenderLeft: false,
 };
 
 const noShareLink: ShareLink = { roomCode: '', shareKey: null };
@@ -192,7 +235,7 @@ export function useReceiverSession({
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
   const isRunningRef = useRef(false);
-  // Once the save location is chosen, a dropped connection is a failed transfer, not a reason to reconnect
+  // While a download runs, a dropped connection is a failed transfer, not a reason to reconnect
   const hasStartedSavingRef = useRef(false);
   // After leaving (done, failed, cancelled), the connection closing is expected, not a reason to reconnect
   const hasLeftRef = useRef(false);
@@ -281,8 +324,11 @@ export function useReceiverSession({
       });
       connectionRef.current = connection;
 
+      // Looked up alongside connecting, so it never holds up the HELLO
+      const introducing = introduceThisDevice();
       try {
         const conn = await connection.initReceiver(roomCode, settingsRef.current);
+        const introduction = await introducing;
         if (connectionRef.current !== connection) {
           return;
         }
@@ -305,8 +351,9 @@ export function useReceiverSession({
             onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
             onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
             onAllCompleted: ifCurrent((result) => {
+              // Still connected: the user may download more, or the same files again
               endRun(true);
-              leave();
+              hasStartedSavingRef.current = false;
               dispatch({ type: 'COMPLETED', result });
             }),
             onError: ifCurrent((error) => {
@@ -315,13 +362,14 @@ export function useReceiverSession({
               dispatch({ type: 'FAILED', error });
             }),
             onConnectionLost: ifCurrent(handleSenderGone),
+            onPeerLeft: ifCurrent(handleSenderGone),
             onCancelled: ifCurrent(() => {
               endRun(false);
               leave();
               dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
             }),
           },
-          { shareKey, introduction: introduceThisDevice() }
+          { shareKey, introduction }
         );
         engineRef.current = engine;
         soundService.playConnect();

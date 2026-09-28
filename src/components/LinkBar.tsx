@@ -77,12 +77,12 @@ export const LinkBar: React.FC<LinkBarProps> = ({
           readOnly
           aria-label="Share link"
           value={isReady ? shareUrl : 'Creating link…'}
-          onFocus={(e) => e.currentTarget.select()}
           className="flex-1 min-w-0 truncate bg-transparent px-3 py-2.5 font-mono text-xs text-text-3 outline-none"
         />
         <Button
           disabled={!isReady}
           onClick={() => copyLink(shareUrl)}
+          variant="secondary"
           aria-label={isCopied ? 'Copied' : 'Copy link'}
           title={isCopied ? 'Copied' : 'Copy link'}
           className="shrink-0 rounded-none shadow-none hover:shadow-none active:scale-100 px-3.5"
@@ -91,10 +91,10 @@ export const LinkBar: React.FC<LinkBarProps> = ({
         </Button>
         <Menu title="Link options" icon={MenuIcon} anchorName="--link-menu" triggerClassName="rounded-none border-l border-border-2 px-3">
           <MenuItem data-testid="open-link-settings" icon={Settings} onSelect={() => setOpenDialog('settings')}>
-            Link settings
+            Settings
           </MenuItem>
           <MenuItem icon={QrCode} disabled={!isReady} onSelect={() => setOpenDialog('qr')}>
-            QR code and room code
+            QR code
           </MenuItem>
           {canWebShare && (
             <MenuItem icon={Share2} disabled={!isReady} onSelect={() => shareLink(shareUrl)}>

@@ -43,10 +43,12 @@ export class TransferSender extends TransferPeer<SenderEvents> {
   private pinAttemptsLeft = 0;
   // File requests are refused until the manifest (and so any PIN check) has been passed
   private hasSentManifest = false;
-  // Once the receiver requests the first file, the file list can no longer change
+  // From the receiver requesting a download's first file until that download ends, the file list is fixed
   private hasReceiverStarted = false;
   // Indices the receiver chose to download; null means every file
   private selection: number[] | null = null;
+  // Resolves once this receiver may stream: at once, unless it has to wait in line for a free slot
+  private slot: Promise<void> = Promise.resolve();
 
   constructor(conn: DataConnection, events: SenderEvents) {
     super(conn, events);
@@ -62,7 +64,6 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     this.pinAttemptsLeft = MAX_PIN_ATTEMPTS;
     this.hasSentManifest = false;
     this.selection = null;
-    this.beginTransfer(toManifest(files).totalBytes, files.length);
 
     if (pin) {
       this.send({ type: 'AUTH_REQUEST', payload: { attemptsLeft: MAX_PIN_ATTEMPTS, isIncorrect: false } });
@@ -71,13 +72,17 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     }
   }
 
+  /** Holds the download that is starting until `slot` resolves; call it from onReceiverStarted. */
+  public holdUntil(slot: Promise<void>) {
+    this.slot = slot;
+  }
+
   /** Replaces the offered files while the receiver is still choosing; returns false once downloading began. */
   public updateFiles(files: TransferFile[]): boolean {
     if (this.hasReceiverStarted) {
       return false;
     }
     this.files = files;
-    this.beginTransfer(toManifest(files).totalBytes, files.length);
     if (this.hasSentManifest) {
       this.sendManifest();
     }
@@ -101,10 +106,12 @@ export class TransferSender extends TransferPeer<SenderEvents> {
         }
         if (!this.hasReceiverStarted) {
           this.hasReceiverStarted = true;
+          const selected = this.transferIndices().map((index) => this.files[index]);
+          this.beginTransfer(toManifest(selected).totalBytes, selected.length);
           this.events.onReceiverStarted?.(this.transferIndices());
         }
-        // Not awaited: streaming a file must not block pause/cancel messages in the queue
-        this.streamFile(message.payload.fileIndex).catch((err) => this.failTransfer(err));
+        // Not awaited: streaming a file (or waiting for a slot) must not block pause/cancel messages in the queue
+        this.slot.then(() => this.streamFile(message.payload.fileIndex)).catch((err) => this.failTransfer(err));
         return;
       case 'FILE_ACK':
         this.handleFileAck(message.payload.fileIndex, message.payload.isVerified);
@@ -130,8 +137,13 @@ export class TransferSender extends TransferPeer<SenderEvents> {
       throw new Error('Receiver selected a file that was not offered');
     }
     this.selection = fileIndices;
-    const selected = fileIndices.map((index) => this.files[index]);
-    this.beginTransfer(toManifest(selected).totalBytes, selected.length);
+  }
+
+  protected onDownloadFinished() {
+    // The receiver may pick again: any files, the whole list by default, from a list that may change again
+    this.hasReceiverStarted = false;
+    this.selection = null;
+    this.slot = Promise.resolve();
   }
 
   private sendManifest() {
@@ -179,6 +191,9 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     const position = this.transferIndices().indexOf(fileIndex);
     const channel = this.conn.dataChannel;
 
+    if (this.isStopped) {
+      return;
+    }
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       await this.waitUntilResumed();
       if (this.isStopped) {

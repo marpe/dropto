@@ -2,7 +2,6 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import type { AppSettings, TransferFile } from '../types/transfer';
 import type { SharingOptions } from '../types/sharing';
 import { displayPath } from '../utils/filePath';
-import { rememberMaxSimultaneous } from '../utils/sharingMemory';
 import { defaultSessionServices } from './sessionServices';
 import type { SessionServices } from './sessionServices';
 import { SenderRoom } from './senderRoom';
@@ -80,9 +79,6 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   };
 
   const setSharingOptions = (options: Partial<SharingOptions>) => {
-    if (options.maxSimultaneous !== undefined) {
-      rememberMaxSimultaneous(options.maxSimultaneous);
-    }
     dispatch({ type: 'OPTIONS_CHANGED', options });
   };
 
@@ -104,12 +100,8 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     room.open(settingsRef.current, { isFresh: true });
   };
 
-  const clearFiles = () => {
-    // Someone deciding where to save keeps their connection and just sees the list empty
-    if (focus?.stage === 'choosing') {
-      dispatch({ type: 'QUEUE_EMPTIED' });
-      return;
-    }
+  /** Back to an empty page: no files, no link, nobody connected. */
+  const startOver = () => {
     room.endShare();
     dispatch({ type: 'FILES_CLEARED' });
     // A new batch gets a new link: whoever had the old one must not be let into the next share
@@ -118,15 +110,25 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     }
   };
 
+  const clearFiles = () => {
+    // Someone deciding where to save keeps their connection and just sees the list empty
+    if (state.receivers.some((receiver) => receiver.stage === 'choosing')) {
+      dispatch({ type: 'QUEUE_EMPTIED' });
+      return;
+    }
+    startOver();
+  };
+
   return {
     state,
     status: selectSenderStatus(state),
-    /** The one receiver a one-person share is about; null when sharing with several people */
+    /** The only person on the link; null with nobody or several */
     focus,
     actions: {
       addFiles,
       removeFile: (fileId: string) => dispatch({ type: 'FILE_REMOVED', fileId }),
       clearFiles,
+      startOver,
       setSharingOptions,
       createLink: () => {
         if (state.files.length > 0) {
@@ -138,20 +140,9 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       stopSharing,
       approvePeer: (peerId: string) => room.approve(peerId),
       rejectPeer: (peerId: string) => room.reject(peerId),
-      togglePause: () => {
-        if (focus) {
-          room.togglePause(focus.peerId);
-        }
-      },
-      /** Stops the focused receiver's transfer (one-person share) */
-      cancel: () => {
-        if (focus) {
-          room.stop(focus.peerId);
-        }
-      },
       stopReceiver: (peerId: string) => room.stop(peerId),
+      togglePauseReceiver: (peerId: string) => room.togglePause(peerId),
       dismissReceiver: (peerId: string) => dispatch({ type: 'RECEIVER_REMOVED', peerId }),
-      dismissError: () => dispatch({ type: 'FINISHED_CLEARED' }),
       retryRoom: () => room.open(settingsRef.current),
     },
   };

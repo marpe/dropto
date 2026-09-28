@@ -23,21 +23,24 @@ export interface OpenRoomOptions {
   notice?: string | null;
 }
 
+interface QueuedReceiver {
+  conn: DataConnection;
+  /** Called with a free slot */
+  start: () => void;
+}
+
 // Three attempts per connection, three connections: then guessing has to stop
 const MAX_PIN_LOCKOUTS_PER_ROOM = 3;
 export const PIN_LOCKOUT_NOTICE =
   'Too many wrong PINs, so the link changed. Share the new one.';
 export const PIN_LOCKDOWN_NOTICE =
   'Too many wrong PINs. New connections now need your approval.';
-export const BUSY_MESSAGE = 'The sender is busy with someone else. Try again later.';
-export const LINK_USED_MESSAGE =
-  'This link was single-use and has been used. Ask for a new one.';
-export const REMOVED_MESSAGE = 'The sender stopped sharing with you.';
 
 /**
- * Everyone connected to the sender's room: people waiting for the sender's OK, people waiting in
- * line for a download slot, and one transfer engine per person downloading. Admission rules live
- * here; the session reducer only mirrors what happens, through `dispatch`.
+ * Everyone connected to the sender's room: people waiting for the sender's OK, and one transfer engine
+ * per person let in. Anyone let in may browse and choose; only downloads take a slot, and a download
+ * started while every slot is taken waits in line. Admission rules live here; the session reducer only
+ * mirrors what happens, through `dispatch`.
  */
 export class SenderRoom {
   private readonly services: SessionServices;
@@ -45,16 +48,22 @@ export class SenderRoom {
   private config: RoomConfig;
   private settings: AppSettings | null = null;
   private connection: SessionConnection | null = null;
+  private roomCode: string | null = null;
   private shareKey: string | null = null;
   private readonly pending = new Map<string, { conn: DataConnection; isTrusted: boolean }>();
-  private queue: DataConnection[] = [];
+  // Downloads started while every slot was taken, in the order they were started
+  private queue: QueuedReceiver[] = [];
+  // One engine per admitted receiver, kept after a finished download so they can download again
   private readonly engines = new Map<string, SessionSender>();
+  // Receivers downloading, each holding a slot
+  private readonly busy = new Set<string>();
   // How each connected receiver introduced itself, plus its address once known
   private readonly details = new Map<string, PeerDetails>();
-  // Device effects (wake lock, sounds) span from the first engine starting to the last one ending
+  // Each connection's browser tab (from its HELLO), and the connection each tab was last let in on
+  private readonly sessionOf = new Map<string, string>();
+  private readonly lastConnOfSession = new Map<string, DataConnection>();
+  // Device effects (wake lock, sounds) span from the first slot taken to the last one freed
   private isRunning = false;
-  // A one-person link stops admitting anyone once somebody has downloaded the files
-  private hasCompletedShare = false;
   private pinLockouts = 0;
 
   constructor(services: SessionServices, dispatch: (action: SenderAction) => void, config: RoomConfig) {
@@ -67,12 +76,12 @@ export class SenderRoom {
   public configure(config: RoomConfig) {
     const previous = this.config;
     this.config = config;
+    if (config.isShared !== previous.isShared && this.roomCode && this.shareKey) {
+      rememberRoom({ roomCode: this.roomCode, shareKey: this.shareKey, isShared: config.isShared });
+    }
     if (config.files !== previous.files) {
       // Engines still waiting for their receiver to choose re-offer the list; the others ignore it
       this.engines.forEach((engine) => engine.updateFiles(config.files));
-    }
-    if (!config.options.allowMultiple) {
-      this.queue.splice(0).forEach((conn) => this.turnAway(conn, BUSY_MESSAGE));
     }
     this.admitHeld();
     this.fillSlots();
@@ -105,10 +114,13 @@ export class SenderRoom {
       const roomCode = await connection.initSender(settings, { preferredRoomId: remembered?.roomCode });
       if (this.connection === connection) {
         // Links already handed out stay valid only while both the room and its key survive
-        const shareKey = remembered?.roomCode === roomCode ? remembered.shareKey : generateShareKey();
+        const isReused = remembered?.roomCode === roomCode;
+        const shareKey = isReused ? remembered.shareKey : generateShareKey();
+        const wasShared = isReused && remembered.isShared;
+        this.roomCode = roomCode;
         this.shareKey = shareKey;
-        rememberRoom({ roomCode, shareKey });
-        this.dispatch({ type: 'ROOM_READY', roomCode, shareKey });
+        rememberRoom({ roomCode, shareKey, isShared: wasShared });
+        this.dispatch({ type: 'ROOM_READY', roomCode, shareKey, wasShared });
       }
     } catch (err) {
       if (this.connection === connection) {
@@ -122,11 +134,11 @@ export class SenderRoom {
     this.teardown();
   }
 
-  /** Lets in someone waiting for the sender's OK; they take a free slot or join the line. */
+  /** Lets in someone waiting for the sender's OK. */
   public approve(peerId: string) {
     const held = this.pending.get(peerId);
-    // An empty manifest would leave both peers stuck; the request stays pending until files are added
-    if (!held || this.config.files.length === 0) {
+    // Even with no files yet: the receiver waits on an empty list, and files added later are re-offered
+    if (!held) {
       return;
     }
     this.pending.delete(peerId);
@@ -145,49 +157,46 @@ export class SenderRoom {
     this.engines.get(peerId)?.togglePause();
   }
 
-  /** Stops one person's download, or takes them out of the line. */
+  /** Disconnects one person: their download stops, or they leave the line. */
   public stop(peerId: string) {
     const engine = this.engines.get(peerId);
-    if (engine) {
-      engine.cancel();
-      this.connection?.disconnectPeer(peerId);
-      this.dispatch({ type: 'RECEIVER_REMOVED', peerId });
-      this.endEngine(peerId, false);
+    if (!engine) {
       return;
     }
-    const queued = this.queue.find((conn) => conn.peer === peerId);
-    if (queued) {
-      this.queue = this.queue.filter((conn) => conn !== queued);
-      this.turnAway(queued, REMOVED_MESSAGE);
-      this.announcePositions();
-    }
+    engine.cancel();
+    this.connection?.disconnectPeer(peerId);
+    this.dispatch({ type: 'RECEIVER_REMOVED', peerId });
+    this.endEngine(peerId, false);
   }
 
-  /** Stops every download and empties the line; people waiting for the sender's OK stay. */
+  /** Disconnects everyone let in; people waiting for the sender's OK stay. */
   public stopAll() {
-    // The line first, so freed slots are not handed to someone about to be turned away
-    this.queue.splice(0).forEach((conn) => this.turnAway(conn, REMOVED_MESSAGE));
+    // The line first, so freed slots are not handed to someone about to be stopped
+    this.queue = [];
     [...this.engines.keys()].forEach((peerId) => this.stop(peerId));
   }
 
-  /** Ends the current share: everyone is disconnected, and a one-person link may be used again. */
+  /** Ends the current share: everyone is disconnected, and nobody is recognised in the next one. */
   public endShare() {
     this.stopAll();
     this.pending.clear();
     this.connection?.disconnectPeer();
     this.dispatch({ type: 'PEER_DISCONNECTED' });
-    this.hasCompletedShare = false;
+    this.lastConnOfSession.clear();
   }
 
   private teardown() {
     const connection = this.connection;
     this.connection = null;
     this.engines.clear();
+    this.busy.clear();
     this.pending.clear();
     this.queue = [];
     this.details.clear();
+    this.sessionOf.clear();
+    this.lastConnOfSession.clear();
+    this.roomCode = null;
     this.shareKey = null;
-    this.hasCompletedShare = false;
     this.pinLockouts = 0;
     this.endEffects(false);
     connection?.destroy();
@@ -195,18 +204,12 @@ export class SenderRoom {
 
   private handleIncoming(conn: DataConnection, greeting: ReceiverGreeting) {
     const { files, options, isShared } = this.config;
-    if (!options.allowMultiple) {
-      if (this.hasCompletedShare) {
-        this.turnAway(conn, LINK_USED_MESSAGE);
-        return;
-      }
-      if (this.engines.size > 0 || this.pending.size > 0) {
-        this.turnAway(conn, BUSY_MESSAGE);
-        return;
-      }
-    }
     soundService.playConnect();
-    this.details.set(conn.peer, { device: greeting.device ?? null, timeZone: greeting.timeZone ?? null, ip: null });
+    const { device, timeZone, formFactor, model, storage } = greeting;
+    this.details.set(conn.peer, { device: device ?? null, timeZone: timeZone ?? null, ip: null, formFactor, model, storage });
+    if (greeting.sessionId) {
+      this.sessionOf.set(conn.peer, greeting.sessionId);
+    }
     void this.lookUpAddress(conn);
     const hasLinkKey = greeting.shareKey !== null && greeting.shareKey === this.shareKey;
     const isTrusted = hasLinkKey && !options.requireApproval;
@@ -226,7 +229,7 @@ export class SenderRoom {
       this.queue = [];
     } else {
       this.pending.delete(peerId);
-      this.queue = this.queue.filter((conn) => conn.peer !== peerId);
+      this.queue = this.queue.filter(({ conn }) => conn.peer !== peerId);
     }
     this.dispatch({ type: 'PEER_DISCONNECTED', peerId });
     if (this.queue.length !== queueLength) {
@@ -253,43 +256,100 @@ export class SenderRoom {
     return this.details.get(peerId) ?? { device: null, timeZone: null, ip: null };
   }
 
-  /** The address only shows once ICE has settled on a route, so it follows the rest of the details. */
+  /** The address and route only show once ICE has settled on them, so they follow the rest of the details. */
   private async lookUpAddress(conn: DataConnection) {
     const connection = this.connection;
-    const ip = await this.services.readAddress(conn);
+    const address = await this.services.readAddress(conn);
     const known = this.details.get(conn.peer);
-    if (!ip || !known || this.connection !== connection) {
+    if (!address || !known || this.connection !== connection) {
       return;
     }
-    this.details.set(conn.peer, { ...known, ip });
-    this.dispatch({ type: 'PEER_ADDRESS', peerId: conn.peer, ip });
+    this.details.set(conn.peer, { ...known, ip: address.ip, route: address.route });
+    this.dispatch({ type: 'PEER_ADDRESS', peerId: conn.peer, ip: address.ip, route: address.route });
   }
 
-  private capacity(): number {
-    const { allowMultiple, maxSimultaneous } = this.config.options;
-    return allowMultiple ? maxSimultaneous : 1;
+  private hasFreeSlot(): boolean {
+    return this.busy.size < this.config.options.maxSimultaneous;
   }
 
   private admit(conn: DataConnection) {
-    if (this.engines.size < this.capacity()) {
-      this.startEngine(conn);
+    this.resumeSession(conn);
+    this.startEngine(conn);
+  }
+
+  /**
+   * The same browser tab back on a new connection (after a reload or a dropped connection) takes over its
+   * earlier place in the list. While that earlier connection is still open (e.g. a duplicated tab), the
+   * newcomer counts as someone else.
+   */
+  private resumeSession(conn: DataConnection) {
+    const sessionId = this.sessionOf.get(conn.peer);
+    if (!sessionId) {
       return;
     }
-    if (!this.config.options.allowMultiple) {
-      this.turnAway(conn, BUSY_MESSAGE);
+    const previous = this.lastConnOfSession.get(sessionId);
+    if (previous?.open && previous !== conn) {
       return;
     }
-    this.queue.push(conn);
-    this.dispatch({ type: 'RECEIVER_QUEUED', peerId: conn.peer, details: this.detailsOf(conn.peer) });
+    this.lastConnOfSession.set(sessionId, conn);
+    if (!previous || previous === conn) {
+      return;
+    }
+    if (this.engines.has(previous.peer)) {
+      // Its close has not been noticed yet; the new connection replaces it
+      this.connection?.disconnectPeer(previous.peer);
+      this.endEngine(previous.peer, false);
+    }
+    this.dispatch({ type: 'RECEIVER_RESUMED', fromPeerId: previous.peer, peerId: conn.peer });
+  }
+
+  /** Every download, the first or a later one: at once with a free slot, otherwise after waiting in line. */
+  private startDownload(conn: DataConnection, engine: SessionSender, fileIndices: number[]) {
+    const peerId = conn.peer;
+    const start = () => {
+      this.occupySlot(peerId);
+      this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices });
+    };
+    if (this.hasFreeSlot()) {
+      start();
+      return;
+    }
+    engine.holdUntil(
+      new Promise((resolve) => {
+        this.queue.push({
+          conn,
+          start: () => {
+            start();
+            resolve();
+          },
+        });
+      })
+    );
+    this.dispatch({ type: 'RECEIVER_QUEUED', peerId });
     this.announcePositions();
+  }
+
+  private occupySlot(peerId: string) {
+    this.busy.add(peerId);
+    if (!this.isRunning) {
+      this.isRunning = true;
+      this.services.effects.onTransferStarted();
+    }
+  }
+
+  /** Device effects (wake lock, sounds) end with the last busy slot. */
+  private releaseSlot(peerId: string, isSuccessful: boolean) {
+    if (this.busy.delete(peerId) && this.busy.size === 0) {
+      this.endEffects(isSuccessful);
+    }
   }
 
   /** Starts people from the front of the line while slots are free (e.g. after one finished or the limit rose). */
   private fillSlots() {
     let hasLineMoved = false;
-    while (this.queue.length > 0 && this.engines.size < this.capacity()) {
+    while (this.queue.length > 0 && this.hasFreeSlot()) {
       const [next] = this.queue.splice(0, 1);
-      this.startEngine(next);
+      next.start();
       hasLineMoved = true;
     }
     if (hasLineMoved) {
@@ -298,14 +358,7 @@ export class SenderRoom {
   }
 
   private announcePositions() {
-    this.queue.forEach((conn, index) => sendControlMessage(conn, { type: 'QUEUED', payload: { position: index + 1 } }));
-  }
-
-  /** Tells the receiver why before closing, so it can show the reason instead of a lost connection. */
-  private turnAway(conn: DataConnection, message: string) {
-    sendControlMessage(conn, { type: 'ERROR', payload: { message } });
-    this.connection?.disconnectPeer(conn.peer);
-    this.dispatch({ type: 'RECEIVER_REMOVED', peerId: conn.peer });
+    this.queue.forEach(({ conn }, index) => sendControlMessage(conn, { type: 'QUEUED', payload: { position: index + 1 } }));
   }
 
   private startEngine(conn: DataConnection) {
@@ -327,14 +380,19 @@ export class SenderRoom {
       }),
       onReceiverStarted: ifCurrent((fileIndices) => {
         hasReceiverStarted = true;
-        this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices });
+        this.startDownload(conn, engine, fileIndices);
       }),
       onMetrics: ifCurrent((metrics) => this.dispatch({ type: 'METRICS', peerId, metrics })),
       onPaused: ifCurrent((isPaused) => this.dispatch({ type: 'PAUSED', peerId, isPaused })),
       onAllCompleted: ifCurrent((result) => {
-        this.hasCompletedShare = true;
-        this.dispatch({ type: 'RECEIVER_COMPLETED', peerId, result });
-        this.endEngine(peerId, true);
+        // They stay connected and may download again, but give up their slot meanwhile
+        this.dispatch({ type: 'RECEIVER_COMPLETED', peerId, result, atMs: Date.now() });
+        this.releaseSlot(peerId, true);
+        this.afterSlotFreed();
+      }),
+      onPeerLeft: ifCurrent(() => {
+        this.dispatch({ type: 'RECEIVER_LEFT', peerId });
+        this.endEngine(peerId, false);
       }),
       onError: ifCurrent((error) => {
         this.connection?.disconnectPeer(peerId);
@@ -350,23 +408,26 @@ export class SenderRoom {
       }),
     });
     this.engines.set(peerId, engine);
-    if (!this.isRunning) {
-      this.isRunning = true;
-      this.services.effects.onTransferStarted();
-    }
-    this.dispatch({ type: 'RECEIVER_ADMITTED', peerId, details: this.detailsOf(peerId) });
+    this.dispatch({ type: 'RECEIVER_ADMITTED', peerId, details: this.detailsOf(peerId), atMs: Date.now() });
     engine.start(files, options.pin);
   }
 
   private endEngine(peerId: string, isSuccessful: boolean) {
     this.engines.delete(peerId);
+    const queueLength = this.queue.length;
+    this.queue = this.queue.filter(({ conn }) => conn.peer !== peerId);
+    if (this.queue.length !== queueLength) {
+      this.announcePositions();
+    }
+    this.releaseSlot(peerId, isSuccessful);
+    this.afterSlotFreed();
+  }
+
+  private afterSlotFreed() {
     if (this.pinLockouts >= MAX_PIN_LOCKOUTS_PER_ROOM) {
       this.lockDown();
     } else {
       this.fillSlots();
-    }
-    if (this.engines.size === 0) {
-      this.endEffects(isSuccessful);
     }
   }
 
@@ -380,7 +441,7 @@ export class SenderRoom {
   /** Stops PIN guessing without cutting off anyone downloading through this room. */
   private lockDown() {
     this.pinLockouts = 0;
-    if (this.engines.size === 0 && this.queue.length === 0 && this.settings) {
+    if (this.engines.size === 0 && this.settings) {
       // Nobody else is here, so the old code and link can simply stop working
       void this.open(this.settings, { isFresh: true, notice: PIN_LOCKOUT_NOTICE });
       return;

@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import type { RefObject } from 'react';
-import { FileUp, FolderUp } from 'lucide-react';
+import { File, Folder } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface FilePickerButtonsProps {
@@ -25,8 +25,8 @@ export const FilePickerButtons: React.FC<FilePickerButtonsProps> = ({ onAddFiles
   return (
     <>
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => addFromInput(e, onAddFiles)} />
-      <Button data-testid="pick-files" size={size} onClick={() => fileInputRef.current?.click()}>
-        <FileUp className="w-4 h-4" />
+      <Button data-testid="pick-files" variant="secondary" size={size} onClick={() => fileInputRef.current?.click()}>
+        <File className="w-4 h-4" />
         <span>File</span>
       </Button>
 
@@ -40,7 +40,7 @@ export const FilePickerButtons: React.FC<FilePickerButtonsProps> = ({ onAddFiles
         onChange={(e) => addFromInput(e, onAddFiles)}
       />
       <Button data-testid="pick-folder" variant="secondary" size={size} onClick={() => folderInputRef.current?.click()}>
-        <FolderUp className="w-4 h-4" />
+        <Folder className="w-4 h-4" />
         <span>Folder</span>
       </Button>
     </>

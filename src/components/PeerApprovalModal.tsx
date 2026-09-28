@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { formatBytes } from '../utils/format';
 import { describePeer, placeFromTimeZone } from '../utils/deviceInfo';
+import { BrowserIcon } from './ui/BrowserIcon';
 import type { PeerDetails } from '../types/sharing';
 
 interface PeerApprovalModalProps {
@@ -37,6 +38,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
   onSelectFiles,
 }) => {
   const hasFiles = fileCount > 0;
+  const peer = describePeer(details);
 
   return (
     <Modal
@@ -64,14 +66,19 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
           {fileCount} {fileCount === 1 ? 'file' : 'files'}
         </DetailRow>
         <DetailRow label="Size">{formatBytes(totalBytes)}</DetailRow>
-        <DetailRow label="Device">{describePeer(details).name}</DetailRow>
+        <DetailRow label="Device">
+          <span className="inline-flex items-center gap-1.5">
+            <BrowserIcon browser={peer.browser} className="text-text-4" />
+            {peer.name}
+          </span>
+        </DetailRow>
         {details.ip && (
           <DetailRow label="Address">
             <span className="font-mono font-normal">{details.ip}</span>
           </DetailRow>
         )}
         {placeFromTimeZone(details.timeZone) && (
-          <DetailRow label="Location">{placeFromTimeZone(details.timeZone)}</DetailRow>
+          <DetailRow label="Time zone">{placeFromTimeZone(details.timeZone)}</DetailRow>
         )}
       </div>
 

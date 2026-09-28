@@ -43,6 +43,10 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
         shareKey,
         ...(introduction?.device && { device: introduction.device }),
         ...(introduction?.timeZone && { timeZone: introduction.timeZone }),
+        ...(introduction?.sessionId && { sessionId: introduction.sessionId }),
+        ...(introduction?.formFactor && { formFactor: introduction.formFactor }),
+        ...(introduction?.model && { model: introduction.model }),
+        ...(introduction?.storage && { storage: introduction.storage }),
       },
     });
   }
@@ -90,12 +94,11 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   protected async handleMessage(message: ControlMessage) {
     switch (message.type) {
       case 'MANIFEST':
-        // The sender may refine the list while this side is choosing; never once writing started
+        // The sender may refine the list while this side is choosing; never during a download
         if (this.createWriter) {
           throw new Error('The sender changed the file list after the download started');
         }
         this.manifest = message.payload;
-        this.beginTransfer(message.payload.totalBytes, message.payload.files.length);
         this.events.onManifest?.(message.payload);
         return;
       case 'AUTH_REQUEST':
@@ -143,6 +146,11 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   protected onStop() {
     this.writer?.abort();
     this.writer = null;
+  }
+
+  protected onDownloadFinished() {
+    // The next download asks where to save again and may come from an updated list
+    this.createWriter = null;
   }
 
   private async startFile(fileIndex: number): Promise<boolean> {

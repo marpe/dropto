@@ -16,7 +16,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   private paused = false;
   // Resolved on resume or stop; waiting on an event (not a timer) keeps throttled background tabs responsive
   private resumeWaiters: (() => void)[] = [];
-  // From transfer start until completion or stop; losing the connection in this window is a failure
+  // From a download's first file until it completes or stops; losing the connection in this window is a failure
   private isActive = false;
   private incomingQueue: Promise<void> = Promise.resolve();
   private corruptedFiles: string[] = [];
@@ -52,6 +52,9 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   /** Stop-time cleanup specific to one side (e.g. discarding a partial file). */
   protected onStop() {}
 
+  /** Resets one side for the next download on the same connection. */
+  protected onDownloadFinished() {}
+
   /** Resolves at once unless paused; otherwise when either side resumes or the transfer stops. */
   protected waitUntilResumed(): Promise<void> {
     if (!this.paused || this.isStopped) {
@@ -78,6 +81,7 @@ export abstract class TransferPeer<Events extends TransferEvents> {
 
   protected completeTransfer() {
     this.isActive = false;
+    this.onDownloadFinished();
     this.events.onAllCompleted?.({ corruptedFiles: [...this.corruptedFiles] });
   }
 
@@ -161,7 +165,12 @@ export abstract class TransferPeer<Events extends TransferEvents> {
   }
 
   private handleConnectionLost() {
+    if (this.isStopped) {
+      return;
+    }
     if (!this.isActive) {
+      this.stop();
+      this.events.onPeerLeft?.();
       return;
     }
     this.stop();

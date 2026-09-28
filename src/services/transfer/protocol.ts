@@ -84,6 +84,9 @@ function isByteCount(value: unknown): value is number {
 // Display-only details from the peer: short, plain and optional, so a bad value is dropped rather than fatal
 const DEVICE_PATTERN = /^[\p{L}\p{N} .-]{1,60}$/u;
 const TIME_ZONE_PATTERN = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+// Model names like "Pixel 8 Pro" or "SM-S918B"; anything else is not shown
+const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._()+-]{0,39}$/;
 
 function parseHello(payload: UnknownRecord): HelloPayload | null {
   if (typeof payload.shareKey !== 'string' && payload.shareKey !== null) {
@@ -95,6 +98,18 @@ function parseHello(payload: UnknownRecord): HelloPayload | null {
   }
   if (typeof payload.timeZone === 'string' && payload.timeZone.length <= 64 && TIME_ZONE_PATTERN.test(payload.timeZone)) {
     hello.timeZone = payload.timeZone;
+  }
+  if (typeof payload.sessionId === 'string' && SESSION_ID_PATTERN.test(payload.sessionId)) {
+    hello.sessionId = payload.sessionId;
+  }
+  if (payload.formFactor === 'phone' || payload.formFactor === 'tablet' || payload.formFactor === 'desktop') {
+    hello.formFactor = payload.formFactor;
+  }
+  if (typeof payload.model === 'string' && MODEL_PATTERN.test(payload.model)) {
+    hello.model = payload.model;
+  }
+  if (payload.storage === 'disk' || payload.storage === 'memory') {
+    hello.storage = payload.storage;
   }
   return hello;
 }

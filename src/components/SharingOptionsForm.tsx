@@ -7,7 +7,7 @@ import { NumberStepper } from './ui/NumberStepper';
 import { OptionRow } from './ui/OptionRow';
 import type { SharingOptions } from '../types/sharing';
 import { generatePin } from '../utils/pin';
-import { MAX_SIMULTANEOUS } from '../utils/sharingMemory';
+import { MAX_SIMULTANEOUS, MIN_SIMULTANEOUS } from '../utils/sharingLimits';
 
 interface SharingOptionsFormProps {
   options: SharingOptions;
@@ -79,20 +79,16 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
       isChecked={options.requireApproval}
       onChange={(requireApproval) => onChange({ ...options, requireApproval })}
     />
-    {/* One number for both: 1 is the one-person link, more lets that many download at once */}
     <OptionRow
-      label="Allow simultaneous downloads"
-      description={options.allowMultiple ? 'Others wait in line' : 'Single use'}
-      isActive={options.allowMultiple}
+      label="Simultaneous downloads"
+      description="Others wait in line"
       control={
         <NumberStepper
           label="Simultaneous downloads"
-          value={options.allowMultiple ? options.maxSimultaneous : 1}
-          min={1}
+          value={options.maxSimultaneous}
+          min={MIN_SIMULTANEOUS}
           max={MAX_SIMULTANEOUS}
-          onChange={(count) =>
-            onChange(count > 1 ? { ...options, allowMultiple: true, maxSimultaneous: count } : { ...options, allowMultiple: false })
-          }
+          onChange={(maxSimultaneous) => onChange({ ...options, maxSimultaneous })}
         />
       }
     />

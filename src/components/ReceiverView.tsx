@@ -3,17 +3,15 @@ import { AlertCircle, RotateCw } from 'lucide-react';
 import { Screen } from './ui/Screen';
 import { IconBadge } from './ui/IconBadge';
 import { Button } from './ui/Button';
-import { Spinner } from './ui/Spinner';
 import { StatusCard } from './ui/StatusCard';
-import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
-import { MetricsDashboard } from './MetricsDashboard';
+import type { FinishedFile, ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
+import { TransferSummary } from './TransferSummary';
 import { PinEntryCard } from './PinEntryCard';
 import { WaitingForSenderCard } from './WaitingForSenderCard';
 import type { WaitingStage } from './WaitingForSenderCard';
 import { IncomingFilesCard } from './IncomingFilesCard';
 import { RoomCodeForm } from './RoomCodeForm';
 import { pickFiles } from '../utils/fileSelection';
-import { settledMetrics } from '../utils/transferProgress';
 import type { PinPrompt } from '../types/transfer';
 
 interface ReceiverViewProps {
@@ -39,8 +37,12 @@ interface ReceiverViewProps {
   isInvited?: boolean;
   /** Manifest indices being downloaded; null means all of them */
   selectedFileIndices?: number[] | null;
-  /** Place in the sender's line while it is busy with others */
+  /** Place in the sender's line while the download waits for a free slot */
   queuePosition?: number | null;
+  /** Files downloaded so far on this connection, by id */
+  finishedFiles?: Record<string, FinishedFile>;
+  /** The sender went away after a finished download */
+  hasSenderLeft?: boolean;
 }
 
 function getWaitingStage(
@@ -50,9 +52,6 @@ function getWaitingStage(
 ): WaitingStage | null {
   if (status === 'connecting') {
     return 'connecting';
-  }
-  if (status === 'queued') {
-    return 'queued';
   }
   if (status === 'verifying_pin') {
     return 'pin';
@@ -91,47 +90,39 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   isInvited = false,
   selectedFileIndices = null,
   queuePosition = null,
+  finishedFiles = {},
+  hasSenderLeft = false,
 }) => {
   const waitingStage = getWaitingStage(connectionState, isInvited, manifest);
-  const transferFiles = pickFiles(manifest?.files ?? [], selectedFileIndices);
+  const isTransferring = connectionState === 'transferring';
+  const hasDownloaded = isTransferring || connectionState === 'completed';
+  const isChoosing = connectionState === 'connected' && !waitingStage;
 
   return (
     <Screen>
-      {/* Active Transfer State */}
-      {connectionState === 'transferring' ? (
-        transferMetrics ? (
-          <MetricsDashboard
-            metrics={transferMetrics}
-            files={transferFiles}
-            isSender={false}
-            isPaused={isPaused}
+      {/* One list from choosing through downloading to done, so ticks and scroll position survive */}
+      {manifest && (isChoosing || hasDownloaded) ? (
+        <>
+          {hasDownloaded && (
+            <TransferSummary
+              metrics={transferMetrics}
+              files={pickFiles(manifest.files, selectedFileIndices)}
+              isPaused={isPaused}
+              queuePosition={isTransferring ? queuePosition : null}
+              completion={isTransferring ? null : { corruptedFiles }}
+            />
+          )}
+          <IncomingFilesCard
+            manifest={manifest}
+            isNativeFSA={isNativeFSA}
+            onStartSaving={onStartSaving}
+            download={isTransferring ? { fileIndices: selectedFileIndices, metrics: transferMetrics, isPaused } : null}
+            finishedFiles={finishedFiles}
+            hasSenderLeft={hasSenderLeft}
             onTogglePause={onTogglePause}
             onCancel={onCancelTransfer}
           />
-        ) : (
-          <StatusCard
-            badge={<Spinner className="w-10 h-10 border-[3px] text-brand-500" />}
-            title="Preparing to save…"
-            description="Choose where to save."
-          />
-        )
-      ) : connectionState === 'completed' ? (
-        <MetricsDashboard
-          metrics={settledMetrics(transferMetrics, transferFiles)}
-          files={transferFiles}
-          isSender={false}
-          isPaused={false}
-          onTogglePause={onTogglePause}
-          onCancel={onCancelTransfer}
-          completion={{
-            corruptedFiles,
-            actions: (
-              <Button onClick={onReset} className="px-6">
-                Receive more files
-              </Button>
-            ),
-          }}
-        />
+        </>
       ) : connectionState === 'error' && errorMessage ? (
         // A dead end gets its own screen: the code form would invite retrying something that cannot work
         <StatusCard
@@ -153,14 +144,11 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
         <WaitingForSenderCard
           stage={waitingStage}
           roomCode={roomCode}
-          queuePosition={queuePosition}
           // Still connecting there is no engine to cancel; starting over abandons the attempt
           onCancel={waitingStage === 'connecting' ? onReset : onCancelTransfer}
         />
       ) : connectionState === 'pin_required' && pinPrompt ? (
         <PinEntryCard pin={pin} prompt={pinPrompt} onPinChange={onPinChange} onSubmit={onSubmitPin} />
-      ) : manifest ? (
-        <IncomingFilesCard manifest={manifest} isNativeFSA={isNativeFSA} onStartSaving={onStartSaving} />
       ) : (
         <RoomCodeForm roomCode={roomCode} onRoomCodeChange={onRoomCodeChange} onConnect={onConnect} />
       )}

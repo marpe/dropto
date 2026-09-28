@@ -13,6 +13,18 @@ export function formatSpeed(bytesPerSec: number): string {
   return `${formatBytes(bytesPerSec)}/s`;
 }
 
+/** A rough, calm age: "10 s", "3 min", "2 h"; finer steps would only make the text flicker. */
+export function formatElapsed(fromMs: number, nowMs: number): string {
+  const seconds = Math.max(Math.floor((nowMs - fromMs) / 1000), 0);
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)} min`;
+  }
+  return `${Math.floor(seconds / 3600)} h`;
+}
+
 export function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0 || !isFinite(seconds)) {
     return '--';

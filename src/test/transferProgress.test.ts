@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getFileProgress } from '../utils/transferProgress';
+import { getFileProgress, getOfferedFileProgress } from '../utils/transferProgress';
 import type { TransferMetrics } from '../types/transfer';
 
 const files = [{ name: 'a.txt' }, { name: 'b.txt', relativePath: 'docs/b.txt' }, { name: 'c.txt' }];
@@ -43,6 +43,40 @@ describe('getFileProgress', () => {
       { status: 'done', seconds: 3 },
       { status: 'corrupted', seconds: 1.5 },
       { status: 'done', seconds: 0 },
+    ]);
+  });
+});
+
+describe('getOfferedFileProgress', () => {
+  const offered = [
+    { id: 'a', name: 'a.txt' },
+    { id: 'b', name: 'b.txt' },
+    { id: 'c', name: 'c.txt' },
+  ];
+
+  it('shows nothing for files never downloaded, and results for files finished earlier', () => {
+    expect(getOfferedFileProgress(offered, null, { b: { seconds: 2, isCorrupted: false }, c: { seconds: null, isCorrupted: true } })).toEqual([
+      null,
+      { status: 'done', seconds: 2 },
+      { status: 'corrupted', seconds: null },
+    ]);
+  });
+
+  it('shows live progress for the files in the running download, counted within it', () => {
+    const download = { fileIndices: [0, 2], metrics: { ...metricsAt(0, 100), currentFileIndex: 1, currentFilePercent: 25 } };
+
+    expect(getOfferedFileProgress(offered, download, { b: { seconds: 2, isCorrupted: false } })).toEqual([
+      { status: 'done', seconds: 3 },
+      { status: 'done', seconds: 2 },
+      { status: 'active', percent: 25 },
+    ]);
+  });
+
+  it('covers every file when the download took the whole list', () => {
+    expect(getOfferedFileProgress(offered, { fileIndices: null, metrics: null }, {}).map((progress) => progress?.status)).toEqual([
+      'pending',
+      'pending',
+      'pending',
     ]);
   });
 });

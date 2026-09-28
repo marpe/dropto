@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeDevice, describePeer, placeFromTimeZone } from '../utils/deviceInfo';
+import { describeDevice, describeFormFactor, describePeer, placeFromTimeZone } from '../utils/deviceInfo';
 
 describe('describeDevice', () => {
   it.each([
@@ -58,14 +58,43 @@ describe('placeFromTimeZone', () => {
 });
 
 describe('describePeer', () => {
-  it('names the device and lists the address and place', () => {
+  it('splits the browser from the system and labels the time zone', () => {
     expect(describePeer({ device: 'Chrome on Android', timeZone: 'Europe/Stockholm', ip: '203.0.113.7' })).toEqual({
-      name: 'Chrome on Android',
-      meta: '203.0.113.7 · Stockholm',
+      browser: 'Chrome',
+      name: 'Android',
+      meta: '203.0.113.7 · Time zone: Stockholm',
+    });
+  });
+
+  it('keeps a device without a known browser as its name', () => {
+    expect(describePeer({ device: 'Android device', timeZone: null, ip: null })).toEqual({
+      browser: null,
+      name: 'Android device',
+      meta: null,
     });
   });
 
   it('still reads well with nothing known', () => {
-    expect(describePeer({ device: null, timeZone: null, ip: null })).toEqual({ name: 'Unknown device', meta: null });
+    expect(describePeer({ device: null, timeZone: null, ip: null })).toEqual({ browser: null, name: 'Unknown device', meta: null });
+  });
+
+  it('adds the model to the system, and says when the connection goes through a relay', () => {
+    expect(
+      describePeer({ device: 'Chrome on Android', timeZone: null, ip: null, model: 'Pixel 8', route: 'relayed' })
+    ).toEqual({ browser: 'Chrome', name: 'Android · Pixel 8', meta: 'Relayed' });
+  });
+});
+
+describe('describeFormFactor', () => {
+  it.each([
+    ['Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36', 0, 'phone'],
+    ['Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 Chrome/126.0 Safari/537.36', 0, 'tablet'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1', 5, 'phone'],
+    // iPadOS asks for desktop sites and says it is a Mac; only the touch screen tells
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15', 5, 'tablet'],
+    ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.5 Safari/605.1.15', 0, 'desktop'],
+    ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0 Safari/537.36', 0, 'desktop'],
+  ] as const)('%s with %i touch points is a %s', (userAgent, maxTouchPoints, expected) => {
+    expect(describeFormFactor(userAgent, maxTouchPoints)).toBe(expected);
   });
 });

@@ -14,7 +14,7 @@ export const Screen: React.FC<ScreenProps> = ({ children, className }) => (
   <div
     className={cn(
       // Grouped sections on a phone; one panel divided by hairlines on desktop
-      'w-full flex flex-col gap-4 sm:gap-0 sm:divide-y sm:divide-border-1 motion-safe:animate-screen-in motion-reduce:animate-fade-in',
+      'w-full flex flex-col gap-4 motion-safe:animate-screen-in motion-reduce:animate-fade-in',
       className
     )}
   >

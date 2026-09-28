@@ -26,6 +26,7 @@ export class FakeTransfer {
   public options: ReceiverOptions;
   public start = vi.fn();
   public updateFiles = vi.fn().mockReturnValue(true);
+  public holdUntil = vi.fn();
   public startReceiving = vi.fn().mockResolvedValue(true);
   public submitPin = vi.fn();
   public togglePause = vi.fn().mockReturnValue(true);

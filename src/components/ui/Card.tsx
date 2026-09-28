@@ -20,7 +20,7 @@ const paddingClasses: Record<CardPadding, string> = {
 export const Card: React.FC<CardProps> = ({ padding = 'lg', className, ...props }) => (
   <div
     className={cn(
-      'bg-surface-1 border-y border-border-1 sm:border-0',
+      'bg-surface-1 border-y border-border-1 sm:rounded-xl',
       paddingClasses[padding],
       className
     )}

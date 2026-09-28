@@ -308,15 +308,31 @@ describe('introduction and live file list', () => {
     expect(places).toEqual([2, 1]);
   });
 
-  it('introduces its device and time zone, so the sender can tell people apart', () => {
+  it('introduces its device, time zone and tab, so the sender can tell people apart and recognise them', () => {
+    const receiverConn = new MockDataConnection();
+    const introduction = {
+      device: 'Chrome on Android',
+      timeZone: 'Europe/Stockholm',
+      sessionId: '0f8c3b4e-7a52-4d0b-9a57-2d1c6e8b9f10',
+      formFactor: 'phone',
+      model: 'Pixel 8',
+      storage: 'memory',
+    } as const;
+
+    new TransferReceiver(asConnection(receiverConn), {}, { shareKey: 'k', introduction });
+
+    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'k', ...introduction }]);
+  });
+
+  it('leaves out what it does not know about itself', () => {
     const receiverConn = new MockDataConnection();
 
     new TransferReceiver(asConnection(receiverConn), {}, {
       shareKey: 'k',
-      introduction: { device: 'Chrome on Android', timeZone: 'Europe/Stockholm' },
+      introduction: { device: null, timeZone: null, sessionId: null, formFactor: null, model: null, storage: 'disk' },
     });
 
-    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'k', device: 'Chrome on Android', timeZone: 'Europe/Stockholm' }]);
+    expect(helloPayloads(receiverConn)).toEqual([{ shareKey: 'k', storage: 'disk' }]);
   });
 
   it('greets without a key when the room code was typed in', () => {
@@ -482,6 +498,71 @@ describe('choosing which files to receive', () => {
   });
 });
 
+describe('downloading again on the same connection', () => {
+  async function finishFirstDownload(senderEvents: SenderEvents = {}, receiverEvents: ReceiverEvents = {}) {
+    const storage = fakeStorage();
+    let manifests: TransferManifest[] = [];
+    const pair = createTransferPair({
+      isAutoReceiving: false,
+      senderEvents,
+      receiverEvents: {
+        ...receiverEvents,
+        onManifest: (manifest) => {
+          manifests = [...manifests, manifest];
+        },
+      },
+      receiverOptions: { chooseStorage: storage.chooseStorage },
+    });
+    pair.sender.start([createTestFile(1024, 'a.bin'), createTestFile(2048, 'b.bin'), createTestFile(4096, 'c.bin')]);
+    await waitFor(() => manifests.length > 0);
+    await pair.receiver.startReceiving([0]);
+    await waitFor(pair.isComplete);
+    pair.record.senderResult = null;
+    pair.record.receiverResult = null;
+    return { ...pair, storage, manifests: () => manifests };
+  }
+
+  it('lets the receiver pick and download more files after finishing', async () => {
+    const started: number[][] = [];
+    const session = await finishFirstDownload({ onReceiverStarted: (fileIndices) => started.push(fileIndices) });
+
+    expect(await session.receiver.startReceiving([2])).toBe(true);
+
+    expect(await waitFor(session.isComplete)).toBe(true);
+    expect(started).toEqual([[0], [2]]);
+    expect(session.storage.writers.map((writer) => vi.mocked(writer.prepare).mock.calls[0][0])).toEqual(['a.bin', 'c.bin']);
+    expect(session.record.senderErrors).toEqual([]);
+    expect(session.record.receiverErrors).toEqual([]);
+  });
+
+  it('downloads the same files again, sized to the new download', async () => {
+    const snapshots: TransferMetrics[] = [];
+    const session = await finishFirstDownload({}, { onMetrics: (metrics) => snapshots.push(metrics) });
+
+    await session.receiver.startReceiving();
+
+    expect(await waitFor(session.isComplete)).toBe(true);
+    expect(snapshots.at(-1)).toMatchObject({ totalBytes: 1024 + 2048 + 4096, totalFiles: 3 });
+    expect(session.storage.writers).toHaveLength(4);
+  });
+
+  it('shows the receiver files the sender adds after a download finished', async () => {
+    const session = await finishFirstDownload();
+
+    const isUpdated = session.sender.updateFiles([
+      createTestFile(1024, 'a.bin'),
+      createTestFile(2048, 'b.bin'),
+      createTestFile(4096, 'c.bin'),
+      createTestFile(512, 'd.bin'),
+    ]);
+
+    expect(isUpdated).toBe(true);
+    expect(await waitFor(() => session.manifests().length === 2)).toBe(true);
+    expect(session.manifests()[1].files.map((file) => file.name)).toContain('d.bin');
+    expect(session.record.receiverErrors).toEqual([]);
+  });
+});
+
 describe('pause and resume', () => {
   const fileChunksSent = (conn: MockDataConnection) => conn.sent.filter((data) => typeof data !== 'string').length;
 
@@ -545,48 +626,76 @@ describe('backpressure', () => {
 });
 
 describe('connection loss', () => {
-  it('reports a dropped connection separately from errors when the UI wants to handle it', () => {
-    const senderConn = new MockDataConnection();
-    const errors: string[] = [];
-    let losses = 0;
-    const sender = new TransferSender(asConnection(senderConn), {
-      onError: (message) => {
-        errors.push(message);
+  /** A pair whose receiver has started downloading, held mid-file by a disk write that never finishes. */
+  async function pairMidTransfer(senderEvents: SenderEvents = {}) {
+    let hasStarted = false;
+    const pair = createTransferPair({
+      senderEvents: {
+        ...senderEvents,
+        onReceiverStarted: () => {
+          hasStarted = true;
+        },
       },
+      receiverOptions: { chooseStorage: fakeStorage(() => new Promise(() => {})).chooseStorage },
+    });
+    pair.sender.start([createTestFile(512 * 1024)]);
+    await waitFor(() => hasStarted);
+    return pair;
+  }
+
+  it('reports a dropped connection separately from errors when the UI wants to handle it', async () => {
+    let losses = 0;
+    const pair = await pairMidTransfer({
       onConnectionLost: () => {
         losses++;
       },
     });
 
-    sender.start([createTestFile(10 * 1024)]);
-    senderConn.emit('close');
+    pair.senderConn.emit('close');
 
     expect(losses).toBe(1);
-    expect(errors).toEqual([]);
+    expect(pair.record.senderErrors).toEqual([]);
   });
 
-  it('reports an error to the sender when the connection closes mid-transfer', () => {
+  it('reports an error to the sender when the connection closes mid-transfer', async () => {
+    const pair = await pairMidTransfer();
+
+    pair.senderConn.emit('close');
+
+    expect(pair.record.senderErrors).toHaveLength(1);
+  });
+
+  it('reports a receiver leaving before it starts downloading as leaving, not an error', () => {
     const senderConn = new MockDataConnection();
     const errors: string[] = [];
+    let departures = 0;
     const sender = new TransferSender(asConnection(senderConn), {
       onError: (message) => {
         errors.push(message);
+      },
+      onPeerLeft: () => {
+        departures++;
       },
     });
 
     sender.start([createTestFile(10 * 1024)]);
     senderConn.emit('close');
 
-    expect(errors).toHaveLength(1);
+    expect(departures).toBe(1);
+    expect(errors).toEqual([]);
   });
 
-  it('reports an error to the receiver when the connection closes after the manifest arrives', async () => {
+  it('reports the sender leaving while the receiver is still choosing as leaving, not an error', async () => {
     let hasManifest = false;
+    let departures = 0;
     const pair = createTransferPair({
       isAutoReceiving: false,
       receiverEvents: {
         onManifest: () => {
           hasManifest = true;
+        },
+        onPeerLeft: () => {
+          departures++;
         },
       },
     });
@@ -595,17 +704,23 @@ describe('connection loss', () => {
     await waitFor(() => hasManifest);
     pair.receiverConn.emit('close');
 
-    expect(pair.record.receiverErrors).toHaveLength(1);
+    expect(departures).toBe(1);
+    expect(pair.record.receiverErrors).toEqual([]);
   });
 
-  it('does not report an error when the connection closes after the transfer completed', async () => {
-    const pair = createTransferPair();
+  it('reports the connection closing after a finished download as the peer leaving, not an error', async () => {
+    let departures = 0;
+    const onPeerLeft = () => {
+      departures++;
+    };
+    const pair = createTransferPair({ senderEvents: { onPeerLeft }, receiverEvents: { onPeerLeft } });
 
     pair.sender.start([createTestFile(10 * 1024)]);
     expect(await waitFor(pair.isComplete)).toBe(true);
     pair.senderConn.emit('close');
     pair.receiverConn.emit('close');
 
+    expect(departures).toBe(2);
     expect(pair.record.senderErrors).toEqual([]);
     expect(pair.record.receiverErrors).toEqual([]);
   });

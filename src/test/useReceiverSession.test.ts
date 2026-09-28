@@ -77,20 +77,15 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.manifest).toEqual(manifest);
   });
 
-  it('waits in line while the sender is busy with others, then shows the files', async () => {
+  it('ignores a place in line outside a download, since only downloads wait for a slot', async () => {
     const session = renderReceiverSession();
     const { engine } = await connect(session);
 
     act(() => {
       engine.events.onQueued?.(2);
     });
-    expect(session.result.current.state.status).toBe('queued');
-    expect(session.result.current.state.queuePosition).toBe(2);
 
-    act(() => {
-      engine.events.onManifest?.(manifest);
-    });
-    expect(session.result.current.state.status).toBe('connected');
+    expect(session.result.current.state.status).toBe('waiting_approval');
     expect(session.result.current.state.queuePosition).toBeNull();
   });
 
@@ -296,7 +291,7 @@ describe('useReceiverSession', () => {
     expect(session.result.current.state.status).toBe('transferring');
   });
 
-  it('shows completion with corrupted files and leaves the room gracefully', async () => {
+  it('shows completion with corrupted files and stays connected for another download', async () => {
     const session = renderReceiverSession();
     const { engine, connection } = await connectWithManifest(session);
 
@@ -306,7 +301,95 @@ describe('useReceiverSession', () => {
 
     expect(session.result.current.state.status).toBe('completed');
     expect(session.result.current.state.corruptedFiles).toEqual(['hello.txt']);
-    expect(connection.disconnectPeer).toHaveBeenCalled();
+    expect(session.result.current.state.finishedFiles).toEqual({ f1: { seconds: null, isCorrupted: true } });
+    expect(connection.disconnectPeer).not.toHaveBeenCalled();
+  });
+
+  it('downloads again from the same list after finishing', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+
+    expect(engine.startReceiving).toHaveBeenCalledTimes(2);
+    expect(session.result.current.state.status).toBe('transferring');
+    expect(session.effects.onTransferStarted).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps finished files marked when the sender adds more after a download', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    const grown: TransferManifest = {
+      totalBytes: 8,
+      files: [...manifest.files, { id: 'f2', name: 'more.txt', size: 3, type: 'text/plain' }],
+    };
+    act(() => {
+      engine.events.onManifest?.(grown);
+    });
+
+    expect(session.result.current.state.status).toBe('completed');
+    expect(session.result.current.state.manifest).toEqual(grown);
+    expect(Object.keys(session.result.current.state.finishedFiles)).toEqual(['f1']);
+  });
+
+  it('keeps the finished list, but says so, when the sender leaves afterwards', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    act(() => {
+      engine.events.onPeerLeft?.();
+    });
+
+    expect(session.result.current.state.status).toBe('completed');
+    expect(session.result.current.state.hasSenderLeft).toBe(true);
+    expect(session.result.current.state.manifest).toEqual(manifest);
+  });
+
+  it('shows its place in line within the download when the sender is busy', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+
+    act(() => {
+      engine.events.onQueued?.(2);
+    });
+    expect(session.result.current.state.status).toBe('transferring');
+    expect(session.result.current.state.queuePosition).toBe(2);
+
+    act(() => {
+      engine.events.onMetrics?.({
+        currentSpeed: 1,
+        averageSpeed: 1,
+        elapsedSeconds: 1,
+        etaSeconds: 4,
+        bytesTransferred: 1,
+        totalBytes: 5,
+        overallPercent: 20,
+        currentFileIndex: 0,
+        totalFiles: 1,
+        currentFileName: 'hello.txt',
+        currentFilePercent: 20,
+        fileSeconds: [],
+      });
+    });
+    expect(session.result.current.state.queuePosition).toBeNull();
   });
 
   it('shows why the transfer failed and leaves the room', async () => {
@@ -510,7 +593,7 @@ describe('useReceiverSession', () => {
       });
 
       act(() => {
-        session.engines[0].events.onConnectionLost?.();
+        session.engines[0].events.onPeerLeft?.();
       });
 
       await waitFor(() => expect(session.engines).toHaveLength(2));
@@ -523,7 +606,8 @@ describe('useReceiverSession', () => {
         session.connections[0].handlers.onDisconnected?.();
       });
 
-      await waitFor(() => expect(session.result.current.state.status).toBe('error'));
+      // Ten attempts, each a few async steps: allow for a busy test run
+      await waitFor(() => expect(session.result.current.state.status).toBe('error'), { timeout: 3000 });
       expect(session.connections.length).toBeGreaterThan(2);
       expect(session.result.current.state.error).toBeTruthy();
     });
