@@ -18,7 +18,7 @@ interface MenuProps {
 /**
  * A menu on the native Popover API, so clicking outside or pressing Escape closes it without extra code.
  * It drops down under its trigger on wider screens and opens as an action sheet on phones (menu-popover
- * in base.css).
+ * in base.css, which also animates it in and out, so closing needs nothing more than hidePopover()).
  */
 export const Menu: React.FC<MenuProps> = ({ title, icon: Icon, anchorName, triggerClassName, children }) => {
   const menuId = useId();
