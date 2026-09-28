@@ -13,28 +13,30 @@
 Standard web apps fail when transferring files larger than 1–2 GB in a browser because JavaScript tries to buffer the entire file into RAM (`Blob` / `ArrayBuffer`), triggering an immediate **Out-Of-Memory (OOM) tab crash**.
 
 **dropto.space** overcomes this with a streaming architecture:
-1. **Zero-RAM Disk Streaming**: Uses the **File System Access API** (`showSaveFilePicker` -> `createWritable`) on Chromium browsers (Chrome, Edge, Brave, Opera). Incoming 64 KB SCTP chunks write directly to disk as they arrive, keeping memory usage **under 50 MB** even when streaming a 100 GB file.
+1. **Zero-RAM Disk Streaming**: Uses the **File System Access API** (`showSaveFilePicker` -> `createWritable`) on Chromium browsers (Chrome, Edge, Brave, Opera). Incoming 64 KB chunks are written to disk as they arrive, so memory use stays flat however large the file.
 2. **Active Backpressure Flow Control**: Monitors `RTCDataChannel.bufferedAmount`. When the buffer exceeds 1 MB (`HIGH_WATERMARK`), file slicing pauses and only resumes when the buffer drains below 256 KB (`onbufferedamountlow`), preventing packet drops and tab freezes.
 3. **Chunk-Indexed Protocol**: 64 KB slices indexed with 64-bit sequence numbers.
 4. **Streaming Checksum Verification**: Computes incremental IEEE 802.3 CRC-32 on the fly on both sender and receiver to verify end-to-end data integrity without CPU bottlenecks.
-5. **Screen Wake Lock API**: Prevents the device from sleeping or throttling background tabs during long multi-gigabyte transfers.
+5. **Resumable Downloads**: If the connection drops mid-file, the receiver reconnects and carries on from the last chunk it wrote instead of starting over.
+6. **Screen Wake Lock API**: Keeps the device awake during long transfers.
 
 ---
 
 ## ✨ Features
 
-- 🚀 **Files up to 10GB+**: Tested for multi-gigabyte files with constant, minimal memory consumption.
-- 🔒 **Direct P2P & DTLS Encrypted**: Files travel straight from device to device. Zero intermediate servers, zero uploads, zero cloud storage.
-- 📱 **QR Code Mobile Pairing**: Instant camera scan from phone to connect PC and mobile devices.
-- 🛡️ **Sender Connection Approval**: Sender explicitly reviews and accepts/declines incoming peer requests before any file metadata or chunks are sent.
-- 🔑 **Optional Session PIN**: The receiver must enter the sender's PIN (up to 6 characters, 3 attempts) before any file names or data are shared.
-- 📂 **Multi-File & Folder Queue**: Drag-and-drop multiple files or entire folder hierarchies with sequential transfers.
-- 📊 **Real-time Transfer Dashboard**: Live speedometer (MB/s gauge), dynamic ETA calculator, per-file and total progress bars, and dynamic tab title percentage.
-- 🔔 **Audio Chimes & Notifications**: Pleasant Web Audio synth chimes on peer connect and transfer completion (zero external media assets required).
-- 🌐 **Zero Server Setup**: Uses free public PeerJS cloud signaling (`0.peerjs.com`) with shareable 6-digit codes (`DT-XXXXXX`) and URLs.
-- ⚙️ **Enterprise Ready**: Built-in settings modal to configure custom signaling servers and private STUN/TURN relays for strict corporate NATs/firewalls.
-- 🌙 **Dark & Light Mode**: Auto-detects system theme with instant toggle and zero flash of unstyled content (FOUC).
-- 📦 **Installable PWA**: Offline asset caching and installable app icon for desktop and mobile.
+- 🚀 **Large Files**: On Chromium browsers downloads stream straight to disk; Firefox and Safari hold a download in memory until it is done, so very large files may not fit there.
+- 🔒 **Direct & Encrypted**: Files travel device to device over DTLS-encrypted WebRTC. No uploads, no cloud storage. A signalling server (the public PeerJS one, `0.peerjs.com`, by default) only introduces the two browsers; a TURN relay, if you configure one, forwards the encrypted data when a direct route is impossible.
+- 🔗 **Share by Link**: Copy link hands out `?room=DT-XXXXXX#key=…`. The random 128-bit key lives in the URL fragment, which browsers never send to a server; anyone with the link joins without asking, while someone with only the room code waits for you to accept.
+- 👥 **Several People at Once**: Everyone with the link can browse and pick files at the same time; up to three download at once and the rest wait in line.
+- ☑️ **Pick What to Download**: Receivers tick the files they want, and can come back for more or download again while connected.
+- 📂 **Files & Folders**: Drop or paste files and whole folders anywhere on the page; folder structure is recreated on the receiving side.
+- ♻️ **Survives a Reload**: The sender's link and file list persist across a reload; on Chromium the files themselves come back too.
+- ✅ **Integrity Check**: Every file is verified end to end with CRC-32.
+- 📊 **Live Progress**: Per-person and per-file progress and speed, with the percentage in the tab title.
+- 🔔 **Notifications & Chimes**: System notifications and optional Web Audio chimes when someone connects or a transfer finishes.
+- ⚙️ **Custom Servers**: Settings for your own PeerJS signalling server and STUN/TURN relays for strict NATs and firewalls.
+- 🌙 **Light & Dark**: Follows the system theme, or pick one, without a flash on load.
+- 📦 **Installable PWA**: Install it as an app on desktop and mobile.
 
 ---
 
@@ -70,18 +72,16 @@ If you edit the inline theme script in `index.html`, regenerate its hash in the 
 
 ## 🌐 Browser Compatibility
 
-| Browser | Direct-to-Disk (Zero RAM) | Max Tested File Size |
-| :--- | :---: | :---: |
-| **Google Chrome** (v86+) | ✅ Native File System Access | 100 GB+ |
-| **Microsoft Edge** (v86+) | ✅ Native File System Access | 100 GB+ |
-| **Brave / Opera** | ✅ Native File System Access | 100 GB+ |
-| **Mozilla Firefox** | ⚠️ Streaming Fallback | ~2–4 GB (Heap limit) |
-| **Apple Safari / iOS** | ⚠️ Streaming Fallback | ~2–4 GB (Heap limit) |
+| Receiving browser | Where downloads go |
+| :--- | :--- |
+| **Chrome, Edge, Brave, Opera** (Chromium 86+) | ✅ Straight to disk (File System Access API) |
+| **Mozilla Firefox** | ⚠️ Memory until the download finishes |
+| **Apple Safari / iOS** | ⚠️ Memory until the download finishes |
 
-> **Note for 10GB+ transfers**: We recommend using a Chromium-based browser (Chrome, Edge, Brave) on the receiving side for transfers over 4 GB to enable native zero-RAM streaming direct to disk.
+> **Very large files**: receive them in a Chromium-based browser. Elsewhere the whole download has to fit in the tab's memory, which usually tops out at a few GB. The sender sees a "Saves to memory" warning next to such a receiver.
 
 ---
 
 ## 📜 License
 
-MIT License. Free for personal and commercial use.
+[MIT](LICENSE)
