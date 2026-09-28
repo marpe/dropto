@@ -4,7 +4,7 @@ import { ProgressBar } from './ui/ProgressBar';
 import type { FileProgress } from '../utils/transferProgress';
 
 /** Width of a `FileTable` column holding this cell: the percent (or warning), and the bar once there is room */
-export const FILE_PROGRESS_COLUMN = 'w-8 @xs:w-23';
+export const FILE_PROGRESS_COLUMN = 'w-8 @xs:w-20';
 
 /**
  * A file's place in a download, at the end of its row: an empty bar while it waits, the bar and its percent while
@@ -16,7 +16,7 @@ export const FileProgressCell: React.FC<{ progress: FileProgress }> = ({ progres
     <ProgressBar
       percent={progress.status === 'active' ? progress.percent : progress.status === 'pending' ? 0 : 100}
       variant="subtle"
-      className="hidden @xs:block shrink-0 w-12"
+      className="hidden @xs:block shrink-0 w-10"
     />
     <span className="flex shrink-0 w-8 justify-end tabular-nums text-text-4">
       {progress.status === 'active' && <span className="text-brand-500">{Math.round(progress.percent)}%</span>}

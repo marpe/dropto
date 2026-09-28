@@ -65,16 +65,32 @@ const ColumnsContext = createContext<Columns>({ hasLead: false, widths: {} });
 
 const widthStyle = (width: number | undefined) => (width === undefined ? undefined : { width });
 
+// Fixed columns only as wide as their content, so the name gets the rest
 const CELL = {
   lead: 'flex shrink-0 w-4',
-  name: 'flex-1 min-w-0 truncate',
-  type: 'hidden @sm:block shrink-0 w-12 truncate uppercase',
-  size: 'shrink-0 w-18 text-right tabular-nums',
-  modified: 'hidden @md:block shrink-0 w-26 text-right tabular-nums',
-  trail: 'flex shrink-0 items-center justify-end gap-3',
+  name: 'flex flex-1 min-w-0',
+  type: 'hidden @sm:block shrink-0 w-10 truncate uppercase',
+  size: 'shrink-0 w-16 text-right tabular-nums',
+  modified: 'hidden @md:block shrink-0 w-24 text-right tabular-nums',
+  trail: 'flex shrink-0 items-center justify-end gap-2',
 };
 
-const ROW = 'flex items-center gap-3 px-2';
+const ROW = 'flex items-center gap-2 px-2';
+
+// Names often differ only at the end ("Screenshot 2026-09-04 001512.png"), so a long one is cut in the middle
+const NAME_TAIL_LENGTH = 12;
+
+const FileName: React.FC<{ path: string }> = ({ path }) => {
+  if (path.length <= NAME_TAIL_LENGTH * 2) {
+    return <span className="truncate">{path}</span>;
+  }
+  return (
+    <>
+      <span className="truncate">{path.slice(0, -NAME_TAIL_LENGTH)}</span>
+      <span className="shrink-0 whitespace-pre">{path.slice(-NAME_TAIL_LENGTH)}</span>
+    </>
+  );
+};
 
 interface ResizeHandleProps {
   width: number | undefined;
@@ -184,7 +200,7 @@ export const FileTableRow: React.FC<FileTableRowProps> = ({
           className={cn(CELL.name, 'font-semibold', progress?.status === 'corrupted' ? 'text-text-warning-1' : 'text-text-2')}
           title={displayPath(file)}
         >
-          {displayPath(file)}
+          <FileName path={displayPath(file)} />
         </span>
         <span className={cn(CELL.type, 'text-text-5')} style={widthStyle(widths.type)}>
           {fileExtension(file.name)}
