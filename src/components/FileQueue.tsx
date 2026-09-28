@@ -24,8 +24,6 @@ interface FileQueueProps {
   /** One file (its remove button) or several (ticked, then Remove) */
   onRemoveFiles: (fileIds: string[]) => void;
   onClearFiles: () => void;
-  /** Below the list, e.g. the Share button */
-  footer?: React.ReactNode;
 }
 
 export const FileQueue: React.FC<FileQueueProps> = ({
@@ -37,7 +35,6 @@ export const FileQueue: React.FC<FileQueueProps> = ({
   fileInputRef,
   onRemoveFiles,
   onClearFiles,
-  footer,
 }) => {
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
   const missingIds = new Set(missingFiles.map((file) => file.id));
@@ -132,7 +129,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({
                  )} />
 
       {/* While files are ticked, the footer is about them; otherwise it counts the list and adds to it */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1 sm:rounded-xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1">
         {ticked.length > 0 ? (
           <>
             <span data-testid="ticked-count"
@@ -160,6 +157,15 @@ export const FileQueue: React.FC<FileQueueProps> = ({
                         ofCount={files.length + missingFiles.length}
                         totalBytes={totalBytes} />
             <div className="flex items-center gap-2">
+              {/* Only the icon on phones, so it fits on one row with File and Folder */}
+              <Button variant="ghost"
+                      size="sm"
+                      title="Clear all"
+                      onClick={onClearFiles}
+                      className="hover:bg-surface-danger-1 hover:text-text-danger-1">
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="max-sm:sr-only">Clear all</span>
+              </Button>
               <FilePickerButtons onAddFiles={onAddFiles}
                                  fileInputRef={fileInputRef}
                                  size="sm" />
@@ -167,8 +173,6 @@ export const FileQueue: React.FC<FileQueueProps> = ({
           </>
         )}
       </div>
-
-      {footer && <div className="pt-4 mt-3 border-t border-border-1">{footer}</div>}
     </Card>
   );
 };
