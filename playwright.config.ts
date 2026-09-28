@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 import { LOCAL_PEER_SERVER_PORT } from './e2e/fixtures';
 
 const isCI = !!process.env.CI;
+// Another project's dev server may already hold Vite's default port
+const DEV_SERVER_PORT = Number(process.env.E2E_PORT ?? 5173);
+const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -13,7 +16,7 @@ export default defineConfig({
   retries: isCI ? 1 : 0,
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: DEV_SERVER_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -30,8 +33,8 @@ export default defineConfig({
   // Signalling runs on a local PeerServer, so tests need no internet and never flake on the public one
   webServer: [
     {
-      command: 'npm run dev',
-      url: 'http://localhost:5173',
+      command: `npm run dev -- --port ${DEV_SERVER_PORT} --strictPort`,
+      url: DEV_SERVER_URL,
       reuseExistingServer: !isCI,
     },
     {

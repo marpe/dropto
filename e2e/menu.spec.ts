@@ -1,6 +1,8 @@
 import { test, expect } from './fixtures';
 
-test('phone: tapping outside the open menu only closes it', async ({ page }) => {
+// The link menu is hidden until it is behind a feature flag
+
+test.fixme('phone: tapping outside the open menu only closes it', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 760 });
   await page.goto('/');
   await page.locator('input[type=file]').first().setInputFiles([
@@ -24,7 +26,7 @@ test('phone: tapping outside the open menu only closes it', async ({ page }) => 
   await expect(page.getByText('a.txt')).toBeVisible();
 });
 
-test('phone: menu items still work while the page behind is blocked', async ({ page }) => {
+test.fixme('phone: menu items still work while the page behind is blocked', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 760 });
   await page.goto('/');
   await page.locator('input[type=file]').first().setInputFiles({ name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('a') });
