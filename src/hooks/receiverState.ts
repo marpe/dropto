@@ -32,6 +32,10 @@ export interface ReceiverSessionState {
   finishedFiles: Record<string, FinishedFile>;
   /** The sender went away after a finished download; the list stays, but nothing more can be downloaded */
   hasSenderLeft: boolean;
+  /** A download cut off by a dropped connection, waiting for the sender to be back so it can carry on */
+  isInterrupted: boolean;
+  /** A cut-off download could not carry on; the list offers what is still missing */
+  hasInterruptedDownload: boolean;
 }
 
 export type ReceiverAction =
@@ -53,7 +57,10 @@ export type ReceiverAction =
   | { type: 'COMPLETED'; result: TransferResult }
   | { type: 'FAILED'; error: string }
   | { type: 'CANCELLED' }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'DOWNLOAD_INTERRUPTED'; finishedCount: number; corruptedFiles: string[] }
+  | { type: 'DOWNLOAD_RESUMED'; fileIndices: number[] }
+  | { type: 'RESUME_FAILED' };
 
 const noProgress = { metrics: null, isPaused: false } as const;
 
@@ -73,6 +80,8 @@ export const initialReceiverState: ReceiverSessionState = {
   corruptedFiles: [],
   finishedFiles: {},
   hasSenderLeft: false,
+  isInterrupted: false,
+  hasInterruptedDownload: false,
 };
 
 export function receiverReducer(state: ReceiverSessionState, action: ReceiverAction): ReceiverSessionState {
@@ -95,11 +104,16 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         corruptedFiles: [],
         finishedFiles: {},
         hasSenderLeft: false,
+        isInterrupted: false,
+        hasInterruptedDownload: false,
       };
     case 'CONNECTED':
-      return { ...state, status: 'waiting_approval', isInvited: action.isInvited };
+      // Back to carry on a cut-off download: it stays on screen
+      return state.isInterrupted
+        ? { ...state, isInvited: action.isInvited }
+        : { ...state, status: 'waiting_approval', isInvited: action.isInvited };
     case 'CONNECT_FAILED':
-      return { ...state, status: 'error', error: action.error };
+      return { ...state, status: 'error', error: action.error, isInterrupted: false, hasInterruptedDownload: false };
     case 'QUEUED':
       // Only a download waits for a slot, so the place in line shows within it
       return state.status === 'transferring' ? { ...state, queuePosition: action.position } : state;
@@ -118,7 +132,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
       return {
         ...state,
         // After a finished download the sender may still change the list; it stays on the finished screen
-        status: state.status === 'completed' ? 'completed' : 'connected',
+        status: state.status === 'completed' ? 'completed' : state.isInterrupted ? 'transferring' : 'connected',
         manifest: action.manifest,
         pinPrompt: null,
         queuePosition: null,
@@ -134,6 +148,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         selectedFileIndices: action.fileIndices,
         queuePosition: null,
         corruptedFiles: [],
+        hasInterruptedDownload: false,
       };
     case 'SAVING_ABORTED':
       return { ...state, status: 'connected' };
@@ -158,10 +173,53 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
       if (state.status === 'completed') {
         return { ...state, hasSenderLeft: true };
       }
-      return { ...state, ...noProgress, status: 'error', error: action.error, manifest: null };
+      return {
+        ...state,
+        ...noProgress,
+        status: 'error',
+        error: action.error,
+        manifest: null,
+        isInterrupted: false,
+        hasInterruptedDownload: false,
+      };
     case 'CANCELLED':
-      return { ...state, ...noProgress, status: 'idle', error: null, manifest: null };
+      return {
+        ...state,
+        ...noProgress,
+        status: 'idle',
+        error: null,
+        manifest: null,
+        isInterrupted: false,
+        hasInterruptedDownload: false,
+      };
     case 'RESET':
       return { ...initialReceiverState, roomCode: state.roomCode, link: state.link };
+    case 'DOWNLOAD_INTERRUPTED':
+      return {
+        ...state,
+        isInterrupted: true,
+        isPaused: false,
+        queuePosition: null,
+        finishedFiles: {
+          ...state.finishedFiles,
+          ...finishedFilesOf(
+            pickFiles(state.manifest?.files ?? [], state.selectedFileIndices).slice(0, action.finishedCount),
+            state.metrics,
+            { corruptedFiles: action.corruptedFiles }
+          ),
+        },
+      };
+    case 'DOWNLOAD_RESUMED':
+      return {
+        ...state,
+        ...noProgress,
+        status: 'transferring',
+        isInterrupted: false,
+        selectedFileIndices: action.fileIndices,
+        queuePosition: null,
+        corruptedFiles: [],
+      };
+    case 'RESUME_FAILED':
+      return { ...state, ...noProgress, status: 'connected', isInterrupted: false, hasInterruptedDownload: true, queuePosition: null };
   }
 }

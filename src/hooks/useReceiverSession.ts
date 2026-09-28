@@ -3,7 +3,8 @@ import { describePeerError } from '../services/peerErrors';
 import { parseShareUrl } from '../utils/shareLink';
 import { introduceThisDevice } from '../utils/deviceInfo';
 import type { ShareLink } from '../utils/shareLink';
-import type { AppSettings } from '../types/transfer';
+import type { AppSettings, DownloadInterruption } from '../types/transfer';
+import type { ResumePoint } from '../services/transfer/receiver';
 import { initialReceiverState, receiverReducer } from './receiverState';
 import { defaultSessionServices } from './sessionServices';
 import type { SessionConnection, SessionReceiver, SessionServices } from './sessionServices';
@@ -46,7 +47,7 @@ export function useReceiverSession({
   const engineRef = useRef<SessionReceiver | null>(null);
   // True between the user starting to save and the transfer ending, for wake lock and sounds
   const isRunningRef = useRef(false);
-  // While a download runs, a dropped connection cuts it off; it is cancelled before reconnecting
+  // While a download runs, a dropped connection cuts it off; it carries on once the sender is back, if it can
   const hasStartedSavingRef = useRef(false);
   // After leaving (done, failed, cancelled), the connection closing is expected, not a reason to reconnect
   const hasLeftRef = useRef(false);
@@ -54,10 +55,26 @@ export function useReceiverSession({
   // What a reconnect goes back to, so Retry now can skip the wait
   const reconnectTargetRef = useRef<{ roomCode: string; link: ShareLink } | null>(null);
   const settingsRef = useRef(settings);
+  // The open file of a download cut off by a dropped connection, for the next connection to carry on with
+  const resumeRef = useRef<ResumePoint | null>(null);
+  // From a download being cut off until it carries on or cannot; reconnecting keeps it (and device effects) going
+  const isInterruptedRef = useRef(false);
+  const pinRef = useRef(state.pin);
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    pinRef.current = state.pin;
+  }, [state.pin]);
+
+  /** Gives up on carrying on a cut-off download, closing its half-written file. */
+  const dropResume = useCallback(() => {
+    void resumeRef.current?.writer.abort();
+    resumeRef.current = null;
+    isInterruptedRef.current = false;
+  }, []);
 
   const endRun = useCallback(
     (isSuccessful: boolean) => {
@@ -72,7 +89,10 @@ export function useReceiverSession({
   const teardown = useCallback(() => {
     const connection = connectionRef.current;
     clearTimeout(reconnectTimerRef.current);
-    endRun(false);
+    // A cut-off download is still under way while reconnecting
+    if (!isInterruptedRef.current) {
+      endRun(false);
+    }
     connectionRef.current = null;
     engineRef.current = null;
     connection?.destroy();
@@ -83,10 +103,11 @@ export function useReceiverSession({
       return;
     }
     return () => {
+      dropResume();
       teardown();
       dispatch({ type: 'RESET' });
     };
-  }, [active, teardown]);
+  }, [active, teardown, dropResume]);
 
   /** Stops listening to the engine and closes the peer connection once queued messages are sent. */
   const leave = useCallback(() => {
@@ -107,31 +128,50 @@ export function useReceiverSession({
       hasStartedSavingRef.current = false;
       hasLeftRef.current = false;
       if (reconnectAttempt === 0) {
+        dropResume();
         dispatch({ type: 'CONNECT_REQUESTED' });
       }
 
       const scheduleReconnect = (attempt: number) => {
         teardown();
-        dispatch({ type: 'RECONNECTING' });
+        if (!isInterruptedRef.current) {
+          dispatch({ type: 'RECONNECTING' });
+        }
         reconnectTargetRef.current = { roomCode, link };
         const delayMs = reconnectDelayMs * Math.min(attempt, MAX_RECONNECT_BACKOFF);
         reconnectTimerRef.current = setTimeout(() => connectToRoom(roomCode, link, attempt), delayMs);
       };
       // Reached from both the signalling connection closing and the engine losing its data channel. Unless this
-      // side left on purpose, the sender is tried again: a reload or a network blip should not end the session
-      const handleSenderGone = () => {
+      // side left on purpose, the sender is tried again: a reload or a network blip should not end the session.
+      // A download under way is carried on from where it stopped once the sender is back
+      const handleSenderGone = (interruption?: DownloadInterruption | null) => {
         if (connectionRef.current !== connection || hasLeftRef.current) {
           return;
         }
         if (hasStartedSavingRef.current) {
-          // The cut-off download cannot resume; cancelling closes its half-written file
-          engineRef.current?.cancel();
+          hasStartedSavingRef.current = false;
+          const cut = interruption ?? engineRef.current?.interrupt() ?? null;
+          if (cut) {
+            resumeRef.current = cut.resume;
+            isInterruptedRef.current = true;
+            dispatch({ type: 'DOWNLOAD_INTERRUPTED', finishedCount: cut.finishedCount, corruptedFiles: cut.corruptedFiles });
+          } else {
+            engineRef.current?.cancel();
+          }
         }
         scheduleReconnect(1);
       };
 
+      const handleResumeFailed = () => {
+        // The engine already let go of the half-written file
+        resumeRef.current = null;
+        isInterruptedRef.current = false;
+        endRun(false);
+        dispatch({ type: 'RESUME_FAILED' });
+      };
+
       const connection = services.createConnection({
-        onDisconnected: handleSenderGone,
+        onDisconnected: () => handleSenderGone(),
         onError: (err) => {
           console.error('WebRTC error:', err);
         },
@@ -156,12 +196,30 @@ export function useReceiverSession({
             }
           };
 
+        // Kept here, not handed off, until the engine carries on or cannot: another drop before then keeps it
+        const resumeFrom = resumeRef.current ?? undefined;
+        // Cut off with no file open (between two files): the list comes back with what is still missing
+        let isAwaitingFallback = isInterruptedRef.current && !resumeFrom;
+
         const engine = services.createReceiver(
           conn,
           {
-            onPinRequired: ifCurrent((prompt) => dispatch({ type: 'PIN_REQUIRED', prompt })),
+            onPinRequired: ifCurrent((prompt) => {
+              // Carrying on after a cut: the PIN typed before still works, unless it was just refused
+              if (isInterruptedRef.current && !prompt.isIncorrect && pinRef.current) {
+                engine.submitPin(pinRef.current);
+                return;
+              }
+              dispatch({ type: 'PIN_REQUIRED', prompt });
+            }),
             onQueued: ifCurrent((position) => dispatch({ type: 'QUEUED', position })),
-            onManifest: ifCurrent((manifest) => dispatch({ type: 'MANIFEST_RECEIVED', manifest })),
+            onManifest: ifCurrent((manifest) => {
+              dispatch({ type: 'MANIFEST_RECEIVED', manifest });
+              if (isAwaitingFallback) {
+                isAwaitingFallback = false;
+                handleResumeFailed();
+              }
+            }),
             onMetrics: ifCurrent((metrics) => dispatch({ type: 'METRICS', metrics })),
             onPaused: ifCurrent((isPaused) => dispatch({ type: 'PAUSED', isPaused })),
             onAllCompleted: ifCurrent((result) => {
@@ -171,19 +229,28 @@ export function useReceiverSession({
               dispatch({ type: 'COMPLETED', result });
             }),
             onError: ifCurrent((error) => {
+              dropResume();
               endRun(false);
               leave();
               dispatch({ type: 'FAILED', error });
             }),
             onConnectionLost: ifCurrent(handleSenderGone),
             onPeerLeft: ifCurrent(handleSenderGone),
+            onResumed: ifCurrent((fileIndices) => {
+              resumeRef.current = null;
+              isInterruptedRef.current = false;
+              hasStartedSavingRef.current = true;
+              dispatch({ type: 'DOWNLOAD_RESUMED', fileIndices });
+            }),
+            onResumeFailed: ifCurrent(handleResumeFailed),
             onCancelled: ifCurrent(() => {
+              dropResume();
               endRun(false);
               leave();
               dispatch({ type: 'FAILED', error: 'The sender cancelled the transfer.' });
             }),
           },
-          { shareKey, introduction }
+          { shareKey, introduction, resumeFrom }
         );
         engineRef.current = engine;
         services.effects.onPeerConnected();
@@ -196,6 +263,7 @@ export function useReceiverSession({
           scheduleReconnect(reconnectAttempt + 1);
           return;
         }
+        dropResume();
         teardown();
         dispatch({
           type: 'CONNECT_FAILED',
@@ -203,7 +271,7 @@ export function useReceiverSession({
         });
       }
     },
-    [services, teardown, endRun, leave, reconnectDelayMs]
+    [services, teardown, endRun, leave, reconnectDelayMs, dropResume]
   );
 
   // Opening the sender's link connects straight away: its key admits us without the sender having to accept
@@ -240,6 +308,7 @@ export function useReceiverSession({
 
   const cancel = () => {
     clearTimeout(reconnectTimerRef.current);
+    dropResume();
     const engine = engineRef.current;
     engine?.cancel();
     endRun(false);
@@ -277,6 +346,7 @@ export function useReceiverSession({
       togglePause: () => engineRef.current?.togglePause(),
       cancel,
       reset: () => {
+        dropResume();
         teardown();
         dispatch({ type: 'RESET' });
       },
