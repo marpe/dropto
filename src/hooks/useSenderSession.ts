@@ -58,9 +58,16 @@ interface UseSenderSessionOptions {
   active: boolean;
   settings: AppSettings;
   services?: SessionServices;
+  /** How long a download cut off by a dropped connection keeps its slot; shortened in tests */
+  reservedSlotMs?: number;
 }
 
-export function useSenderSession({ active, settings, services = defaultSessionServices }: UseSenderSessionOptions) {
+export function useSenderSession({
+  active,
+  settings,
+  services = defaultSessionServices,
+  reservedSlotMs,
+}: UseSenderSessionOptions) {
   // Files listed before a reload come back as missing, to be added again (or read back through kept handles)
   const [recalledFiles] = useState(recallFileList);
   const [state, dispatch] = useReducer(senderReducer, undefined, () => ({
@@ -70,7 +77,13 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   // Kept handles the browser wants the user's OK for before they can be read again
   const [lockedHandles, setLockedHandles] = useState<KeptHandle[]>([]);
   const [room] = useState(
-    () => new SenderRoom(services, dispatch, { files: state.files, options: state.options, isShared: state.isShared })
+    () =>
+      new SenderRoom(
+        services,
+        dispatch,
+        { files: state.files, options: state.options, isShared: state.isShared },
+        { reservedSlotMs }
+      )
   );
   const settingsRef = useRef(settings);
   const focus = selectFocusReceiver(state);

@@ -2,10 +2,11 @@ import type { DataConnection } from 'peerjs';
 import { describePeerError } from '../services/peerErrors';
 import { sendControlMessage } from '../services/transfer/protocol';
 import type { ReceiverGreeting } from '../services/webrtc';
-import type { AppSettings, TransferFile } from '../types/transfer';
+import type { AppSettings, DownloadInterruption, TransferFile } from '../types/transfer';
 import type { PeerDetails, SharingOptions } from '../types/sharing';
 import { generateShareKey } from '../utils/shareLink';
 import { recallRoom, rememberRoom } from '../utils/roomMemory';
+import { CONNECTION_LOST_MESSAGE } from './senderState';
 import type { SenderAction } from './senderState';
 import type { SessionConnection, SessionSender, SessionServices } from './sessionServices';
 
@@ -26,6 +27,17 @@ interface QueuedReceiver {
   conn: DataConnection;
   /** Called with a free slot */
   start: () => void;
+}
+
+/** How long a download cut off by a dropped connection keeps its slot for the same tab to come back */
+export const RESERVED_SLOT_MS = 60_000;
+
+interface Reservation {
+  /** The receiver's latest connection; moves when the same tab comes back */
+  peerId: string;
+  /** Held a download slot when cut off (not just a place in line) */
+  hasSlot: boolean;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 // Three attempts per connection, three connections: then guessing has to stop
@@ -62,14 +74,23 @@ export class SenderRoom {
   // Each connection's browser tab (from its HELLO), and the connection each tab was last let in on
   private readonly sessionOf = new Map<string, string>();
   private readonly lastConnOfSession = new Map<string, DataConnection>();
+  // Downloads cut off by a dropped connection, by browser tab, until they carry on or give up
+  private readonly reservations = new Map<string, Reservation>();
+  private readonly reservedSlotMs: number;
   // Device effects (wake lock, sounds) span from the first slot taken to the last one freed
   private isRunning = false;
   private pinLockouts = 0;
 
-  constructor(services: SessionServices, dispatch: (action: SenderAction) => void, config: RoomConfig) {
+  constructor(
+    services: SessionServices,
+    dispatch: (action: SenderAction) => void,
+    config: RoomConfig,
+    { reservedSlotMs = RESERVED_SLOT_MS }: { reservedSlotMs?: number } = {}
+  ) {
     this.services = services;
     this.dispatch = dispatch;
     this.config = config;
+    this.reservedSlotMs = reservedSlotMs;
   }
 
   /** Takes the sender's latest choices and applies what they change for people already here. */
@@ -163,26 +184,29 @@ export class SenderRoom {
 
   /** Disconnects one person: their download stops, or they leave the line. */
   public stop(peerId: string) {
+    const sessionId = this.sessionOf.get(peerId);
     const engine = this.engines.get(peerId);
-    if (!engine) {
+    const reservation = sessionId ? this.reservations.get(sessionId) : undefined;
+    if (!engine && reservation?.peerId !== peerId) {
       return;
     }
     // Sent away on purpose: coming back from the same tab must not skip the approval they would otherwise need
-    const sessionId = this.sessionOf.get(peerId);
     if (sessionId) {
       this.lastConnOfSession.delete(sessionId);
+      this.clearReservation(sessionId);
     }
-    engine.cancel();
+    engine?.cancel();
     this.connection?.disconnectPeer(peerId);
     this.dispatch({ type: 'RECEIVER_REMOVED', peerId });
     this.endEngine(peerId, false);
   }
 
-  /** Disconnects everyone let in; people waiting for the sender's OK stay. */
+  /** Disconnects everyone let in, including anyone reconnecting; people waiting for the sender's OK stay. */
   public stopAll() {
     // The line first, so freed slots are not handed to someone about to be stopped
     this.queue = [];
-    [...this.engines.keys()].forEach((peerId) => this.stop(peerId));
+    const reconnecting = [...this.reservations.values()].map((reservation) => reservation.peerId);
+    new Set([...this.engines.keys(), ...reconnecting]).forEach((peerId) => this.stop(peerId));
   }
 
   /** Ends the current share: everyone is disconnected, and nobody is recognised in the next one. */
@@ -197,6 +221,8 @@ export class SenderRoom {
   private teardown() {
     const connection = this.connection;
     this.connection = null;
+    this.reservations.forEach((reservation) => clearTimeout(reservation.timer));
+    this.reservations.clear();
     this.engines.clear();
     this.busy.clear();
     this.pending.clear();
@@ -306,23 +332,38 @@ export class SenderRoom {
     if (!previous || previous === conn) {
       return;
     }
-    if (this.engines.has(previous.peer)) {
+    const previousEngine = this.engines.get(previous.peer);
+    if (previousEngine) {
       // Its close has not been noticed yet; the new connection replaces it
-      this.connection?.disconnectPeer(previous.peer);
-      this.endEngine(previous.peer, false);
+      const interruption = previousEngine.interrupt();
+      if (interruption) {
+        this.interruptDownload(previous.peer, interruption);
+      } else {
+        this.connection?.disconnectPeer(previous.peer);
+        this.endEngine(previous.peer, false);
+      }
     }
+    this.moveReservation(sessionId, conn.peer);
     this.dispatch({ type: 'RECEIVER_RESUMED', fromPeerId: previous.peer, peerId: conn.peer });
   }
 
-  /** Every download, the first or a later one: at once with a free slot, otherwise after waiting in line. */
-  private startDownload(conn: DataConnection, engine: SessionSender, fileIndices: number[]) {
+  /**
+   * Every download, the first or a later one: at once in the slot kept for it after a dropped connection, or with a
+   * free slot, otherwise after waiting in line.
+   */
+  private startDownload(conn: DataConnection, engine: SessionSender, fileIndices: number[], startBytes: number) {
     const peerId = conn.peer;
+    const sessionId = this.sessionOf.get(peerId);
+    const reservation = sessionId ? this.reservations.get(sessionId) : undefined;
+    if (sessionId && reservation) {
+      clearTimeout(reservation.timer);
+      this.reservations.delete(sessionId);
+    }
     const start = () => {
       this.occupySlot(peerId);
-      // Task 7 resumes a cut-off download from where it stopped; for now every download starts at 0
-      this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices, startBytes: 0 });
+      this.dispatch({ type: 'RECEIVER_STARTED', peerId, fileIndices, startBytes });
     };
-    if (this.hasFreeSlot()) {
+    if (reservation?.hasSlot || this.hasFreeSlot()) {
       start();
       return;
     }
@@ -373,6 +414,71 @@ export class SenderRoom {
     this.queue.forEach(({ conn }, index) => sendControlMessage(conn, { type: 'QUEUED', payload: { position: index + 1 } }));
   }
 
+  /** A download cut off by a dropped connection: its slot (or place) waits a while for the same tab to carry on. */
+  private interruptDownload(peerId: string, interruption: DownloadInterruption) {
+    this.connection?.disconnectPeer(peerId);
+    this.dispatch({
+      type: 'RECEIVER_INTERRUPTED',
+      peerId,
+      finishedCount: interruption.finishedCount,
+      corruptedFiles: interruption.corruptedFiles,
+    });
+    const sessionId = this.sessionOf.get(peerId);
+    if (!sessionId) {
+      // Nothing to recognise them by if they come back
+      this.dispatch({ type: 'RECEIVER_FAILED', peerId, error: CONNECTION_LOST_MESSAGE });
+      this.endEngine(peerId, false);
+      return;
+    }
+    this.engines.delete(peerId);
+    this.leaveLine(peerId);
+    const timer = setTimeout(() => this.expireReservation(sessionId), this.reservedSlotMs);
+    this.reservations.set(sessionId, { peerId, hasSlot: this.busy.has(peerId), timer });
+  }
+
+  /** The same tab is back on a new connection: what was kept for it follows. */
+  private moveReservation(sessionId: string, peerId: string) {
+    const reservation = this.reservations.get(sessionId);
+    if (!reservation) {
+      return;
+    }
+    if (reservation.hasSlot) {
+      this.busy.delete(reservation.peerId);
+      this.busy.add(peerId);
+    }
+    reservation.peerId = peerId;
+  }
+
+  /** Not carried on in time: someone still away failed, and the slot goes to the line. */
+  private expireReservation(sessionId: string) {
+    const reservation = this.reservations.get(sessionId);
+    if (!reservation) {
+      return;
+    }
+    this.reservations.delete(sessionId);
+    if (!this.engines.has(reservation.peerId)) {
+      this.dispatch({ type: 'RECEIVER_FAILED', peerId: reservation.peerId, error: CONNECTION_LOST_MESSAGE });
+    }
+    this.releaseSlot(reservation.peerId, false);
+    this.afterSlotFreed();
+  }
+
+  private clearReservation(sessionId: string) {
+    const reservation = this.reservations.get(sessionId);
+    if (reservation) {
+      clearTimeout(reservation.timer);
+      this.reservations.delete(sessionId);
+    }
+  }
+
+  private leaveLine(peerId: string) {
+    const queueLength = this.queue.length;
+    this.queue = this.queue.filter(({ conn }) => conn.peer !== peerId);
+    if (this.queue.length !== queueLength) {
+      this.announcePositions();
+    }
+  }
+
   private startEngine(conn: DataConnection) {
     const peerId = conn.peer;
     const { files, options } = this.config;
@@ -390,10 +496,11 @@ export class SenderRoom {
       onPinLockout: ifCurrent(() => {
         this.pinLockouts += 1;
       }),
-      onReceiverStarted: ifCurrent((fileIndices) => {
+      onReceiverStarted: ifCurrent((fileIndices, startBytes) => {
         hasReceiverStarted = true;
-        this.startDownload(conn, engine, fileIndices);
+        this.startDownload(conn, engine, fileIndices, startBytes ?? 0);
       }),
+      onConnectionLost: ifCurrent((interruption) => this.interruptDownload(peerId, interruption)),
       onMetrics: ifCurrent((metrics) => this.dispatch({ type: 'METRICS', peerId, metrics })),
       onPaused: ifCurrent((isPaused) => this.dispatch({ type: 'PAUSED', peerId, isPaused })),
       onAllCompleted: ifCurrent((result) => {
@@ -426,11 +533,7 @@ export class SenderRoom {
 
   private endEngine(peerId: string, isSuccessful: boolean) {
     this.engines.delete(peerId);
-    const queueLength = this.queue.length;
-    this.queue = this.queue.filter(({ conn }) => conn.peer !== peerId);
-    if (this.queue.length !== queueLength) {
-      this.announcePositions();
-    }
+    this.leaveLine(peerId);
     this.releaseSlot(peerId, isSuccessful);
     this.afterSlotFreed();
   }
