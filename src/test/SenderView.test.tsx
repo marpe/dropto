@@ -3,7 +3,6 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { SenderView } from '../components/SenderView';
 import type { SenderSession, SenderSessionState } from '../hooks/useSenderSession';
 import { createInitialSenderState } from '../hooks/senderState';
-import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
 import type { SenderReceiver } from '../types/sharing';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 
@@ -101,8 +100,6 @@ function renderSenderView(
   return session.actions;
 }
 
-const openSettings = () => fireEvent.click(screen.getByTestId('open-link-settings'));
-
 const shared = (state: Partial<SenderSessionState> = {}) => ({ files: [queuedFile], isShared: true, ...state });
 
 describe('SenderView', () => {
@@ -125,7 +122,7 @@ describe('SenderView', () => {
     });
 
     expect(within(screen.getByTestId('receiver-row')).getByText('Connection to peer lost')).toBeDefined();
-    expect(screen.getByTestId('link-bar')).toBeDefined();
+    expect(screen.getByTestId('copy-link')).toBeDefined();
     fireEvent.click(screen.getByTitle('Remove from list'));
     expect(actions.dismissReceiver).toHaveBeenCalledWith('receiver-1');
   });
@@ -139,25 +136,32 @@ describe('SenderView', () => {
     expect(actions.retryRoom).toHaveBeenCalledTimes(1);
   });
 
-  it('creates the link straight away with Share, without copying anything', () => {
+  it('creates the link and copies it on the first Copy link', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     const actions = renderSenderView({ state: { files: [queuedFile] } });
-    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
 
-    fireEvent.click(screen.getByTestId('share-files'));
+    fireEvent.click(screen.getByTestId('copy-link'));
 
     expect(actions.createLink).toHaveBeenCalledTimes(1);
-    expect(writeText).not.toHaveBeenCalled();
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DW-ABC234#key=link-key$/));
   });
 
-  it('shows the link and its settings below the files once shared, with no separate step', () => {
-    renderSenderView({ state: shared() });
+  it('copies the link again without creating another once shared', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const actions = renderSenderView({ state: shared() });
 
-    expect(screen.getByText('report.pdf')).toBeDefined();
-    expect(screen.getByRole('button', { name: /copy link/i })).toBeDefined();
-    expect(screen.getByTestId('open-link-settings')).toBeDefined();
-    expect(screen.queryByTestId('share-files')).toBeNull();
+    fireEvent.click(screen.getByTestId('copy-link'));
+
+    expect(actions.createLink).not.toHaveBeenCalled();
+    expect(writeText).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Copy link even before any files are added', () => {
+    renderSenderView();
+
+    expect((screen.getByTestId('copy-link') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('lists each file with its size and, where there is room, when it was last modified', () => {
@@ -166,57 +170,6 @@ describe('SenderView', () => {
     const row = screen.getByTestId('file-row');
     expect(within(row).getByText('2 KB')).toBeDefined();
     expect(within(row).getByTestId('file-modified').textContent).toMatch(/2024/);
-  });
-
-  describe('sharing settings', () => {
-    it('raises the number of simultaneous downloads from the default', () => {
-      const actions = renderSenderView({ state: shared() });
-      openSettings();
-      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe(String(DEFAULT_SIMULTANEOUS));
-
-      fireEvent.click(screen.getByTitle('More'));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(
-        expect.objectContaining({ maxSimultaneous: DEFAULT_SIMULTANEOUS + 1 }),
-        'new'
-      );
-    });
-
-    const withPin = (pin: string) => shared({ options: { ...createInitialSenderState().options, pin } });
-
-    it('suggests a random PIN as soon as one is required', () => {
-      const actions = renderSenderView({ state: shared() });
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
-    });
-
-    it('applies a typed PIN when the field is left or Enter is pressed, not on every keystroke', () => {
-      const actions = renderSenderView({ state: withPin('1234') });
-      openSettings();
-      const pinField = screen.getByTestId('pin-input');
-
-      fireEvent.change(pinField, { target: { value: '56' } });
-      expect(actions.updateSharing).not.toHaveBeenCalled();
-      fireEvent.change(pinField, { target: { value: '5678' } });
-      fireEvent.keyDown(pinField, { key: 'Enter' });
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '5678' }), 'new');
-    });
-
-    it('keeps the current PIN when the field is left empty', () => {
-      const actions = renderSenderView({ state: withPin('1234') });
-      openSettings();
-      const pinField = screen.getByTestId('pin-input') as HTMLInputElement;
-
-      fireEvent.change(pinField, { target: { value: '' } });
-      fireEvent.blur(pinField);
-
-      expect(actions.updateSharing).not.toHaveBeenCalled();
-      expect(pinField.value).toBe('1234');
-    });
   });
 
   it('copies a link that carries the room key', async () => {
@@ -233,16 +186,6 @@ describe('SenderView', () => {
     renderSenderView({ state: shared() });
 
     expect(screen.queryAllByTestId('receiver-row')).toHaveLength(0);
-  });
-
-  it('puts the link where the Share button was, with Copy and a menu of the other tools joined to it', () => {
-    renderSenderView({ state: shared() });
-
-    expect(screen.getByTestId('link-bar').closest('[data-testid="file-queue"]')).toBeNull();
-    expect(screen.getByTitle('Copy link')).toBeDefined();
-    expect(screen.getByTitle('Link options')).toBeDefined();
-    const items = screen.getAllByRole('menuitem', { hidden: true }).map((item) => item.textContent);
-    expect(items).toEqual(['Link settings', 'QR code and room code', 'Stop sharing']);
   });
 
   it('shows a receiver who has not started downloading as connected, while files can still change', () => {
@@ -485,31 +428,6 @@ describe('SenderView', () => {
     expect(row.textContent).not.toMatch(/done/i);
   });
 
-  describe('stopping the share', () => {
-    it('stops straight away when nobody is connected', () => {
-      const actions = renderSenderView({ state: shared() });
-
-      fireEvent.click(screen.getByTestId('stop-sharing'));
-
-      expect(actions.stopSharing).toHaveBeenCalledTimes(1);
-    });
-
-    it('asks first when it would stop someone’s download', () => {
-      const actions = renderSenderView({
-        state: shared({
-          options: createInitialSenderState().options,
-          receivers: [makeReceiver({ stage: 'transferring', metrics })],
-        }),
-      });
-
-      fireEvent.click(screen.getByTestId('stop-sharing'));
-      expect(actions.stopSharing).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByTestId('confirm'));
-
-      expect(actions.stopSharing).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe('sharing with several people', () => {
     const several = (receivers: SenderReceiver[]) =>
       shared({ options: { ...createInitialSenderState().options, maxSimultaneous: 2 }, receivers });
@@ -570,80 +488,6 @@ describe('SenderView', () => {
 
       expect(actions.dismissReceiver).toHaveBeenCalledWith('a');
     });
-
-    it('asks whether a lower download limit should stop everyone now', () => {
-      const actions = renderSenderView({
-        state: several([makeReceiver({ peerId: 'a', stage: 'transferring' }), makeReceiver({ peerId: 'b', stage: 'transferring' })]),
-      });
-      openSettings();
-      fireEvent.click(screen.getByTitle('Fewer'));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ maxSimultaneous: 1 }), 'new');
-      expect(screen.getByRole('heading', { name: 'Stop current downloads?' })).toBeDefined();
-      expect(screen.getByText(/2 people are still connected/i)).toBeDefined();
-    });
-  });
-
-  describe('changing how files are shared after the link is out', () => {
-    function renderWithSomeoneConnected(overrides: SessionOverrides = {}) {
-      const receiver = makeReceiver();
-      return renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver, ...overrides });
-    }
-
-    it('applies a change at once when nobody is connected', () => {
-      const actions = renderSenderView({ state: shared() });
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
-    });
-
-    it('applies a stricter setting to new connections, then asks whether to stop the current download', () => {
-      const actions = renderWithSomeoneConnected();
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
-      expect(screen.getByRole('heading', { name: 'Stop current downloads?' })).toBeDefined();
-      expect(screen.getByText(/new connections need a pin\. someone is still connected/i)).toBeDefined();
-    });
-
-    it('stops the current download too when asked', () => {
-      const actions = renderWithSomeoneConnected();
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
-      fireEvent.click(screen.getByTestId('confirm'));
-
-      expect(actions.updateSharing).toHaveBeenLastCalledWith(expect.objectContaining({ requireApproval: true }), 'now');
-    });
-
-    it('lets the current download go on when the question is dismissed', () => {
-      const actions = renderWithSomeoneConnected();
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-      expect(actions.updateSharing).toHaveBeenCalledTimes(1);
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
-      expect(screen.queryByRole('heading', { name: 'Stop current downloads?' })).toBeNull();
-    });
-
-    it('applies without asking when the change only loosens things', () => {
-      const receiver = makeReceiver();
-      const actions = renderWithSomeoneConnected({
-        state: shared({ receivers: [receiver], options: { ...createInitialSenderState().options, pin: '1234' } }),
-      });
-
-      openSettings();
-      fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '' }), 'new');
-      expect(screen.queryByTestId('confirm')).toBeNull();
-    });
   });
 
   describe('editing files after sharing', () => {
@@ -667,13 +511,6 @@ describe('SenderView', () => {
       fireEvent.click(screen.getByTestId('confirm'));
 
       expect(actions.clearFiles).toHaveBeenCalledTimes(1);
-    });
-
-    it('shows the PIN in the settings so it can be passed on', () => {
-      renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, pin: '2468' } }) });
-      openSettings();
-
-      expect((screen.getByTestId('pin-input') as HTMLInputElement).value).toBe('2468');
     });
 
     it('removes straight away when nobody is choosing', () => {

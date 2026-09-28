@@ -223,11 +223,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       clearFiles,
       startOver,
       setSharingOptions,
+      // Files are not needed yet: people who open the link wait until some are added
       createLink: () => {
-        if (state.files.length > 0) {
-          services.effects.onTransferRequested();
-          dispatch({ type: 'LINK_CREATED' });
-        }
+        services.effects.onTransferRequested();
+        dispatch({ type: 'LINK_CREATED' });
       },
       updateSharing,
       stopSharing,
