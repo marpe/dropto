@@ -4,6 +4,8 @@ import { notificationService } from './notifications';
 
 /** Device-level side effects around a transfer, kept out of the protocol code. */
 export interface TransferEffects {
+  /** Someone arrived on the link, or this receiver reached the sender */
+  onPeerConnected(): void;
   /** Runs inside the click that shares or starts a download, while the browser still allows permission prompts */
   onTransferRequested(): void;
   onTransferStarted(): void;
@@ -11,6 +13,9 @@ export interface TransferEffects {
 }
 
 export const defaultTransferEffects: TransferEffects = {
+  onPeerConnected: () => {
+    soundService.playConnect();
+  },
   onTransferRequested: () => {
     void notificationService.requestPermission();
   },

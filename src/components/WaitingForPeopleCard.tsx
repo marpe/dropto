@@ -21,9 +21,7 @@ export const WaitingForPeopleCard: React.FC = () => (
         ))}
         <IconBadge icon={Radio} size="md" />
       </div>
-      <div>
-        <p className="text-sm font-medium text-text-2">Waiting for connections</p>
-      </div>
+      <p className="text-sm font-medium text-text-2">Waiting for connections</p>
     </div>
   </Card>
 );

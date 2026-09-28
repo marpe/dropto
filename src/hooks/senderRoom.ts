@@ -1,5 +1,4 @@
 import type { DataConnection } from 'peerjs';
-import { soundService } from '../services/sound';
 import { describePeerError } from '../services/peerErrors';
 import { sendControlMessage } from '../services/transfer/protocol';
 import type { ReceiverGreeting } from '../services/webrtc';
@@ -214,7 +213,7 @@ export class SenderRoom {
 
   private handleIncoming(conn: DataConnection, greeting: ReceiverGreeting) {
     const { files, options, isShared } = this.config;
-    soundService.playConnect();
+    this.services.effects.onPeerConnected();
     const { device, timeZone, formFactor, model, storage } = greeting;
     this.details.set(conn.peer, { device: device ?? null, timeZone: timeZone ?? null, ip: null, formFactor, model, storage });
     if (greeting.sessionId) {
