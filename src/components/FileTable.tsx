@@ -45,13 +45,25 @@ function nextSort(current: Sort | null, key: SortKey): Sort | null {
   return current.direction === 'asc' ? { key, direction: 'desc' } : null;
 }
 
+type ResizableColumn = 'type' | 'size' | 'modified';
+
+/** Widths in px the user dragged columns to; a column not in here keeps its default width */
+type ColumnWidths = Partial<Record<ResizableColumn, number>>;
+
+const MIN_COLUMN_WIDTH_PX = 32;
+const MAX_COLUMN_WIDTH_PX = 320;
+
 interface Columns {
   hasLead: boolean;
   trailClassName?: string;
+  widths: ColumnWidths;
 }
 
-// Header and rows render the same fixed-width cells, so the columns line up; "Type" and "Modified" only when the table is wide enough
-const ColumnsContext = createContext<Columns>({ hasLead: false });
+// Header and rows render the same cells at the same widths, so the columns line up; "Type" and "Modified" only
+// when the table is wide enough
+const ColumnsContext = createContext<Columns>({ hasLead: false, widths: {} });
+
+const widthStyle = (width: number | undefined) => (width === undefined ? undefined : { width });
 
 const CELL = {
   lead: 'flex shrink-0 w-4',
@@ -63,6 +75,46 @@ const CELL = {
 };
 
 const ROW = 'flex items-center gap-3 px-2';
+
+interface ResizeHandleProps {
+  width: number | undefined;
+  onResize: (width: number | undefined) => void;
+}
+
+/**
+ * Drags the column's left edge: moving left widens it, and the Name column takes up what is left. The pointer is
+ * captured so the drag carries on outside the handle; a double click puts the default width back.
+ */
+const ResizeHandle: React.FC<ResizeHandleProps> = ({ width, onResize }) => {
+  const startDrag = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const handle = event.currentTarget;
+    const startX = event.clientX;
+    const startWidth = width ?? handle.parentElement?.getBoundingClientRect().width ?? 0;
+    handle.setPointerCapture(event.pointerId);
+    const move = (moveEvent: PointerEvent) => {
+      const next = startWidth - (moveEvent.clientX - startX);
+      onResize(Math.min(Math.max(next, MIN_COLUMN_WIDTH_PX), MAX_COLUMN_WIDTH_PX));
+    };
+    const stop = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', stop);
+      handle.removeEventListener('pointercancel', stop);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', stop);
+    handle.addEventListener('pointercancel', stop);
+    event.preventDefault();
+  };
+
+  return (
+    <span
+      data-testid="column-resize"
+      onPointerDown={startDrag}
+      onDoubleClick={() => onResize(undefined)}
+      className="absolute -left-2 inset-y-0 w-3 cursor-col-resize touch-none select-none after:absolute after:left-1/2 after:inset-y-0.5 after:w-px after:bg-border-2 after:opacity-0 hover:after:opacity-100 after:transition-opacity"
+    />
+  );
+};
 
 interface SortHeaderProps {
   label: string;
@@ -112,7 +164,7 @@ export const FileTableRow: React.FC<FileTableRowProps> = ({
   className,
   ...liProps
 }) => {
-  const { hasLead, trailClassName } = useContext(ColumnsContext);
+  const { hasLead, trailClassName, widths } = useContext(ColumnsContext);
   const Row = isLabel ? 'label' : 'div';
   return (
     <li
@@ -134,9 +186,13 @@ export const FileTableRow: React.FC<FileTableRowProps> = ({
         >
           {displayPath(file)}
         </span>
-        <span className={cn(CELL.type, 'text-text-5')}>{fileExtension(file.name)}</span>
-        <span className={cn(CELL.size, 'text-text-4')}>{formatBytes(file.size)}</span>
-        <span data-testid="file-modified" className={cn(CELL.modified, 'text-text-5')}>
+        <span className={cn(CELL.type, 'text-text-5')} style={widthStyle(widths.type)}>
+          {fileExtension(file.name)}
+        </span>
+        <span className={cn(CELL.size, 'text-text-4')} style={widthStyle(widths.size)}>
+          {formatBytes(file.size)}
+        </span>
+        <span data-testid="file-modified" className={cn(CELL.modified, 'text-text-5')} style={widthStyle(widths.modified)}>
           {formatModified(file.lastModified)}
         </span>
         {trailClassName !== undefined && (
@@ -162,7 +218,10 @@ interface FileTableProps<F extends ManifestFile> {
   className?: string;
 }
 
-/** A file list with sortable Name, Type, Size and Modified columns, and optional columns before and after them. */
+/**
+ * A file list with sortable Name, Type, Size and Modified columns (the last three resizable from the header), and
+ * optional columns before and after them.
+ */
 export function FileTable<F extends ManifestFile>({
   files,
   renderRow,
@@ -172,24 +231,31 @@ export function FileTable<F extends ManifestFile>({
   className,
 }: FileTableProps<F>) {
   const [sort, setSort] = useState<Sort | null>(null);
+  const [widths, setWidths] = useState<ColumnWidths>({});
   const onSort = (key: SortKey) => setSort((current) => nextSort(current, key));
+  const resizer = (column: ResizableColumn) => (
+    <ResizeHandle width={widths[column]} onResize={(width) => setWidths((current) => ({ ...current, [column]: width }))} />
+  );
 
   return (
-    <ColumnsContext.Provider value={{ hasLead, trailClassName }}>
+    <ColumnsContext.Provider value={{ hasLead, trailClassName, widths }}>
       <div className={cn('@container', className)}>
         <div className={cn(ROW, 'pb-1 border-b border-border-1 text-2xs font-semibold text-text-5')}>
           {hasLead && <span className={CELL.lead}>{headerLead}</span>}
           <span className="w-4 shrink-0" />
           <SortHeader label="Name" sortKey="name" sort={sort} onSort={onSort} className={CELL.name} />
-          <SortHeader label="Type" sortKey="type" sort={sort} onSort={onSort} className={cn(CELL.type, '@sm:inline-flex')} />
-          <SortHeader label="Size" sortKey="size" sort={sort} onSort={onSort} className={cn(CELL.size, 'justify-end')} />
-          <SortHeader
-            label="Modified"
-            sortKey="modified"
-            sort={sort}
-            onSort={onSort}
-            className={cn(CELL.modified, '@md:inline-flex justify-end')}
-          />
+          <span className={cn(CELL.type, 'relative @sm:flex')} style={widthStyle(widths.type)}>
+            {resizer('type')}
+            <SortHeader label="Type" sortKey="type" sort={sort} onSort={onSort} className="min-w-0" />
+          </span>
+          <span className={cn(CELL.size, 'relative flex justify-end')} style={widthStyle(widths.size)}>
+            {resizer('size')}
+            <SortHeader label="Size" sortKey="size" sort={sort} onSort={onSort} />
+          </span>
+          <span className={cn(CELL.modified, 'relative @md:flex justify-end')} style={widthStyle(widths.modified)}>
+            {resizer('modified')}
+            <SortHeader label="Modified" sortKey="modified" sort={sort} onSort={onSort} />
+          </span>
           {trailClassName !== undefined && <span className={cn(CELL.trail, trailClassName)} />}
         </div>
         <ul className="scroll-fade max-h-80 overflow-y-auto overscroll-contain divide-y divide-border-1">
