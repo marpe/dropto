@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Settings2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 import { SharingOptionsForm } from './SharingOptionsForm';
@@ -28,11 +29,23 @@ function describeStricterChanges(current: SharingOptions, next: SharingOptions):
   return changes;
 }
 
+/** One line saying how the link is set up; the PIN is spelled out because the sender has to pass it on. */
+function summarizeOptions({ pin, requireApproval, allowMultiple, maxSimultaneous }: SharingOptions): string {
+  return [
+    pin ? `PIN ${pin}` : 'No PIN',
+    requireApproval ? 'you approve each person' : null,
+    allowMultiple ? `${maxSimultaneous} at once` : 'one download',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 /**
- * The live link's settings. Each change applies at once; a stricter one while people are connected
+ * The live link's settings: a summary, and the options in a dialog. Each change applies at once; a stricter one while people are connected
  * first asks whether it is for new connections only or should also stop everyone connected now.
  */
 export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, connectedCount, onUpdate }) => {
+  const [isOpen, setIsOpen] = useState(false);
   const [pending, setPending] = useState<SharingOptions | null>(null);
   const stricterChanges = pending ? describeStricterChanges(options, pending) : [];
   const isSeveral = connectedCount > 1;
@@ -52,9 +65,23 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
   };
 
   return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-text-5">Settings</h3>
-      <SharingOptionsForm options={options} onChange={change} />
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <Button data-testid="open-link-settings" variant="secondary" size="sm" onClick={() => setIsOpen(true)}>
+        <Settings2 className="w-3.5 h-3.5" />
+        Settings
+      </Button>
+      <span className="min-w-0 text-xs text-text-4 tabular-nums">{summarizeOptions(options)}</span>
+
+      {isOpen && (
+        <Modal
+          title="Link settings"
+          icon={Settings2}
+          onClose={() => setIsOpen(false)}
+          footer={<Button onClick={() => setIsOpen(false)}>Done</Button>}
+        >
+          <SharingOptionsForm options={options} onChange={change} />
+        </Modal>
+      )}
 
       {pending && (
         <Modal
@@ -85,6 +112,6 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
           </ul>
         </Modal>
       )}
-    </section>
+    </div>
   );
 };

@@ -87,9 +87,8 @@ export const LinkSection: React.FC<LinkSectionProps> = ({
         <ReceiverList receivers={receivers} onStopReceiver={onStopReceiver} onDismissReceiver={onDismissReceiver} />
       )}
 
-      <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} />
-
-      <div className="flex justify-end pt-4 border-t border-border-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border-1">
+        <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} />
         <Button data-testid="stop-sharing" variant="danger" size="sm" onClick={requestStopSharing}>
           <Unlink className="w-3.5 h-3.5" />
           Stop sharing

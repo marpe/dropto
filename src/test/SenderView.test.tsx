@@ -87,6 +87,8 @@ function renderSenderView(
   return session.actions;
 }
 
+const openSettings = () => fireEvent.click(screen.getByTestId('open-link-settings'));
+
 const shared = (state: Partial<SenderSessionState> = {}) => ({ files: [queuedFile], isShared: true, ...state });
 
 describe('SenderView', () => {
@@ -135,7 +137,7 @@ describe('SenderView', () => {
 
     expect(screen.getByText('report.pdf')).toBeDefined();
     expect(screen.getByRole('button', { name: /copy link/i })).toBeDefined();
-    expect(screen.getByRole('checkbox', { name: /require a pin/i })).toBeDefined();
+    expect(screen.getByTestId('open-link-settings')).toBeDefined();
     expect(screen.queryByTestId('share-files')).toBeNull();
   });
 
@@ -150,6 +152,7 @@ describe('SenderView', () => {
   describe('sharing settings', () => {
     it('turns on simultaneous downloads by raising the number above one', () => {
       const actions = renderSenderView({ state: shared() });
+      openSettings();
       expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('1');
 
       fireEvent.click(screen.getByTitle('More'));
@@ -163,6 +166,7 @@ describe('SenderView', () => {
     it('shows the download limit when several people may download', () => {
       renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, allowMultiple: true, maxSimultaneous: 4 } }) });
 
+      openSettings();
       expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('4');
     });
 
@@ -171,6 +175,7 @@ describe('SenderView', () => {
     it('suggests a random PIN as soon as one is required', () => {
       const actions = renderSenderView({ state: shared() });
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
@@ -178,6 +183,7 @@ describe('SenderView', () => {
 
     it('applies a typed PIN when the field is left or Enter is pressed, not on every keystroke', () => {
       const actions = renderSenderView({ state: withPin('1234') });
+      openSettings();
       const pinField = screen.getByTestId('pin-input');
 
       fireEvent.change(pinField, { target: { value: '56' } });
@@ -190,6 +196,7 @@ describe('SenderView', () => {
 
     it('keeps the current PIN when the field is left empty', () => {
       const actions = renderSenderView({ state: withPin('1234') });
+      openSettings();
       const pinField = screen.getByTestId('pin-input') as HTMLInputElement;
 
       fireEvent.change(pinField, { target: { value: '' } });
@@ -452,6 +459,7 @@ describe('SenderView', () => {
       const actions = renderSenderView({
         state: several([makeReceiver({ peerId: 'a', stage: 'transferring' }), makeReceiver({ peerId: 'b', stage: 'transferring' })]),
       });
+      openSettings();
       fireEvent.click(screen.getByTitle('Fewer'));
       expect(actions.updateSharing).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId('apply-to-new'));
@@ -470,6 +478,7 @@ describe('SenderView', () => {
     it('applies a change at once when nobody is connected', () => {
       const actions = renderSenderView({ state: shared() });
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
@@ -478,6 +487,7 @@ describe('SenderView', () => {
     it('asks whether a stricter setting should also stop the current receiver', () => {
       const actions = renderWithSomeoneConnected();
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
       expect(actions.updateSharing).not.toHaveBeenCalled();
 
@@ -488,6 +498,7 @@ describe('SenderView', () => {
     it('can apply a stricter setting to the current receiver too', () => {
       const actions = renderWithSomeoneConnected();
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
       fireEvent.click(screen.getByTestId('apply-now'));
 
@@ -497,6 +508,7 @@ describe('SenderView', () => {
     it('leaves the settings as they were when the question is dismissed', () => {
       const actions = renderWithSomeoneConnected();
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
       fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
 
@@ -510,6 +522,7 @@ describe('SenderView', () => {
         state: shared({ receivers: [receiver], options: { ...createInitialSenderState().options, pin: '1234' } }),
       });
 
+      openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '' }), 'new');
@@ -543,7 +556,7 @@ describe('SenderView', () => {
     it('shows the PIN so it can be passed on', () => {
       renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, pin: '2468' } }) });
 
-      expect((screen.getByTestId('pin-input') as HTMLInputElement).value).toBe('2468');
+      expect(screen.getByText(/PIN 2468/)).toBeDefined();
     });
 
     it('removes straight away when nobody is choosing', () => {
