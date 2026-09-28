@@ -349,7 +349,8 @@ describe('SenderView', () => {
     const missing = { id: 'm1', name: 'holiday.jpg', size: 4096, type: 'image/jpeg', lastModified: 1 };
     const actions = renderSenderView({ state: { missingFiles: [missing] } });
 
-    expect(screen.getByText(/1 file needs adding again/i)).toBeDefined();
+    // The callout about them, with its way out
+    expect(screen.getByTestId('remove-missing')).toBeDefined();
     const row = screen.getByTestId('file-row');
     expect(row.hasAttribute('data-missing')).toBe(true);
     expect(screen.getByTestId('file-totals').textContent).toMatch(/^0 of 1 file/);

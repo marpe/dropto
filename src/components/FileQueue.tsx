@@ -69,10 +69,17 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 				<Notice tone="warning"
 				        icon={RotateCcw}
 				        className="mb-3">
-					<span className="flex flex-wrap items-center justify-between gap-3">
-						<span>
-							{missingFiles.length === 1 ? '1 file needs' : `${missingFiles.length} files need`} adding again after
-							the reload. {restorableCount > 0 ? 'Restore them, or pick' : 'Pick'} or drop them and they fill back in.
+					<span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+						<span className="min-w-0">
+							<span className="block font-semibold text-text-1">
+								Reload lost access to {missingFiles.length === 1 ? '1 file' : `${missingFiles.length} files`}
+							</span>
+							{/* A page only holds a picked file while it lives; Chromium alone can keep a handle to ask again */}
+							<span className="block">
+								{restorableCount > 0
+									? 'Browsers keep access only until reload. Restore asks for it again.'
+									: 'Browsers don’t keep picked files across a reload.'}
+							</span>
 						</span>
 						<span className="flex shrink-0 items-center gap-2">
 							{/* Missing files were never offered to anyone, so they go without asking */}
