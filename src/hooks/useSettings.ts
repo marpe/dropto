@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { soundService } from '../services/sound';
-import { wakeLockService } from '../services/wakeLock';
-import { notificationService } from '../services/notifications';
 import type { AppSettings } from '../types/transfer';
 
 const STORAGE_KEY = 'dropwave_settings';
@@ -14,8 +12,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   signalingSecure: true,
   customStunTurn: [],
   enableAudioAlerts: true,
-  enableWakeLock: true,
-  enableNotifications: false,
 };
 
 function loadSettings(): AppSettings {
@@ -30,14 +26,12 @@ function loadSettings(): AppSettings {
   return DEFAULT_SETTINGS;
 }
 
-/** Persisted user settings, also pushed into the sound, wake-lock and notification services. */
+/** Persisted user settings; the sound choice is also pushed into the sound service. */
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
   useEffect(() => {
     soundService.enabled = settings.enableAudioAlerts;
-    wakeLockService.enabled = settings.enableWakeLock;
-    notificationService.enabled = settings.enableNotifications;
   }, [settings]);
 
   const saveSettings = (next: AppSettings) => {

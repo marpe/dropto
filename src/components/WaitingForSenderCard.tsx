@@ -18,32 +18,32 @@ interface WaitingForSenderCardProps {
 const STAGE_COPY: Record<WaitingStage, { title: string; description: string; icon: LucideIcon }> = {
   connecting: {
     title: 'Connecting to the sender…',
-    description: 'Finding a direct route to their device. This usually takes a few seconds.',
+    description: 'Usually takes a few seconds.',
     icon: Plug,
   },
   queued: {
     title: 'You’re in line',
-    description: 'The sender is busy with others. The files appear here as soon as it’s your turn.',
+    description: 'Files appear when it’s your turn.',
     icon: Users,
   },
   approval: {
     title: 'Waiting for the sender to accept',
-    description: 'The sender has been asked to approve this device. Files appear here as soon as they do.',
+    description: 'Files appear once they accept.',
     icon: Hourglass,
   },
   files: {
     title: 'Waiting for the sender’s files',
-    description: 'You are connected. The files appear here as soon as the sender adds them.',
+    description: 'Connected. Files appear once added.',
     icon: FilePlus2,
   },
   reconnecting: {
     title: 'The sender went offline, reconnecting…',
-    description: 'Their page probably reloaded. This reconnects on its own as soon as they are back.',
+    description: 'Reconnects when they’re back.',
     icon: RefreshCw,
   },
   pin: {
     title: 'Checking the PIN…',
-    description: 'The sender’s device is verifying the PIN you entered.',
+    description: 'Waiting for the sender.',
     icon: KeyRound,
   },
 };
@@ -51,9 +51,9 @@ const STAGE_COPY: Record<WaitingStage, { title: string; description: string; ico
 function describeQueuePosition(position: number): string {
   const ahead = position - 1;
   if (ahead === 0) {
-    return 'You’re next. The files appear here as soon as someone else’s download finishes.';
+    return 'You’re next.';
   }
-  return `${ahead === 1 ? '1 person' : `${ahead} people`} ahead of you. The files appear here as soon as it’s your turn.`;
+  return `${ahead === 1 ? '1 person' : `${ahead} people`} ahead of you.`;
 }
 
 export const WaitingForSenderCard: React.FC<WaitingForSenderCardProps> = ({ stage, roomCode, queuePosition = null, onCancel }) => {

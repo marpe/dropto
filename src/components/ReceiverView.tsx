@@ -112,7 +112,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
           <StatusCard
             badge={<Spinner className="w-10 h-10 border-[3px] text-brand-500" />}
             title="Preparing to save…"
-            description="Waiting for you to pick a save location, then for the first data to arrive."
+            description="Choose where to save."
           />
         )
       ) : connectionState === 'completed' ? (

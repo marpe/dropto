@@ -12,8 +12,6 @@ const settings: AppSettings = {
   signalingSecure: true,
   customStunTurn: [],
   enableAudioAlerts: false,
-  enableWakeLock: false,
-  enableNotifications: false,
 };
 
 const manifest: TransferManifest = {
@@ -230,6 +228,17 @@ describe('useReceiverSession', () => {
 
     expect(engine.startReceiving).toHaveBeenCalled();
     expect(session.result.current.state.status).toBe('connected');
+  });
+
+  it('asks for notification permission from the download click', async () => {
+    const session = renderReceiverSession();
+    await connectWithManifest(session);
+
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+
+    expect(session.effects.onTransferRequested).toHaveBeenCalledTimes(1);
   });
 
   it('holds device effects from the start of saving until completion', async () => {

@@ -3,6 +3,7 @@
   It uses scroll-state container queries (Chrome 133+): the container's own pseudo-elements query it.
   Where unsupported the fades simply never appear. The fade blends into --scroll-fade-color, so set it
   to the scroller's background when that is not surface-1 (e.g. `[--scroll-fade-color:var(--color-surface-2)]`).
+  Pad an inner element, not the scroller: sticky fades sit inside its padding, so they'd start below the edge.
 */
 @layer components {
   .scroll-fade {

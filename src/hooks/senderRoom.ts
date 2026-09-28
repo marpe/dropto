@@ -26,12 +26,12 @@ export interface OpenRoomOptions {
 // Three attempts per connection, three connections: then guessing has to stop
 const MAX_PIN_LOCKOUTS_PER_ROOM = 3;
 export const PIN_LOCKOUT_NOTICE =
-  'Someone entered a wrong PIN too many times, so this is a new room. Share the new code or link.';
+  'Too many wrong PINs, so the link changed. Share the new one.';
 export const PIN_LOCKDOWN_NOTICE =
-  'Someone entered a wrong PIN too many times, so from now on you accept each new person yourself.';
-export const BUSY_MESSAGE = 'The sender is already sending these files to someone else. Try again once they are done.';
+  'Too many wrong PINs. New connections now need your approval.';
+export const BUSY_MESSAGE = 'The sender is busy with someone else. Try again later.';
 export const LINK_USED_MESSAGE =
-  'Someone already downloaded these files and this link only worked once. Ask the sender for a new one.';
+  'This link was single-use and has been used. Ask for a new one.';
 export const REMOVED_MESSAGE = 'The sender stopped sharing with you.';
 
 /**

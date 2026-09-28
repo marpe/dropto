@@ -170,15 +170,13 @@ describe('ReceiverView Component UI & Interaction', () => {
   it('warns that files are held in memory when the browser cannot stream to disk', () => {
     renderReadyToSave(false);
 
-    expect(screen.getByText(/held in memory/i)).toBeDefined();
-    expect(screen.queryByText(/straight to disk/i)).toBeNull();
+    expect(screen.getByTestId('storage-note')).toBeDefined();
   });
 
-  it('promises disk streaming only when the browser supports it', () => {
+  it('shows no storage note when the browser streams to disk', () => {
     renderReadyToSave(true);
 
-    expect(screen.queryByText(/held in memory/i)).toBeNull();
-    expect(screen.getByText(/straight to disk/i)).toBeDefined();
+    expect(screen.queryByTestId('storage-note')).toBeNull();
   });
 
   function renderPinStep(overrides: { pin?: string; isIncorrect?: boolean; attemptsLeft?: number } = {}) {

@@ -130,6 +130,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
       setSharingOptions,
       createLink: () => {
         if (state.files.length > 0) {
+          services.effects.onTransferRequested();
           dispatch({ type: 'LINK_CREATED' });
         }
       },

@@ -63,7 +63,6 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
   <div className="space-y-3">
     <ToggleRow
       label="Require a PIN"
-      description="Needed before the files are shown"
       isChecked={options.pin !== ''}
       onChange={(isEnabled) => onChange({ ...options, pin: isEnabled ? generatePin() : '' })}
     >
@@ -77,14 +76,13 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
     </ToggleRow>
     <ToggleRow
       label="Require connection approval"
-      description="You accept each person before they connect"
       isChecked={options.requireApproval}
       onChange={(requireApproval) => onChange({ ...options, requireApproval })}
     />
     {/* One number for both: 1 is the one-person link, more lets that many download at once */}
     <OptionRow
       label="Allow simultaneous downloads"
-      description={options.allowMultiple ? 'Others wait in line' : 'One download, then the link stops working'}
+      description={options.allowMultiple ? 'Others wait in line' : 'Single use'}
       isActive={options.allowMultiple}
       control={
         <NumberStepper

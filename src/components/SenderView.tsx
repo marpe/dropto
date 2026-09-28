@@ -171,11 +171,11 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         >
           <p>
             {pendingRemoval.kind === 'file' &&
-              `Someone is connected and choosing where to save. ${displayPath(pendingRemoval.file)} will disappear from their list.`}
+              `${displayPath(pendingRemoval.file)} will disappear from the list someone is choosing from.`}
             {pendingRemoval.kind === 'all' &&
-              'Someone is connected and choosing where to save. Their list will be empty until you add files again.'}
+              'Someone is choosing files; their list will be empty.'}
             {pendingRemoval.kind === 'restart' &&
-              'Clearing everything starts a new share: downloads in progress stop, your current link stops working, and you get a new one when you share again.'}
+              'Downloads stop and the link stops working.'}
           </p>
         </ConfirmDialog>
       )}

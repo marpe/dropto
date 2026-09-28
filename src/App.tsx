@@ -5,7 +5,6 @@ import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
 import { IconButton } from './components/ui/IconButton';
 import { AppBar } from './components/ui/AppBar';
-import { getActiveBrand } from './branding';
 import { DropOverlay } from './components/DropOverlay';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
@@ -126,10 +125,6 @@ export const App: React.FC = () => {
           />
         )}
       </main>
-      <footer className="hidden sm:flex items-center justify-between gap-3 px-5 py-2 border-t border-border-1 text-2xs text-text-5">
-        <span>{getActiveBrand().name}</span>
-        <span>Straight from your device to theirs · nothing stored</span>
-      </footer>
       </div>
     </div>
   );

@@ -25,8 +25,6 @@ const settings: AppSettings = {
   signalingSecure: true,
   customStunTurn: [],
   enableAudioAlerts: false,
-  enableWakeLock: false,
-  enableNotifications: false,
 };
 
 type Session = Awaited<ReturnType<typeof renderSenderSession>>;
@@ -75,6 +73,12 @@ async function shareWith(options: Parameters<ReturnType<typeof useSenderSession>
   });
   return session;
 }
+
+it('asks for notification permission when the link is created, inside the click', async () => {
+  const session = await shareWith({});
+
+  expect(session.effects.onTransferRequested).toHaveBeenCalledTimes(1);
+});
 
 const stages = (session: Session) => session.result.current.state.receivers.map((receiver) => receiver.stage);
 
@@ -467,7 +471,7 @@ describe('useSenderSession', () => {
     expect(session.connections[1].initSender).toHaveBeenCalledWith(settings, { preferredRoomId: undefined });
     expect(session.connections[0].destroy).toHaveBeenCalled();
     expect(session.result.current.status).toBe('waiting');
-    expect(session.result.current.state.roomNotice).toMatch(/new room/i);
+    expect(session.result.current.state.roomNotice).toMatch(/link changed/i);
   });
 
   describe('sharing', () => {
@@ -766,7 +770,7 @@ describe('useSenderSession', () => {
       expect(session.connections).toHaveLength(1);
       expect(session.engines[0].cancel).not.toHaveBeenCalled();
       expect(session.result.current.state.options.requireApproval).toBe(true);
-      expect(session.result.current.state.roomNotice).toMatch(/accept each new person/i);
+      expect(session.result.current.state.roomNotice).toMatch(/need your approval/i);
       connectPeer(session, 'guesser-4', linkGreeting(session));
       expect(session.result.current.state.pendingPeers).toMatchObject([{ peerId: 'guesser-4', isTrusted: false }]);
     });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { SettingsModal } from '../components/SettingsModal';
 import { DEFAULT_SETTINGS } from '../hooks/useSettings';
 import type { AppSettings } from '../types/transfer';
@@ -25,7 +25,7 @@ describe('SettingsModal relay servers', () => {
   it('saves a TURN relay server with its credentials', () => {
     const { onSave, save } = renderSettings();
 
-    fireEvent.click(screen.getByRole('button', { name: /add relay server/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add server/i }));
     fireEvent.change(screen.getByPlaceholderText('turn:relay.example.com:3478'), {
       target: { value: 'turn:relay.example.com:3478' },
     });
@@ -52,7 +52,7 @@ describe('SettingsModal relay servers', () => {
   it('ignores relay rows left blank', () => {
     const { onSave, save } = renderSettings();
 
-    fireEvent.click(screen.getByRole('button', { name: /add relay server/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add server/i }));
     save();
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ customStunTurn: [] }));
@@ -61,7 +61,7 @@ describe('SettingsModal relay servers', () => {
   it('refuses to save a relay URL without a stun:, turn: or turns: scheme', () => {
     const { onSave, save } = renderSettings();
 
-    fireEvent.click(screen.getByRole('button', { name: /add relay server/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add server/i }));
     fireEvent.change(screen.getByPlaceholderText('turn:relay.example.com:3478'), {
       target: { value: 'relay.example.com' },
     });
@@ -89,40 +89,25 @@ describe('SettingsModal relay servers', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it('asks the browser before turning on notifications, and stays off if refused', async () => {
-    const onSave = vi.fn();
-    const requestPermission = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    render(
-      <SettingsModal
-        onClose={() => {}}
-        settings={DEFAULT_SETTINGS}
-        onSave={onSave}
-        themePreference="system"
-        onThemeChange={() => {}}
-        requestNotificationPermission={requestPermission}
-      />
-    );
-    const toggle = screen.getByRole('checkbox', { name: /notify when done/i });
+  it('offers sound as the only transfer toggle; the screen stays on and notifications are always tried', () => {
+    const { onSave } = renderSettings();
 
-    fireEvent.click(toggle);
-    await waitFor(() => expect(screen.getByText(/blocked/i)).toBeDefined());
-    expect((toggle as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByRole('checkbox', { name: /screen|notif/i })).toBeNull();
 
-    fireEvent.click(toggle);
-    await waitFor(() => expect((toggle as HTMLInputElement).checked).toBe(true));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sound' }));
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ enableNotifications: true }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ enableAudioAlerts: false }));
   });
 
   it('keeps unsaved edits when clicking outside, but closes freely when nothing changed', () => {
     const { onClose } = renderSettings();
     const dialog = screen.getByRole('dialog', { hidden: true });
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /play a sound/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sound' }));
     fireEvent.click(dialog);
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /play a sound/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sound' }));
     fireEvent.click(dialog);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

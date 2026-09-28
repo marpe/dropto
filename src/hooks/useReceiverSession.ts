@@ -123,7 +123,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         ...state,
         status: 'error',
         manifest: null,
-        error: 'The sender declined the connection or went offline.',
+        error: 'The sender declined or went offline.',
       };
     case 'RECONNECTING':
       return { ...state, ...noProgress, status: 'reconnecting', manifest: null, pinPrompt: null, queuePosition: null };
@@ -337,7 +337,7 @@ export function useReceiverSession({
         teardown();
         dispatch({
           type: 'CONNECT_FAILED',
-          error: reconnectAttempt > 0 ? 'The sender went offline and did not come back.' : describePeerError(err),
+          error: reconnectAttempt > 0 ? 'The sender went offline.' : describePeerError(err),
         });
       }
     },
@@ -359,7 +359,10 @@ export function useReceiverSession({
     }
     hasStartedSavingRef.current = true;
     dispatch({ type: 'SAVING_STARTED', fileIndices: fileIndices ?? null });
-    const isStarted = await engine.startReceiving(fileIndices);
+    // The save picker opens synchronously first; the notification prompt then shares the same click
+    const starting = engine.startReceiving(fileIndices);
+    services.effects.onTransferRequested();
+    const isStarted = await starting;
     if (engineRef.current !== engine) {
       // A storage failure already moved the session to 'error' via onError
       return;

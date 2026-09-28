@@ -6,6 +6,11 @@ import { createInitialSenderState } from '../hooks/senderState';
 import type { SenderReceiver } from '../types/sharing';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 
+// canvas-confetti needs a real canvas, which jsdom lacks
+vi.mock('../services/confetti', () => ({
+  fireCelebration: vi.fn(),
+}));
+
 const queuedFile: TransferFile = {
   id: 'f1',
   name: 'report.pdf',
@@ -223,13 +228,14 @@ describe('SenderView', () => {
     expect(screen.queryAllByTestId('receiver-row')).toHaveLength(0);
   });
 
-  it('puts the link where the Share button was, outside the files card, with its tools as icons', () => {
+  it('puts the link where the Share button was, with Copy and a menu of the other tools joined to it', () => {
     renderSenderView({ state: shared() });
 
     expect(screen.getByTestId('link-bar').closest('[data-testid="file-queue"]')).toBeNull();
-    for (const tool of ['Copy link', 'Link settings', 'Show QR code and room code', 'Stop sharing']) {
-      expect(screen.getByTitle(tool)).toBeDefined();
-    }
+    expect(screen.getByTitle('Copy link')).toBeDefined();
+    expect(screen.getByTitle('Link options')).toBeDefined();
+    const items = screen.getAllByRole('menuitem', { hidden: true }).map((item) => item.textContent);
+    expect(items).toEqual(['Link settings', 'QR code and room code', 'Stop sharing']);
   });
 
   it('shows that the receiver is choosing where to save, while files can still change', () => {
@@ -557,7 +563,7 @@ describe('SenderView', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /clear all/i }));
       expect(actions.clearFiles).not.toHaveBeenCalled();
-      expect(screen.getByText(/current link stops working/i)).toBeDefined();
+      expect(screen.getByText(/link stops working/i)).toBeDefined();
       fireEvent.click(screen.getByTestId('confirm'));
 
       expect(actions.clearFiles).toHaveBeenCalledTimes(1);

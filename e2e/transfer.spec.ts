@@ -190,7 +190,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // A one-person link serves a single download; someone else arriving later is told why
     const latecomer = await openReceiver(browser);
     await latecomer.page.goto(link);
-    await expect(latecomer.page.getByText(/only worked once/i)).toBeVisible({ timeout: 15000 });
+    await expect(latecomer.page.getByText(/single-use/i)).toBeVisible({ timeout: 15000 });
     await latecomer.close();
 
     // The same files can go to someone else on a new link
@@ -346,6 +346,7 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
   if (!pin && !simultaneous) {
     return;
   }
+  await page.getByTitle('Link options').click();
   await page.getByTestId('open-link-settings').click();
   if (pin) {
     await page.getByRole('checkbox', { name: /require a pin/i }).check();
