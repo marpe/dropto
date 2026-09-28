@@ -18,7 +18,7 @@ export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInpu
   // Dropping is handled page-wide (usePageFileDrop); this is the visible invitation plus the pickers
   <div
     data-testid="drop-zone"
-    className="group border-2 border-dashed rounded-3xl text-center transition-colors border-border-2 hover:border-brand-500/60 bg-surface-1 p-8"
+    className="group border-2 border-dashed text-center transition-colors border-border-2 hover:border-brand-500/60 bg-surface-1 p-8 -mx-4 border-x-0 sm:mx-0 sm:border-x-2 sm:rounded-3xl"
   >
     <IconBadge
       icon={UploadCloud}

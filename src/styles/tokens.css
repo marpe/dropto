@@ -65,6 +65,14 @@
 
   --text-2xs: 0.625rem;
 
+  /* Flatter corners than Tailwind's defaults (lg 0.5, xl 0.75, 2xl 1, 3xl 1.5rem): components keep their
+     rounded-* classes and the whole app tones down together */
+  --radius-md: 0.3125rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+  --radius-3xl: 0.75rem;
+
   --animate-float: float 3.5s ease-in-out infinite;
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-screen-in: screen-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
