@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings2 } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { Button } from './ui/Button';
 import { IconButton } from './ui/IconButton';
 import { Modal } from './ui/Modal';
@@ -59,13 +59,13 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
   return (
     <>
       <IconButton data-testid="open-link-settings" title="Link settings" onClick={() => setIsOpen(true)} className={className}>
-        <Settings2 className="w-4 h-4" />
+        <Settings className="w-4 h-4" />
       </IconButton>
 
       {isOpen && (
         <Modal
           title="Link settings"
-          icon={Settings2}
+          icon={Settings}
           onClose={() => setIsOpen(false)}
           footer={<Button onClick={() => setIsOpen(false)}>Done</Button>}
         >
