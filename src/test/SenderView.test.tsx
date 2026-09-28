@@ -524,7 +524,9 @@ describe('SenderView', () => {
       const actions = renderSenderView({
         state: several([makeReceiver({ peerId: 'a', stage: 'completed', idleSinceMs: null, hasLeft: true })]),
       });
-      expect(within(screen.getByTestId('receiver-row')).getByRole('img', { name: 'Left' })).toBeDefined();
+      const row = screen.getByTestId('receiver-row');
+      expect(within(row).getByRole('img', { name: 'Finished and left' }).dataset.presence).toBe('done');
+      expect(row.dataset.hasLeft).toBe('true');
 
       fireEvent.click(screen.getByTitle('Remove from list'));
 

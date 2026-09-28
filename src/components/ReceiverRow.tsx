@@ -26,8 +26,9 @@ interface ReceiverRowProps {
 
 /** Whether they are still there; the dot says it, so the text only says what they are doing */
 function presenceOf(receiver: SenderReceiver): Presence {
+  // Only someone whose last download completed stays listed after leaving
   if (receiver.hasLeft) {
-    return 'gone';
+    return 'done';
   }
   if (receiver.stage === 'interrupted') {
     return 'waiting';
@@ -90,7 +91,15 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
         : null;
 
   return (
-    <li data-testid="receiver-row" data-stage={receiver.stage} className="py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
+    <li
+      data-testid="receiver-row"
+      data-stage={receiver.stage}
+      data-has-left={receiver.hasLeft}
+      className={cn(
+        'py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1',
+        receiver.hasLeft && 'opacity-50 hover:opacity-100'
+      )}
+    >
       <div className="flex items-start gap-2">
         <PeerIdentity
           details={receiver.details}
