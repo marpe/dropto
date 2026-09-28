@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { DataConnection } from 'peerjs';
 import { TransferSender } from '../services/transfer/sender';
 import { TransferReceiver } from '../services/transfer/receiver';
-import type { ReceiverOptions } from '../services/transfer/receiver';
+import type { ReceiverOptions, ResumePoint } from '../services/transfer/receiver';
 import { CHUNK_HEADER_SIZE, encodeChunk } from '../services/transfer/protocol';
 import { FastStreamingChecksum } from '../services/checksum';
 import type { StorageWriter } from '../services/storage';
@@ -879,6 +879,179 @@ describe('resume requests', () => {
     await request({ fileIndex: 1, fromChunk: 1 });
 
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe('resuming after a dropped connection', () => {
+  function joined(chunks: Uint8Array[]): Uint8Array {
+    const whole = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) {
+      whole.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return whole;
+  }
+
+  /** Downloads `files` until `chunksBeforeCut` chunks are written, then drops the connection mid-write. */
+  async function downloadUntilCut(files: TransferFile[], chunksBeforeCut: number) {
+    const saved: Uint8Array[] = [];
+    let resume: ResumePoint | null = null;
+    let writes = 0;
+    const cut = () => {
+      for (const conn of [pair.senderConn, pair.receiverConn]) {
+        conn.otherEnd = null;
+        conn.open = false;
+      }
+      pair.senderConn.emit('close');
+      pair.receiverConn.emit('close');
+    };
+    const pair = createTransferPair({
+      receiverEvents: {
+        onConnectionLost: (interruption) => {
+          resume = interruption.resume;
+        },
+      },
+      receiverOptions: {
+        chooseStorage: fakeStorage(async (chunk) => {
+          saved.push(chunk.slice());
+          if (++writes === chunksBeforeCut) {
+            cut();
+          }
+        }).chooseStorage,
+      },
+    });
+    pair.sender.start(files);
+    await waitFor(() => resume !== null);
+    return { saved, resume: resume as unknown as ResumePoint };
+  }
+
+  /** A new connection whose receiver carries on from `resume`; it must never ask where to save. */
+  function resumeWith(files: TransferFile[], resume: ResumePoint) {
+    const seen = { resumed: null as number[] | null, failures: 0, firstMetrics: null as TransferMetrics | null };
+    const pair = createTransferPair({
+      isAutoReceiving: false,
+      receiverEvents: {
+        onResumed: (fileIndices) => {
+          seen.resumed = fileIndices;
+        },
+        onResumeFailed: () => {
+          seen.failures++;
+        },
+        onMetrics: (metrics) => {
+          seen.firstMetrics ??= metrics;
+        },
+      },
+      receiverOptions: {
+        resumeFrom: resume,
+        chooseStorage: async () => {
+          throw new Error('Must not ask where to save');
+        },
+      },
+    });
+    pair.sender.start(files);
+    return { pair, seen };
+  }
+
+  it('carries on from the last saved chunk on a new connection, without asking where to save', async () => {
+    const file = createTestFile(300 * 1024);
+    const { saved, resume } = await downloadUntilCut([file], 2);
+    expect(resume).toMatchObject({ fileId: file.id, nextChunk: 2, receivedBytes: 2 * 64 * 1024 });
+
+    const { pair, seen } = resumeWith([file], resume);
+
+    expect(await waitFor(pair.isComplete)).toBe(true);
+    expect(seen.resumed).toEqual([0]);
+    expect(pair.record.receiverResult).toEqual({ corruptedFiles: [] });
+    expect(joined(saved)).toEqual(new Uint8Array(await file.rawFile.arrayBuffer()));
+    // Only the rest went over the new connection, and progress picked up where it stopped
+    expect(pair.senderConn.sentChunkCount()).toBe(3);
+    expect(seen.firstMetrics!.bytesTransferred).toBeGreaterThanOrEqual(2 * 64 * 1024);
+  });
+
+  it('finishes a file whose last chunk arrived just before the cut', async () => {
+    const file = createTestFile(300 * 1024);
+    const { saved, resume } = await downloadUntilCut([file], 5);
+    expect(resume.nextChunk).toBe(5);
+
+    const { pair } = resumeWith([file], resume);
+
+    expect(await waitFor(pair.isComplete)).toBe(true);
+    expect(pair.senderConn.sentChunkCount()).toBe(0);
+    expect(pair.record.receiverResult).toEqual({ corruptedFiles: [] });
+    expect(joined(saved)).toEqual(new Uint8Array(await file.rawFile.arrayBuffer()));
+  });
+
+  it('carries on with the rest of the download after the cut-off file, skipping files no longer offered', async () => {
+    const a = createTestFile(300 * 1024, 'a.bin');
+    const b = createTestFile(10 * 1024, 'b.bin');
+    const c = createTestFile(10 * 1024, 'c.bin');
+    const { resume } = await downloadUntilCut([a, b, c], 2);
+    expect(resume.remainingIds).toEqual(['a.bin', 'b.bin', 'c.bin']);
+
+    const { pair, seen } = resumeWith([a, c], resume);
+
+    expect(await waitFor(pair.isComplete)).toBe(true);
+    expect(seen.resumed).toEqual([0, 1]);
+  });
+
+  it.each([
+    ['is no longer offered', createTestFile(300 * 1024, 'other.bin')],
+    ['changed size', createTestFile(200 * 1024, 'a.bin')],
+  ])('lets go of the half-written file when it %s', async (_, replacement) => {
+    const { resume } = await downloadUntilCut([createTestFile(300 * 1024, 'a.bin')], 2);
+
+    const { pair, seen } = resumeWith([replacement], resume);
+
+    expect(await waitFor(() => seen.failures === 1)).toBe(true);
+    expect(resume.writer.abort).toHaveBeenCalled();
+    expect(pair.senderConn.sentChunkCount()).toBe(0);
+    expect(pair.record.receiverErrors).toEqual([]);
+  });
+
+  it('lets go of the half-written file when the sender reordered its list', async () => {
+    const a = createTestFile(300 * 1024, 'a.bin');
+    const b = createTestFile(10 * 1024, 'b.bin');
+    const { resume } = await downloadUntilCut([a, b], 2);
+
+    const { seen } = resumeWith([b, a], resume);
+
+    expect(await waitFor(() => seen.failures === 1)).toBe(true);
+  });
+
+  it('never builds a resume point for a writer whose save picker has not finished', async () => {
+    const a = createTestFile(10 * 1024, 'a.bin');
+    const b = createTestFile(10 * 1024, 'b.bin');
+    let fileCalls = 0;
+    let interruption: DownloadInterruption | null = null;
+    const pair = createTransferPair({
+      receiverEvents: {
+        onConnectionLost: (received) => {
+          interruption = received;
+        },
+      },
+      receiverOptions: {
+        chooseStorage: async () => () => {
+          fileCalls++;
+          if (fileCalls === 1) {
+            return createFakeWriter();
+          }
+          return { ...createFakeWriter(), prepare: vi.fn(() => new Promise<boolean>(() => {})) };
+        },
+      },
+    });
+
+    pair.sender.start([a, b]);
+    await waitFor(() => fileCalls === 2);
+    for (const conn of [pair.senderConn, pair.receiverConn]) {
+      conn.otherEnd = null;
+      conn.open = false;
+    }
+    pair.senderConn.emit('close');
+    pair.receiverConn.emit('close');
+
+    expect(await waitFor(() => interruption !== null)).toBe(true);
+    expect(interruption).toMatchObject({ resume: null, finishedCount: 1 });
   });
 });
 

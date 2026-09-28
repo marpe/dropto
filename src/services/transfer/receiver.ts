@@ -28,6 +28,8 @@ export interface ReceiverOptions {
   shareKey?: string | null;
   /** Device and time zone, so the sender can tell receivers apart */
   introduction?: DeviceIntroduction;
+  /** A download cut off on an earlier connection, carried on once this one's manifest arrives */
+  resumeFrom?: ResumePoint;
 }
 
 /** Receives a manifest, then writes each file to the chosen storage while verifying it. */
@@ -42,14 +44,19 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
   private fileIndex = 0;
   private receivedBytesForFile = 0;
   private expectedChunkIndex = 0;
+  // Guards captureInterruption: a dropped connection while the next file's save picker is still open must not
+  // hand back a writer whose prepare() never finished
+  private isFileStarted = false;
+  private resumeFrom: ResumePoint | null;
 
   constructor(
     conn: DataConnection,
     events: ReceiverEvents,
-    { chooseStorage = chooseWriterFactory, shareKey = null, introduction }: ReceiverOptions = {}
+    { chooseStorage = chooseWriterFactory, shareKey = null, introduction, resumeFrom }: ReceiverOptions = {}
   ) {
     super(conn, events);
     this.chooseStorage = chooseStorage;
+    this.resumeFrom = resumeFrom ?? null;
     // Always the first message: the sender decides between auto-admitting and asking
     this.send({
       type: 'HELLO',
@@ -114,6 +121,11 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
         }
         this.manifest = message.payload;
         this.events.onManifest?.(message.payload);
+        if (this.resumeFrom) {
+          const resume = this.resumeFrom;
+          this.resumeFrom = null;
+          this.resume(resume, message.payload);
+        }
         return;
       case 'AUTH_REQUEST':
         this.events.onPinRequired?.(message.payload);
@@ -173,7 +185,7 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     const interruption = super.captureInterruption();
     const manifest = this.manifest;
     const file = manifest?.files[this.fileIndex];
-    if (!manifest || !file || !this.writer || !this.createWriter) {
+    if (!manifest || !file || !this.writer || !this.createWriter || !this.isFileStarted) {
       return interruption;
     }
     const position = this.selection.indexOf(this.fileIndex);
@@ -201,6 +213,7 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.receivedBytesForFile = 0;
     this.expectedChunkIndex = 0;
     this.checksum = new FastStreamingChecksum();
+    this.isFileStarted = false;
     // Immediate update so the UI switches to the progress view before the first chunk arrives
     this.emitMetrics(this.metrics?.snapshot(this.selection.indexOf(fileIndex), file.name, 0, { isForced: true }));
 
@@ -214,8 +227,46 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
       this.failTransfer(new Error(`Failed to prepare disk storage: ${err instanceof Error ? err.message : String(err)}`));
       return false;
     }
+    this.isFileStarted = true;
     this.send({ type: 'FILE_START', payload: { fileIndex } });
     return true;
+  }
+
+  /**
+   * Carries on a download cut off on an earlier connection: the same file, still open, from its next chunk, then
+   * the rest still offered. Only when that file is still offered unchanged and still comes first.
+   */
+  private resume(point: ResumePoint, manifest: TransferManifest) {
+    const indexOf = new Map(manifest.files.map((file, index) => [file.id, index]));
+    const current = indexOf.get(point.fileId);
+    const selection = point.remainingIds.flatMap((id) => indexOf.get(id) ?? []).sort((a, b) => a - b);
+    if (current === undefined || manifest.files[current].size !== point.fileSize || selection[0] !== current) {
+      void point.writer.abort();
+      this.events.onResumeFailed?.();
+      return;
+    }
+    const files = selection.map((index) => manifest.files[index]);
+    this.createWriter = point.createWriter;
+    this.selection = selection;
+    this.writer = point.writer;
+    this.checksum = point.checksum;
+    this.fileIndex = current;
+    this.expectedChunkIndex = point.nextChunk;
+    this.receivedBytesForFile = point.receivedBytes;
+    this.isFileStarted = true;
+    this.beginTransfer(
+      files.reduce((sum, file) => sum + file.size, 0),
+      files.length,
+      point.receivedBytes
+    );
+    this.events.onResumed?.(selection);
+    const file = manifest.files[current];
+    const percent = file.size > 0 ? (point.receivedBytes / file.size) * 100 : 0;
+    this.emitMetrics(this.metrics?.snapshot(0, file.name, percent, { isForced: true }));
+    if (selection.length < manifest.files.length) {
+      this.send({ type: 'FILE_SELECTION', payload: { fileIndices: selection } });
+    }
+    this.send({ type: 'FILE_START', payload: { fileIndex: current, fromChunk: point.nextChunk } });
   }
 
   private async finishFile(fileIndex: number, expectedChecksum: string) {
