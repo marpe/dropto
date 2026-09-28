@@ -38,6 +38,10 @@ async function readSlice(file: TransferFile, start: number, end: number): Promis
   }
 }
 
+function chunkCount(file: TransferFile): number {
+  return Math.ceil(file.size / CHUNK_SIZE);
+}
+
 function toManifest(files: TransferFile[]): TransferManifest {
   return {
     totalBytes: files.reduce((sum, file) => sum + file.size, 0),
@@ -113,22 +117,29 @@ export class TransferSender extends TransferPeer<SenderEvents> {
       case 'FILE_SELECTION':
         this.applySelection(message.payload.fileIndices);
         return;
-      case 'FILE_START':
+      case 'FILE_START': {
+        const { fileIndex, fromChunk = 0 } = message.payload;
         if (!this.hasSentManifest) {
           throw new Error('Receiver requested files before authenticating');
         }
-        if (!this.transferIndices().includes(message.payload.fileIndex)) {
+        if (!this.transferIndices().includes(fileIndex)) {
           throw new Error('Receiver requested a file it did not select');
         }
+        // Carrying on is only for the file a dropped connection cut off, at the start of the next download
+        if (fromChunk > 0 && (this.hasReceiverStarted || fromChunk > chunkCount(this.files[fileIndex]))) {
+          throw new Error('Receiver asked to carry on from an unexpected point');
+        }
+        const startBytes = Math.min(fromChunk * CHUNK_SIZE, this.files[fileIndex].size);
         if (!this.hasReceiverStarted) {
           this.hasReceiverStarted = true;
           const selected = this.transferIndices().map((index) => this.files[index]);
-          this.beginTransfer(toManifest(selected).totalBytes, selected.length);
-          this.events.onReceiverStarted?.(this.transferIndices());
+          this.beginTransfer(toManifest(selected).totalBytes, selected.length, startBytes);
+          this.events.onReceiverStarted?.(this.transferIndices(), fromChunk > 0 ? startBytes : undefined);
         }
         // Not awaited: streaming a file (or waiting for a slot) must not block pause/cancel messages in the queue
-        this.slot.then(() => this.streamFile(message.payload.fileIndex)).catch((err) => this.failTransfer(err));
+        this.slot.then(() => this.streamFile(fileIndex, fromChunk)).catch((err) => this.failTransfer(err));
         return;
+      }
       case 'FILE_ACK':
         this.handleFileAck(message.payload.fileIndex, message.payload.isVerified);
         return;
@@ -196,21 +207,30 @@ export class TransferSender extends TransferPeer<SenderEvents> {
     }
   }
 
-  private async streamFile(fileIndex: number) {
+  private async streamFile(fileIndex: number, fromChunk = 0) {
     const file = this.files[fileIndex];
     if (!file) {
       throw new Error(`Receiver requested unknown file #${fileIndex}`);
     }
     const checksum = new FastStreamingChecksum();
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const totalChunks = chunkCount(file);
     // Progress counts files within the selection, not manifest indices
     const position = this.transferIndices().indexOf(fileIndex);
     const channel = this.conn.dataChannel;
 
+    // What the receiver already has is read again here only to check the whole file at the end
+    for (let chunkIndex = 0; chunkIndex < fromChunk; chunkIndex++) {
+      if (this.isStopped) {
+        return;
+      }
+      const start = chunkIndex * CHUNK_SIZE;
+      checksum.update(await readSlice(file, start, Math.min(start + CHUNK_SIZE, file.size)));
+    }
+
     if (this.isStopped) {
       return;
     }
-    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    for (let chunkIndex = fromChunk; chunkIndex < totalChunks; chunkIndex++) {
       await this.waitUntilResumed();
       if (this.isStopped) {
         return;

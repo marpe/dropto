@@ -151,8 +151,11 @@ export interface TransferEvents {
 }
 
 export interface SenderEvents extends TransferEvents {
-  /** The receiver chose a destination and requested the first file of a download; the file list is fixed until it ends */
-  onReceiverStarted?: (fileIndices: number[]) => void;
+  /**
+   * The receiver chose a destination and requested the first file of a download; the file list is fixed until it
+   * ends. `startBytes`: how much of that first file arrived before a dropped connection, when carrying on
+   */
+  onReceiverStarted?: (fileIndices: number[], startBytes?: number) => void;
   /** A receiver used up its PIN attempts; the transfer then fails as usual */
   onPinLockout?: () => void;
 }
