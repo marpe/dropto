@@ -109,7 +109,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 				                     isIndeterminate={ticked.length > 0 && !isAllTicked}
 				                     onChange={() => setTickedIds(isAllTicked ? new Set() : new Set(allFiles.map((file) => file.id)))} />
 			           }
-			           trailClassName="w-9"
+			           trailClassName="w-6 pointer-coarse:w-9"
 			           renderRow={(file) => (
 				           <FileTableRow key={file.id}
 				                         file={file}
