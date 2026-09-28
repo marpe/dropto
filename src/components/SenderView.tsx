@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
-import { BottomBar } from './ui/BottomBar';
 import { Inset } from './ui/Inset';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { LinkButton } from './ui/LinkButton';
@@ -17,6 +16,7 @@ import { FileDropZone } from './FileDropZone';
 import { FileQueue } from './FileQueue';
 import { LinkBar } from './LinkBar';
 import { ReceiverList } from './ReceiverList';
+import { WaitingForPeopleCard } from './WaitingForPeopleCard';
 
 interface SenderViewProps {
   session: SenderSession;
@@ -144,13 +144,12 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         />
       )}
 
-      {files.length > 0 && !isShared && (
-        <BottomBar>
-          <Button data-testid="share-files" size="lg" onClick={actions.createLink}>
-            <Link2 className="w-5 h-5" />
-            <span>Share</span>
-          </Button>
-        </BottomBar>
+      {/* Share takes exactly the link bar's place and size, so creating the link swaps one for the other */}
+      {!isShared && files.length > 0 && (
+        <Button data-testid="share-files" onClick={actions.createLink} className="w-full h-10 py-0">
+          <Link2 className="w-4 h-4" />
+          <span>Share</span>
+        </Button>
       )}
 
       {isShared && (
@@ -166,7 +165,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       )}
 
       {/* Whoever is connected is listed, from the moment they arrive (even on an empty page after a reload) */}
-      {(receivers.length > 0 || pendingPeers.length > 0) && (
+      {receivers.length > 0 || pendingPeers.length > 0 ? (
         <Card padding="sm">
           <ReceiverList
             requests={pendingPeers}
@@ -179,6 +178,8 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
             onTogglePauseReceiver={actions.togglePauseReceiver}
           />
         </Card>
+      ) : (
+        isShared && <WaitingForPeopleCard />
       )}
     </Screen>
   );
