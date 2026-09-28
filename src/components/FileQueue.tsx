@@ -1,9 +1,10 @@
 import type { RefObject } from 'react';
-import React from 'react';
-import { RotateCcw, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { RotateCcw, Trash2, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { IconButton } from './ui/IconButton';
+import { LinkButton } from './ui/LinkButton';
 import { Notice } from './ui/Notice';
 import { FilePickerButtons } from './FilePickerButtons';
 import { FileTable, FileTableRow } from './FileTable';
@@ -20,7 +21,8 @@ interface FileQueueProps {
 	onAddFiles: AddFiles;
 	/** Lets other controls (e.g. the approval dialog) open the file picker */
 	fileInputRef: RefObject<HTMLInputElement | null>;
-	onRemoveFile: (fileId: string) => void;
+	/** One file (its remove button) or several (ticked, then Remove) */
+	onRemoveFiles: (fileIds: string[]) => void;
 	onClearFiles: () => void;
 	/** Below the list, e.g. the Share button */
 	footer?: React.ReactNode;
@@ -33,12 +35,32 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 	                                                    onRestoreFiles,
 	                                                    onAddFiles,
 	                                                    fileInputRef,
-	                                                    onRemoveFile,
+	                                                    onRemoveFiles,
 	                                                    onClearFiles,
 	                                                    footer,
                                                     }) => {
 	const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
 	const missingIds = new Set(missingFiles.map((file) => file.id));
+	const allFiles = [...files, ...missingFiles];
+	// Ticked for removal; ids of files removed meanwhile simply drop out
+	const [tickedIds, setTickedIds] = useState<ReadonlySet<string>>(new Set());
+	const ticked = allFiles.filter((file) => tickedIds.has(file.id));
+	const canTick = allFiles.length > 1;
+	const isAllTicked = ticked.length === allFiles.length;
+
+	const toggle = (fileId: string) => {
+		setTickedIds((current) => {
+			const next = new Set(current);
+			if (!next.delete(fileId)) {
+				next.add(fileId);
+			}
+			return next;
+		});
+	};
+	const removeTicked = () => {
+		onRemoveFiles(ticked.map((file) => file.id));
+		setTickedIds(new Set());
+	};
 
 	return (
 		<Card padding="sm"
@@ -63,33 +85,73 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 					</span>
 				</Notice>
 			)}
-			<FileTable files={[...files, ...missingFiles]}
+			<FileTable files={allFiles}
+			           hasLead={canTick}
 			           trailClassName="w-9"
 			           renderRow={(file) => (
 				           <FileTableRow key={file.id}
 				                         file={file}
+				                         isLabel={canTick}
+				                         lead={canTick && (
+					                         <input type="checkbox"
+					                                checked={tickedIds.has(file.id)}
+					                                onChange={() => toggle(file.id)}
+					                                className="w-4 h-4 shrink-0 accent-brand-500" />
+				                         )}
 				                         data-missing={missingIds.has(file.id) || undefined}
 				                         title={missingIds.has(file.id) ? 'Add this file again' : undefined}
 				                         className={missingIds.has(file.id) ? 'opacity-50' : undefined}
 				                         trail={
 					                         <IconButton title={`Remove ${file.name}`}
 					                                     size="sm"
-					                                     onClick={() => onRemoveFile(file.id)}
+					                                     onClick={() => onRemoveFiles([file.id])}
 					                                     className="p-1 hover:text-text-danger-1 pointer-coarse:p-2.5 pointer-coarse:-my-2">
 						                         <X className="w-4 h-4" />
 					                         </IconButton>
 				                         } />
 			           )} />
 
+			{/* While files are ticked, the footer is about them; otherwise it counts the list and adds to it */}
 			<div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1 sm:rounded-xl">
-				<FileTotals count={files.length}
-				            ofCount={files.length + missingFiles.length}
-				            totalBytes={totalBytes} />
-				<div className="flex items-center gap-2">
-					<FilePickerButtons onAddFiles={onAddFiles}
-					                   fileInputRef={fileInputRef}
-					                   size="sm" />
-				</div>
+				{ticked.length > 0 ? (
+					<>
+						<span className="flex items-center gap-3 text-xs">
+							<span data-testid="ticked-count"
+							      className="font-semibold text-text-3 tabular-nums">
+								{ticked.length} selected
+							</span>
+							<LinkButton onClick={() => setTickedIds(isAllTicked ? new Set() : new Set(allFiles.map((file) => file.id)))}
+							            className="text-xs">
+								{isAllTicked ? 'Select none' : 'Select all'}
+							</LinkButton>
+						</span>
+						<div className="flex items-center gap-2">
+							<Button variant="ghost"
+							        size="sm"
+							        onClick={() => setTickedIds(new Set())}>
+								Cancel
+							</Button>
+							<Button data-testid="remove-ticked"
+							        variant="danger"
+							        size="sm"
+							        onClick={removeTicked}>
+								<Trash2 className="w-3.5 h-3.5" />
+								<span>Remove</span>
+							</Button>
+						</div>
+					</>
+				) : (
+					<>
+						<FileTotals count={files.length}
+						            ofCount={files.length + missingFiles.length}
+						            totalBytes={totalBytes} />
+						<div className="flex items-center gap-2">
+							<FilePickerButtons onAddFiles={onAddFiles}
+							                   fileInputRef={fileInputRef}
+							                   size="sm" />
+						</div>
+					</>
+				)}
 			</div>
 
 			{footer && <div className="pt-4 mt-3 border-t border-border-1">{footer}</div>}
