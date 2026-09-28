@@ -159,23 +159,23 @@ export const Modal: React.FC<ModalProps> = ({
       {/* The sheet's grab handle: a familiar cue that it closes by going back down */}
       {placement === 'sheet' && <div aria-hidden="true" className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-border-3" />}
 
-	    {(Icon || title) && <header className="shrink-0 flex items-center gap-2 px-5 pt-3 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border-1">
-		    {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
-		    <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
-			    {title}
-		    </h2>
-		    {onClose && (
-			    <IconButton title="Close" size="sm" onClick={() => close()} className="-mr-2">
-				    <X className="w-5 h-5" />
-			    </IconButton>
-		    )}
-	    </header>}
+      {(Icon || title) && <header className="shrink-0 flex items-center gap-2 px-5 pt-3 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border-1">
+        {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
+        <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
+          {title}
+        </h2>
+        {onClose && (
+          <IconButton title="Close" size="sm" onClick={() => close()} className="-mr-2">
+            <X className="w-5 h-5" />
+          </IconButton>
+        )}
+      </header>}
 
-	    {!Icon && !title &&  onClose && (
-		    <IconButton title="Close" size="sm" onClick={() => close()} className="absolute right-0 top-0">
-			    <X className="w-5 h-5" />
-		    </IconButton>
-	    )}
+      {!Icon && !title &&  onClose && (
+        <IconButton title="Close" size="sm" onClick={() => close()} className="absolute right-0 top-0">
+          <X className="w-5 h-5" />
+        </IconButton>
+      )}
 
       <CloseModalContext.Provider value={close}>
         <div className="scroll-fade flex-1 min-h-0 overflow-y-auto overscroll-contain">
