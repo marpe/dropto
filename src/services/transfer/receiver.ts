@@ -96,7 +96,7 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     const selectedFiles = selection.map((index) => manifest.files[index]);
     const createWriter = await this.chooseStorage(selectedFiles);
     // The sender changed the list while the picker was open; the choice may not fit it (e.g. one-file dialog)
-    if (!createWriter || this.manifest !== manifest) {
+    if (!createWriter || this.manifest !== manifest || this.isStopped) {
       return false;
     }
     this.createWriter = createWriter;
@@ -218,8 +218,15 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     this.emitMetrics(this.metrics?.snapshot(this.selection.indexOf(fileIndex), file.name, 0, { isForced: true }));
 
     try {
-      this.writer = this.createWriter(file);
-      if (!(await this.writer.prepare(file.name, file.size))) {
+      const writer = this.createWriter(file);
+      this.writer = writer;
+      const isPrepared = await writer.prepare(file.name, file.size);
+      if (this.isStopped) {
+        // Stopped while the file was being opened (never a resume point: it had not started), so close it again
+        void writer.abort();
+        return false;
+      }
+      if (!isPrepared) {
         this.writer = null;
         return false;
       }
@@ -276,6 +283,10 @@ export class TransferReceiver extends TransferPeer<ReceiverEvents> {
     const isVerified = this.checksum.digest().toLowerCase() === expectedChecksum.toLowerCase();
     await this.writer.finalize();
     this.writer = null;
+    if (this.isStopped) {
+      // Stopped meanwhile: the next file must not be opened
+      return;
+    }
 
     this.send({ type: 'FILE_ACK', payload: { fileIndex, isVerified } });
     this.recordVerification(this.manifest?.files[fileIndex], isVerified);

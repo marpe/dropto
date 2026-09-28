@@ -874,6 +874,19 @@ describe('useReceiverSession: a download cut off by a dropped connection', () =>
     expect(session.connections).toHaveLength(2);
   });
 
+  it('ends the cut-off download when the user connects afresh', async () => {
+    const { session, engine } = await downloading();
+    const resume = resumePoint();
+    await cutOff(session, engine, resume);
+
+    await act(async () => {
+      await session.result.current.actions.connect();
+    });
+
+    expect(resume.writer.abort).toHaveBeenCalled();
+    expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
+  });
+
   it('enters the PIN typed before when reconnecting to carry on', async () => {
     const { session, engine } = await downloading('2468');
     const next = await cutOff(session, engine, resumePoint());

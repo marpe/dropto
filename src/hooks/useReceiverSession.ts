@@ -130,11 +130,14 @@ export function useReceiverSession({
       }
       // The key belongs to the room it was shared for; never hand it to another sender
       const shareKey = roomCode === link.roomCode ? link.shareKey : null;
+      if (reconnectAttempt === 0) {
+        // First, so the teardown below ends a cut-off download's run instead of keeping it for a reconnect
+        dropResume();
+      }
       teardown();
       hasStartedSavingRef.current = false;
       hasLeftRef.current = false;
       if (reconnectAttempt === 0) {
-        dropResume();
         dispatch({ type: 'CONNECT_REQUESTED' });
       }
 
