@@ -18,7 +18,6 @@ import { useProgressTitle } from './hooks/useProgressTitle';
 import { usePageFileDrop } from './hooks/usePageFileDrop';
 import type { AddFiles, ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
-import { supportsSaveFilePicker } from './utils/fileSystemAccess';
 import type { ShareLink } from './utils/shareLink';
 import { getActiveBrand } from './branding';
 
@@ -39,8 +38,6 @@ function readShareLink(): ShareLink {
   }
   return link;
 }
-
-const isNativeFSA = supportsSaveFilePicker();
 
 export const App: React.FC = () => {
   const theme = useTheme();
@@ -135,37 +132,12 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Room at the bottom on a phone for the pinned action bar */}
-      <main className="flex-1 pt-4 pb-28 sm:py-0">
+      {/* Room at the bottom on a phone for the pinned action bar, when there is one */}
+      <main className="flex-1 pt-4 pb-4 has-[[data-bottom-bar]]:pb-28 sm:py-0 sm:has-[[data-bottom-bar]]:pb-0">
         {mode === 'send' ? (
           <SenderView session={sender} onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')} />
         ) : (
-          <ReceiverView
-            roomCode={receiver.state.roomCode}
-            onRoomCodeChange={receiver.actions.setRoomCode}
-            pin={receiver.state.pin}
-            onPinChange={receiver.actions.setPin}
-            onConnect={receiver.actions.connect}
-            connectionState={receiver.state.status}
-            pinPrompt={receiver.state.pinPrompt}
-            onSubmitPin={receiver.actions.submitPin}
-            manifest={receiver.state.manifest}
-            transferMetrics={receiver.state.metrics}
-            onStartSaving={receiver.actions.startSaving}
-            onTogglePause={receiver.actions.togglePause}
-            onCancelTransfer={receiver.actions.cancel}
-            onRetryNow={receiver.actions.retryNow}
-            isPaused={receiver.state.isPaused}
-            errorMessage={receiver.state.error}
-            isNativeFSA={isNativeFSA}
-            corruptedFiles={receiver.state.corruptedFiles}
-            onReset={receiver.actions.reset}
-            isInvited={receiver.state.isInvited}
-            selectedFileIndices={receiver.state.selectedFileIndices}
-            queuePosition={receiver.state.queuePosition}
-            finishedFiles={receiver.state.finishedFiles}
-            hasSenderLeft={receiver.state.hasSenderLeft}
-          />
+          <ReceiverView session={receiver} />
         )}
       </main>
       </div>
