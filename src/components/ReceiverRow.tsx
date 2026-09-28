@@ -58,16 +58,16 @@ function describeActivity(receiver: SenderReceiver, queuePosition: number | null
 }
 
 const STOP_TITLES = {
-  queued: { button: 'Remove from line', dialog: 'Remove from the line?' },
-  transferring: { button: 'Stop download', dialog: 'Stop this download?' },
-  idle: { button: 'Disconnect', dialog: 'Disconnect?' },
+  queued: { button: 'Remove from line', dialog: 'Remove from the line?', confirm: 'Remove' },
+  transferring: { button: 'Stop download', dialog: 'Stop this download?', confirm: 'Stop' },
+  idle: { button: 'Disconnect', dialog: 'Disconnect?', confirm: 'Disconnect' },
 } as const;
 
 /** One person on the link: where they are, the files sent to them, and a way to stop them. */
 export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePosition, onStop, onDismiss, onTogglePause }) => {
   const [isConfirmingStop, setIsConfirmingStop] = useState(false);
   const nowMs = useNow(1000, receiver.idleSinceMs !== null);
-  const { name, meta } = describePeer(receiver.details);
+  const { name } = describePeer(receiver.details);
   // Still connected after a download counts as idle, and can be disconnected; only the gone can be dismissed
   const isGone = receiver.hasLeft || receiver.stage === 'failed';
   const stopTitles = STOP_TITLES[receiver.stage === 'queued' || receiver.stage === 'transferring' ? receiver.stage : 'idle'];
@@ -90,15 +90,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
           details={receiver.details}
           presence={presenceOf(receiver)}
           detail={bytesSent > 0 && <span data-testid="bytes-sent">{formatBytes(bytesSent)} sent</span>}
-          status={
-            activity && (
-              <span
-                className={cn('shrink-0 text-xs tabular-nums', receiver.stage === 'failed' ? 'text-text-danger-1' : 'text-text-4')}
-              >
-                {activity}
-              </span>
-            )
-          }
+          status={activity && <span className={cn(receiver.stage === 'failed' && 'text-text-danger-1')}>{activity}</span>}
         />
         {receiver.stage === 'transferring' && (
           <IconButton title={receiver.isPaused ? 'Resume' : 'Pause'} size="sm" onClick={onTogglePause}>
@@ -142,7 +134,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
       {isConfirmingStop && (
         <ConfirmDialog
           title={stopTitles.dialog}
-          confirmLabel={receiver.stage === 'transferring' ? 'Stop' : 'Disconnect'}
+          confirmLabel={stopTitles.confirm}
           tone="danger"
           onConfirm={() => {
             setIsConfirmingStop(false);
@@ -150,10 +142,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
           }}
           onCancel={() => setIsConfirmingStop(false)}
         >
-          <p>
-            {name}
-            {meta && ` (${meta})`} will be disconnected. They can reconnect with the link.
-          </p>
+          <p>{name} will be disconnected. They can reconnect with the link.</p>
         </ConfirmDialog>
       )}
     </li>

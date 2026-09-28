@@ -28,7 +28,11 @@ export const AppBar: React.FC<AppBarProps> = ({ title, onTitleClick, onBack, bac
     )}
     <h1 className="flex-1 min-w-0 truncate text-base sm:text-sm font-semibold text-text-1">
       {onTitleClick ? (
-        <button type="button" onClick={onTitleClick} className="max-w-full truncate rounded-md px-1 -mx-1">
+        <button
+          type="button"
+          onClick={onTitleClick}
+          className="max-w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-surface-3"
+        >
           {title}
         </button>
       ) : (

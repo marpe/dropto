@@ -20,7 +20,7 @@ import type { AddFiles, ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
 import { supportsSaveFilePicker } from './utils/fileSystemAccess';
 import type { ShareLink } from './utils/shareLink';
-import { getActiveBrand } from './branding.ts';
+import { getActiveBrand } from './branding';
 
 type Mode = 'send' | 'receive';
 
@@ -28,6 +28,8 @@ type Mode = 'send' | 'receive';
 const CAN_ADD_FILES: SenderStatus[] = ['waiting', 'awaiting_receiver'];
 // From the room-code form, dropping files means "actually, I want to send"
 const CAN_SWITCH_TO_SENDING: ReceiverStatus[] = ['idle', 'error'];
+// Back is also offered once a download is done: leaving then loses nothing
+const CAN_LEAVE_RECEIVING: ReceiverStatus[] = [...CAN_SWITCH_TO_SENDING, 'completed'];
 
 /** Reads the link the page was opened with, then hides its key from the address bar, history and screenshots. */
 function readShareLink(): ShareLink {
@@ -69,8 +71,8 @@ export const App: React.FC = () => {
   const canTakeFiles =
     mode === 'send' ? CAN_ADD_FILES.includes(sender.status) : CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
   const { isDraggingFiles } = usePageFileDrop(canTakeFiles ? addDroppedFiles : null);
-  // Leaving mid-connection would tear it down; back is offered from the code form and its errors
-  const canLeaveReceiving = CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
+  // Leaving mid-connection would tear it down; back is offered from the code form, its errors and after a download
+  const canLeaveReceiving = CAN_LEAVE_RECEIVING.includes(receiver.state.status);
 
   const leaveCost = describeLeaveCost({
     mode,
@@ -113,13 +115,13 @@ export const App: React.FC = () => {
 
       {isConfirmingHome && leaveCost && (
         <ConfirmDialog
-          title="Stop sharing"
-          confirmLabel="OK"
+          title={leaveCost.title}
+          confirmLabel={leaveCost.confirmLabel}
           tone="danger"
           onConfirm={goHome}
           onCancel={() => setIsConfirmingHome(false)}
         >
-          <p>{leaveCost}</p>
+          <p>{leaveCost.body}</p>
         </ConfirmDialog>
       )}
 
