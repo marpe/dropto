@@ -146,3 +146,99 @@
     }
   }
 }
+
+/* Enter and exit motion for dialogs (ui/Modal) and menus (ui/Menu). Each fades in from --enter-translate
+   and --enter-scale, and plays it backwards when it closes: the closed state is the starting state. */
+.menu-popover {
+  --enter-translate: 0 -0.25rem;
+  --enter-scale: 0.97;
+  transform-origin: top right;
+}
+
+@media (width < 40rem) {
+  .menu-popover {
+    --enter-translate: 0 100%;
+    --enter-scale: 1;
+  }
+}
+
+.modal-dialog,
+.menu-popover {
+  translate: var(--enter-translate, 0);
+  scale: var(--enter-scale, 1);
+}
+
+.modal-dialog,
+.modal-dialog::backdrop,
+.menu-popover,
+.menu-popover::backdrop {
+  opacity: 0;
+  transition-property: opacity, translate, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-in;
+}
+
+.modal-dialog[open],
+.modal-dialog[open]::backdrop,
+.menu-popover:popover-open,
+.menu-popover:popover-open::backdrop {
+  opacity: 1;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+
+.modal-dialog[open],
+.menu-popover:popover-open {
+  translate: none;
+  scale: none;
+}
+
+@starting-style {
+  .modal-dialog[open],
+  .modal-dialog[open]::backdrop,
+  .menu-popover:popover-open,
+  .menu-popover:popover-open::backdrop {
+    opacity: 0;
+  }
+
+  .modal-dialog[open],
+  .menu-popover:popover-open {
+    translate: var(--enter-translate, 0);
+    scale: var(--enter-scale, 1);
+  }
+}
+
+/* A dropdown is small and close to the pointer: quicker than a sheet or dialog */
+@media (width >= 40rem) {
+  .menu-popover,
+  .menu-popover::backdrop {
+    transition-duration: 100ms;
+  }
+
+  .menu-popover:popover-open,
+  .menu-popover:popover-open::backdrop {
+    transition-duration: 150ms;
+  }
+}
+
+/* Transitioning display and overlay (allow-discrete) keeps a closing dialog or menu rendered, in the top
+   layer, until it has faded out. Without `overlay` (Firefox) a closed one would drop out of the top layer
+   into the page while fading, so there it only animates in */
+@supports (overlay: auto) {
+  .modal-dialog,
+  .modal-dialog::backdrop,
+  .menu-popover,
+  .menu-popover::backdrop {
+    transition-property: opacity, translate, scale, display, overlay;
+    transition-behavior: allow-discrete;
+  }
+}
+
+/* Reduced motion: fade only. Unlayered, so it also beats the per-placement offsets Modal sets as utilities */
+@media (prefers-reduced-motion: reduce) {
+  .modal-dialog,
+  .menu-popover {
+    --enter-translate: 0;
+    --enter-scale: 1;
+  }
+}
