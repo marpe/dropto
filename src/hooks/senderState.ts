@@ -1,4 +1,4 @@
-import type { SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
+import type { ManifestFile, SenderStatus, TransferFile, TransferMetrics, TransferResult } from '../types/transfer';
 import type { PeerDetails, PendingPeer, ReceiverStage, SenderReceiver, SharingOptions } from '../types/sharing';
 import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
 import { pickFiles } from '../utils/fileSelection';
@@ -13,6 +13,8 @@ export interface SenderSessionState {
   /** Why the room code changed or the rules tightened, shown with the link */
   roomNotice: string | null;
   files: TransferFile[];
+  /** Files listed before a reload, which the browser could not keep; adding the same file again restores it */
+  missingFiles: ManifestFile[];
   options: SharingOptions;
   /** The sender has finished choosing and created the link; until then nobody is admitted */
   isShared: boolean;
@@ -57,6 +59,7 @@ export function createInitialSenderState(): SenderSessionState {
     roomError: null,
     roomNotice: null,
     files: [],
+    missingFiles: [],
     options: { pin: '', requireApproval: false, maxSimultaneous: DEFAULT_SIMULTANEOUS },
     isShared: false,
     pendingPeers: [],
@@ -138,14 +141,25 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
       return { ...state, ...emptyRoom, roomCode: '', shareKey: '', roomError: null, isShared: false };
     case 'LOCKED_DOWN':
       return { ...state, options: { ...state.options, requireApproval: true }, roomNotice: action.notice };
-    case 'FILES_ADDED':
-      return { ...state, files: [...state.files, ...action.files] };
+    case 'FILES_ADDED': {
+      // Files added again after a reload (with their old ids) leave the missing list
+      const added = new Set(action.files.map((file) => file.id));
+      return {
+        ...state,
+        files: [...state.files, ...action.files],
+        missingFiles: state.missingFiles.filter((file) => !added.has(file.id)),
+      };
+    }
     case 'FILE_REMOVED':
-      return { ...state, files: state.files.filter((file) => file.id !== action.fileId) };
+      return {
+        ...state,
+        files: state.files.filter((file) => file.id !== action.fileId),
+        missingFiles: state.missingFiles.filter((file) => file.id !== action.fileId),
+      };
     case 'QUEUE_EMPTIED':
-      return { ...state, files: [] };
+      return { ...state, files: [], missingFiles: [] };
     case 'FILES_CLEARED':
-      return { ...state, files: [], receivers: [], isShared: false };
+      return { ...state, files: [], missingFiles: [], receivers: [], isShared: false };
     case 'OPTIONS_CHANGED':
       return { ...state, options: { ...state.options, ...action.options } };
     case 'LINK_CREATED':

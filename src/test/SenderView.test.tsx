@@ -346,6 +346,21 @@ describe('SenderView', () => {
     expect(screen.getByTestId('file-totals').textContent).toMatch(/^1 file\s*·\s*2 KB$/);
   });
 
+  it('lists files from before a reload faded, asking for them again, and drops one without asking', () => {
+    const missing = { id: 'm1', name: 'holiday.jpg', size: 4096, type: 'image/jpeg', lastModified: 1 };
+    const actions = renderSenderView({ state: { missingFiles: [missing] } });
+
+    expect(screen.getByText(/1 file needs adding again/i)).toBeDefined();
+    const row = screen.getByTestId('file-row');
+    expect(row.hasAttribute('data-missing')).toBe(true);
+    expect(screen.getByTestId('file-totals').textContent).toMatch(/^0 of 1 file/);
+
+    fireEvent.click(within(row).getByTitle('Remove holiday.jpg'));
+
+    expect(actions.removeFile).toHaveBeenCalledWith('m1');
+    expect(screen.queryByTestId('confirm')).toBeNull();
+  });
+
   it('sorts the files by the column clicked, then the other way, then back to the order they were added', () => {
     const small: TransferFile = { ...queuedFile, id: 's', name: 'zebra.txt', size: 10, lastModified: 3 };
     const large: TransferFile = { ...queuedFile, id: 'l', name: 'apple.txt', size: 5000, lastModified: 1 };

@@ -983,6 +983,50 @@ describe('useSenderSession', () => {
     });
   });
 
+  it('asks for the same files again after a reload, and gives a re-added file its old id back', async () => {
+    const first = await renderSenderSession();
+    const lastModified = 1_700_000_000_000;
+    act(() => {
+      first.result.current.actions.addFiles([
+        new File(['hello'], 'hello.txt', { lastModified }),
+        new File(['other'], 'other.txt', { lastModified }),
+      ]);
+    });
+    const helloId = first.result.current.state.files[0].id;
+    first.unmount();
+
+    const second = await renderSenderSession();
+    expect(second.result.current.state.files).toEqual([]);
+    expect(second.result.current.state.missingFiles.map((file) => file.name)).toEqual(['hello.txt', 'other.txt']);
+
+    act(() => {
+      second.result.current.actions.addFiles([
+        new File(['hello'], 'hello.txt', { lastModified }),
+        // Same name, but changed since: a different file, added as new
+        new File(['other!'], 'other.txt', { lastModified }),
+      ]);
+    });
+
+    expect(second.result.current.state.files.map((file) => file.id)[0]).toBe(helloId);
+    expect(second.result.current.state.files[1].id).not.toBe(first.result.current.state.files[1]?.id);
+    expect(second.result.current.state.missingFiles.map((file) => file.name)).toEqual(['other.txt']);
+  });
+
+  it('forgets the listed files when starting over', async () => {
+    const first = await renderSenderSession();
+    act(() => {
+      first.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+    });
+    act(() => {
+      first.result.current.actions.startOver();
+    });
+    first.unmount();
+
+    const second = await renderSenderSession();
+
+    expect(second.result.current.state.missingFiles).toEqual([]);
+  });
+
   it('remembers that the link was shared, so a reload shows it again', async () => {
     const first = await shareWith({});
     expect(JSON.parse(sessionStorage.getItem(SENDER_ROOM_STORAGE_KEY) ?? '{}').isShared).toBe(true);
