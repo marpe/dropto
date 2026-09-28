@@ -815,6 +815,73 @@ describe('connection loss', () => {
   });
 });
 
+describe('resume requests', () => {
+  function senderWith(files: TransferFile[], events: SenderEvents = {}) {
+    const conn = new MockDataConnection();
+    const errors: string[] = [];
+    const sender = new TransferSender(asConnection(conn), {
+      ...events,
+      onError: (message) => {
+        errors.push(message);
+      },
+    });
+    sender.start(files);
+    const request = async (payload: { fileIndex: number; fromChunk?: number }) => {
+      conn.emit('data', JSON.stringify({ type: 'FILE_START', payload }));
+      await sleep(10);
+    };
+    return { conn, errors, request };
+  }
+
+  it('sends only the rest of a file, with the checksum of all of it', async () => {
+    const file = createTestFile(300 * 1024);
+    const { conn, errors, request } = senderWith([file]);
+
+    await request({ fileIndex: 0, fromChunk: 2 });
+    await waitFor(() => conn.sentMessageTypes().includes('FILE_COMPLETE'));
+
+    expect(errors).toEqual([]);
+    expect(conn.sentChunkCount()).toBe(3);
+    const complete = conn.sent
+      .filter((data): data is string => typeof data === 'string')
+      .map((data) => JSON.parse(data))
+      .find((message) => message.type === 'FILE_COMPLETE');
+    const whole = new FastStreamingChecksum();
+    whole.update(new Uint8Array(await file.rawFile.arrayBuffer()));
+    expect(complete.payload.checksum).toBe(whole.digest());
+  });
+
+  it('tells the room how much of the download had already arrived', async () => {
+    let started: [number[], number | undefined] | null = null;
+    const { request } = senderWith([createTestFile(300 * 1024)], {
+      onReceiverStarted: (fileIndices, startBytes) => {
+        started = [fileIndices, startBytes];
+      },
+    });
+
+    await request({ fileIndex: 0, fromChunk: 2 });
+
+    expect(started).toEqual([[0], 2 * 64 * 1024]);
+  });
+
+  it('refuses to carry on past the end of a file', async () => {
+    const { errors, request } = senderWith([createTestFile(100 * 1024)]);
+
+    await request({ fileIndex: 0, fromChunk: 3 });
+
+    expect(errors).toHaveLength(1);
+  });
+
+  it('refuses to carry on a file other than the first of a download', async () => {
+    const { errors, request } = senderWith([createTestFile(100 * 1024, 'a.bin'), createTestFile(100 * 1024, 'b.bin')]);
+
+    await request({ fileIndex: 0 });
+    await request({ fileIndex: 1, fromChunk: 1 });
+
+    expect(errors).toHaveLength(1);
+  });
+});
+
 describe('storage and read failures', () => {
   it('writes received chunks to disk one at a time', async () => {
     let inFlight = 0;
