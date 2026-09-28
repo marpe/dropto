@@ -34,7 +34,9 @@ type PendingRemoval = { kind: 'file'; file: TransferFile } | { kind: 'all' } | {
 
 export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToReceive }) => {
   const { state, status, actions } = session;
-  const { files, isShared, options, roomCode, shareKey, receivers, pendingPeers } = state;
+  const { files, missingFiles, isShared, options, roomCode, shareKey, receivers, pendingPeers } = state;
+  // After a reload the list can hold only files waiting to be added again; it still shows
+  const hasList = files.length + missingFiles.length > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
 
@@ -46,7 +48,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   // Link holders are let in once there are shared files; until then they are listed with what they wait for
   const waitingFor = files.length === 0 ? 'Waiting for files' : 'Joins when you share';
   const hasRoomError = !roomCode && !!state.roomError;
-  const isLanding = files.length === 0 && !isAwaitingReceiver && pendingPeers.length === 0;
+  const isLanding = !hasList && !isAwaitingReceiver && pendingPeers.length === 0;
 
   const requestRemoveFile = (file: TransferFile) => {
     if (isSomeoneChoosing) {
@@ -74,7 +76,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   };
 
   return (
-    <Screen key={files.length === 0 ? 'landing' : 'files'}>
+    <Screen key={hasList ? 'files' : 'landing'}>
       {pendingRemoval && (
         <ConfirmDialog
           title={REMOVAL_TITLES[pendingRemoval.kind]}
@@ -107,7 +109,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         </Inset>
       )}
 
-      {files.length === 0 ? (
+      {!hasList ? (
         <>
           <FileDropZone onAddFiles={actions.addFiles} fileInputRef={fileInputRef} />
           {isLanding && onSwitchToReceive && (
@@ -122,12 +124,16 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       ) : (
         <FileQueue
           files={files}
+          missingFiles={missingFiles}
           onAddFiles={actions.addFiles}
           fileInputRef={fileInputRef}
           onRemoveFile={(fileId) => {
             const file = files.find((candidate) => candidate.id === fileId);
             if (file) {
               requestRemoveFile(file);
+            } else {
+              // A missing file was never offered to anyone, so it goes without asking
+              actions.removeFile(fileId);
             }
           }}
           onClearFiles={requestClearFiles}

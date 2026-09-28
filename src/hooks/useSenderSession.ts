@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import type { AppSettings, TransferFile } from '../types/transfer';
 import type { SharingOptions } from '../types/sharing';
-import { displayPath } from '../utils/filePath';
+import { fileIdentity, recallFileList, rememberFileList } from '../utils/fileMemory';
 import { defaultSessionServices } from './sessionServices';
 import type { SessionServices } from './sessionServices';
 import { SenderRoom } from './senderRoom';
@@ -23,11 +23,6 @@ function toTransferFile(file: File): TransferFile {
   };
 }
 
-/** Same path, size and modification time: the same file picked or dropped twice. */
-function fileIdentity(file: TransferFile): string {
-  return `${displayPath(file)}|${file.size}|${file.lastModified}`;
-}
-
 interface UseSenderSessionOptions {
   /** A room is open only while active (i.e. the app is in send mode) */
   active: boolean;
@@ -36,7 +31,11 @@ interface UseSenderSessionOptions {
 }
 
 export function useSenderSession({ active, settings, services = defaultSessionServices }: UseSenderSessionOptions) {
-  const [state, dispatch] = useReducer(senderReducer, undefined, createInitialSenderState);
+  // Files listed before a reload come back as missing, to be added again
+  const [state, dispatch] = useReducer(senderReducer, undefined, () => ({
+    ...createInitialSenderState(),
+    missingFiles: recallFileList(),
+  }));
   const [room] = useState(
     () => new SenderRoom(services, dispatch, { files: state.files, options: state.options, isShared: state.isShared })
   );
@@ -46,6 +45,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    rememberFileList([...state.files, ...state.missingFiles]);
+  }, [state.files, state.missingFiles]);
 
   // The room applies the sender's choices to everyone connected: re-offered files, admissions, free slots
   useEffect(() => {
@@ -65,7 +68,10 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
 
   const addFiles = (rawFiles: File[]) => {
     const known = new Set(state.files.map(fileIdentity));
-    const added = rawFiles.map(toTransferFile).filter((file) => {
+    // A file listed before a reload takes its old id back, so receivers' records of it still match
+    const missingIds = new Map(state.missingFiles.map((file) => [fileIdentity(file), file.id]));
+    const restore = (file: TransferFile) => ({ ...file, id: missingIds.get(fileIdentity(file)) ?? file.id });
+    const added = rawFiles.map((rawFile) => restore(toTransferFile(rawFile))).filter((file) => {
       const identity = fileIdentity(file);
       if (known.has(identity)) {
         return false;
