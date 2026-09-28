@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useReceiverSession } from '../hooks/useReceiverSession';
 import type { AppSettings, TransferManifest } from '../types/transfer';
-import { createFakeServices, FakeConnection } from './utils/fakeSessionServices';
+import type { ResumePoint } from '../services/transfer/receiver';
+import { createFakeServices, FakeConnection, FakeTransfer } from './utils/fakeSessionServices';
 
 const settings: AppSettings = {
   useCustomSignaling: false,
@@ -680,7 +681,7 @@ describe('useReceiverSession', () => {
       await waitFor(() => expect(session.engines).toHaveLength(2));
     });
 
-    it('cancels a download the connection cut off, then reconnects so it can be started again', async () => {
+    it('carries a download the connection cut off into the reconnect, waiting for the sender to be back', async () => {
       const session = await openLink();
       act(() => {
         session.engines[0].events.onManifest?.(manifest);
@@ -693,9 +694,158 @@ describe('useReceiverSession', () => {
         session.engines[0].events.onConnectionLost?.({ finishedCount: 0, corruptedFiles: [], resume: null });
       });
 
-      expect(session.engines[0].cancel).toHaveBeenCalled();
-      expect(session.result.current.state.status).toBe('reconnecting');
+      // Nothing was open to hand off, but the cut still counts as interrupted, not cancelled
+      expect(session.engines[0].cancel).not.toHaveBeenCalled();
+      expect(session.result.current.state).toMatchObject({ status: 'transferring', isInterrupted: true });
       await waitFor(() => expect(session.engines).toHaveLength(2));
     });
+  });
+});
+
+describe('useReceiverSession: a download cut off by a dropped connection', () => {
+  const twoFiles: TransferManifest = {
+    totalBytes: 10,
+    files: [
+      { id: 'f1', name: 'one.txt', size: 5, type: 'text/plain' },
+      { id: 'f2', name: 'two.txt', size: 5, type: 'text/plain' },
+    ],
+  };
+  const resumePoint = () => ({ writer: { abort: vi.fn().mockResolvedValue(undefined) } }) as unknown as ResumePoint;
+  const cut = (resume: ResumePoint | null, finishedCount = 0) => ({ finishedCount, corruptedFiles: [], resume });
+
+  async function downloading(pin = '') {
+    const session = renderReceiverSession();
+    const { engine } = await connect(session);
+    act(() => {
+      engine.events.onManifest?.(twoFiles);
+      session.result.current.actions.setPin(pin);
+    });
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    return { session, engine };
+  }
+
+  async function cutOff(session: ReturnType<typeof renderReceiverSession>, engine: FakeTransfer, resume: ResumePoint | null, finishedCount = 0) {
+    act(() => {
+      engine.events.onConnectionLost?.(cut(resume, finishedCount));
+    });
+    await waitFor(() => expect(session.engines).toHaveLength(2));
+    return session.engines[1];
+  }
+
+  it('keeps the download on screen and hands the open file to the next connection', async () => {
+    const { session, engine } = await downloading();
+    const resume = resumePoint();
+
+    const next = await cutOff(session, engine, resume, 1);
+
+    expect(session.result.current.state).toMatchObject({ status: 'transferring', isInterrupted: true });
+    expect(Object.keys(session.result.current.state.finishedFiles)).toEqual(['f1']);
+    expect(next.options.resumeFrom).toBe(resume);
+    expect(engine.cancel).not.toHaveBeenCalled();
+    expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
+  });
+
+  it('carries on once the sender is back', async () => {
+    const { session, engine } = await downloading();
+    const next = await cutOff(session, engine, resumePoint(), 1);
+
+    act(() => {
+      next.events.onManifest?.(twoFiles);
+      next.events.onResumed?.([1]);
+    });
+
+    expect(session.result.current.state).toMatchObject({ status: 'transferring', isInterrupted: false, selectedFileIndices: [1] });
+  });
+
+  it('offers what is still missing when it cannot carry on', async () => {
+    const { session, engine } = await downloading();
+    const next = await cutOff(session, engine, resumePoint(), 1);
+
+    act(() => {
+      next.events.onManifest?.(twoFiles);
+      next.events.onResumeFailed?.();
+    });
+
+    expect(session.result.current.state).toMatchObject({ status: 'connected', isInterrupted: false, hasInterruptedDownload: true });
+    expect(Object.keys(session.result.current.state.finishedFiles)).toEqual(['f1']);
+    expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
+  });
+
+  it('offers what is still missing when the cut left no file open', async () => {
+    const { session, engine } = await downloading();
+    const next = await cutOff(session, engine, null, 1);
+
+    act(() => {
+      next.events.onManifest?.(twoFiles);
+    });
+
+    expect(next.options.resumeFrom).toBeUndefined();
+    expect(session.result.current.state).toMatchObject({ status: 'connected', hasInterruptedDownload: true });
+  });
+
+  it('keeps the open file through another drop before the sender answers', async () => {
+    const { session, engine } = await downloading();
+    const resume = resumePoint();
+    const next = await cutOff(session, engine, resume);
+
+    act(() => {
+      next.events.onPeerLeft?.();
+    });
+    await waitFor(() => expect(session.engines).toHaveLength(3));
+
+    expect(session.engines[2].options.resumeFrom).toBe(resume);
+    expect(resume.writer.abort).not.toHaveBeenCalled();
+    expect(session.result.current.state.status).toBe('transferring');
+  });
+
+  it('lets go of the half-written file when the user stops', async () => {
+    const { session, engine } = await downloading();
+    const resume = resumePoint();
+    await cutOff(session, engine, resume);
+
+    act(() => {
+      session.result.current.actions.cancel();
+    });
+
+    expect(resume.writer.abort).toHaveBeenCalled();
+    expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
+  });
+
+  it('enters the PIN typed before when reconnecting to carry on', async () => {
+    const { session, engine } = await downloading('2468');
+    const next = await cutOff(session, engine, resumePoint());
+
+    act(() => {
+      next.events.onPinRequired?.({ attemptsLeft: 3, isIncorrect: false });
+    });
+
+    expect(next.submitPin).toHaveBeenCalledWith('2468');
+    expect(session.result.current.state.status).toBe('transferring');
+  });
+
+  it('asks for the PIN when the one typed before is refused', async () => {
+    const { session, engine } = await downloading('2468');
+    const next = await cutOff(session, engine, resumePoint());
+
+    act(() => {
+      next.events.onPinRequired?.({ attemptsLeft: 2, isIncorrect: true });
+    });
+
+    expect(session.result.current.state.status).toBe('pin_required');
+  });
+
+  it('asks the engine for what it leaves behind when the signalling connection goes first', async () => {
+    const { session, engine } = await downloading();
+    const resume = resumePoint();
+    engine.interrupt.mockReturnValue(cut(resume));
+
+    act(() => {
+      session.connections[0].handlers.onDisconnected?.();
+    });
+    await waitFor(() => expect(session.engines).toHaveLength(2));
+
+    expect(session.engines[1].options.resumeFrom).toBe(resume);
   });
 });
