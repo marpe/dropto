@@ -262,6 +262,32 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(actions.cancel).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the download reconnecting after a dropped connection', () => {
+    renderReceiver('transferring', { manifest: dummyManifest, metrics: dummyMetrics, isInterrupted: true });
+
+    expect(screen.getByTestId('transfer-summary').textContent).toContain('Reconnecting…');
+  });
+
+  it('offers only what is still missing when a cut-off download could not carry on', () => {
+    const manifest: TransferManifest = {
+      totalBytes: 2,
+      files: [
+        { id: 'f1', name: 'got.txt', size: 1, type: 'text/plain' },
+        { id: 'f2', name: 'missing.txt', size: 1, type: 'text/plain' },
+      ],
+    };
+
+    renderReceiver('connected', {
+      manifest,
+      finishedFiles: { f1: { seconds: 1, isCorrupted: false } },
+      hasInterruptedDownload: true,
+    });
+
+    expect(screen.getByText('Download was interrupted.')).toBeDefined();
+    expect((screen.getByRole('checkbox', { name: /got\.txt/ }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole('checkbox', { name: /missing\.txt/ }) as HTMLInputElement).checked).toBe(true);
+  });
+
   describe('choosing which files to download', () => {
     const twoFiles: TransferManifest = {
       totalBytes: 3072,

@@ -61,6 +61,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({ session }) => {
               isPaused={isPaused}
               queuePosition={isTransferring ? state.queuePosition : null}
               completion={isTransferring ? null : { corruptedFiles: state.corruptedFiles }}
+              isReconnecting={isTransferring && state.isInterrupted}
             />
           )}
           <IncomingFilesCard
@@ -69,6 +70,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({ session }) => {
             download={isTransferring ? { fileIndices: selectedFileIndices, metrics: state.metrics, isPaused } : null}
             finishedFiles={state.finishedFiles}
             hasSenderLeft={state.hasSenderLeft}
+            hasInterruptedDownload={state.hasInterruptedDownload}
             onTogglePause={actions.togglePause}
             onCancel={actions.cancel}
             onDone={actions.reset}
