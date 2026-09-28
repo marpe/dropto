@@ -7,7 +7,7 @@ import { Notice } from './ui/Notice';
 import { QrModal } from './QrModal';
 import { SharingSettings } from './SharingSettings';
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 import { isAbortError } from '../utils/errors';
 import type { SharingOptions } from '../types/sharing';
 
@@ -29,7 +29,7 @@ const canWebShare = typeof navigator !== 'undefined' && typeof navigator.share =
 
 async function shareLink(url: string) {
   try {
-    await navigator.share({ title: getActiveBrand().name, url });
+    await navigator.share({ title: BRAND.name, url });
   } catch (err) {
     // Closing the share sheet rejects with AbortError; that is the user's choice, not a failure
     if (!isAbortError(err)) {

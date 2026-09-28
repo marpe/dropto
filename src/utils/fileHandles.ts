@@ -187,7 +187,7 @@ function getIndexedDB(): IDBFactory | undefined {
   }
 }
 
-const DEFAULT_DB_NAME = 'dropwave-file-handles';
+const DEFAULT_DB_NAME = 'dropto-file-handles';
 const STORE_NAME = 'handles';
 const DB_VERSION = 1;
 

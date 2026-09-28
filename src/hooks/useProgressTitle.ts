@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 
 /** Shows transfer progress in the tab title while `percent` is set; restores the original afterwards. */
 export function useProgressTitle(percent: number | null) {
@@ -15,7 +15,7 @@ export function useProgressTitle(percent: number | null) {
       return;
     }
     originalTitleRef.current ??= document.title;
-    document.title = `(${roundedPercent}%) ${getActiveBrand().name} — Transferring`;
+    document.title = `(${roundedPercent}%) ${BRAND.name} — Transferring`;
   }, [roundedPercent]);
 
   useEffect(

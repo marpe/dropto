@@ -19,7 +19,7 @@ import { usePageFileDrop } from './hooks/usePageFileDrop';
 import type { AddFiles, ReceiverStatus, SenderStatus } from './types/transfer';
 import { parseShareLink, stripShareKeyFromUrl } from './utils/shareLink';
 import type { ShareLink } from './utils/shareLink';
-import { getActiveBrand } from './branding';
+import { BRAND } from './branding';
 
 type Mode = 'send' | 'receive';
 
@@ -97,7 +97,7 @@ export const App: React.FC = () => {
     <div className="min-h-dvh bg-background sm:py-16">
       <div className="flex flex-col min-h-dvh sm:min-h-0 sm:max-w-[30rem] sm:mx-auto sm:rounded-xl sm:overflow-clip">
       <AppBar
-        title={getActiveBrand().name}
+        title={BRAND.name}
         onTitleClick={requestHome}
         onBack={mode === 'receive' && canLeaveReceiving ? () => setMode('send') : undefined}
         backLabel="Send files instead"

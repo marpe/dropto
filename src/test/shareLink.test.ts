@@ -30,7 +30,7 @@ describe('share links', () => {
   });
 
   it('normalises a lower-case room code and tolerates a missing key', () => {
-    expect(parseShareLink('?room=dw-abc234', '')).toEqual({ roomCode: 'DW-ABC234', shareKey: null });
+    expect(parseShareLink('?room=dt-abc234', '')).toEqual({ roomCode: 'DT-ABC234', shareKey: null });
   });
 
   it('returns nothing useful for a plain visit', () => {

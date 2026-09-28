@@ -9,7 +9,7 @@ type AnyTransferEvents = SenderEvents & ReceiverEvents;
 
 export class FakeConnection {
   public handlers: ConnectionEventHandler;
-  public initSender = vi.fn().mockResolvedValue('DW-ROOM22');
+  public initSender = vi.fn().mockResolvedValue('DT-ROOM22');
   public initReceiver = vi.fn().mockResolvedValue(createFakePeerConnection('sender'));
   public disconnectPeer = vi.fn();
   public destroy = vi.fn();

@@ -91,7 +91,7 @@ function renderSenderView(
   onSwitchToReceive?: () => void
 ) {
   const session = {
-    state: { ...createInitialSenderState(), roomCode: 'DW-ABC234', shareKey: 'link-key', ...state },
+    state: { ...createInitialSenderState(), roomCode: 'DT-ABC234', shareKey: 'link-key', ...state },
     status,
     focus,
     restorableCount,
@@ -145,7 +145,7 @@ describe('SenderView', () => {
     fireEvent.click(screen.getByTestId('copy-link'));
 
     expect(actions.createLink).toHaveBeenCalledTimes(1);
-    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DW-ABC234#key=link-key$/));
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DT-ABC234#key=link-key$/));
   });
 
   it('copies the link again without creating another once shared', () => {
@@ -180,7 +180,7 @@ describe('SenderView', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /copy link/i }));
 
-    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DW-ABC234#key=link-key$/));
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DT-ABC234#key=link-key$/));
   });
 
   it('shows nothing below the link until someone connects', () => {

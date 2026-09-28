@@ -23,12 +23,12 @@
   --color-text-4: #71717a;
   --color-text-5: #a1a1aa;
   /* Filled controls (primary buttons, selected segments) and their text. Without contrast-color() support
-     the text colour is set per brand; with it, the browser picks black or white (see the end of this file) */
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
+     the text colour is fixed; with it, the browser picks black or white (see the end of this file) */
+  --color-accent: #f97316;
+  --color-accent-hover: #ea580c;
   /* A primary button's edge: one step lighter than its fill */
-  --color-border-accent-1: #6366f1;
-  --color-text-on-accent: #ffffff;
+  --color-border-accent-1: #fb923c;
+  --color-text-on-accent: #121212;
 
   --color-text-muted: color-mix(in oklab, currentColor, contrast-color(currentColor) 20%);
 
@@ -38,18 +38,18 @@
   --color-border-danger-1: #fecaca;
   --color-text-warning-1: #d97706;
 
-  /* Brand accent: DropWave indigo by default, dropto.space orange below */
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
-  --color-brand-950: #1e1b4b;
+  /* Brand accent: orange */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+  --color-brand-950: #431407;
 
   /* Catppuccin accents for file-type icons: Latte here, Mocha in the dark theme */
   --color-ctp-red: #d20f39;
@@ -189,36 +189,9 @@
   --scrollbar-track: #121212;
 }
 
-/* Indigo is dark: on dark surfaces DropWave's accent text and icons step one shade lighter to stay readable */
-.dark:not([data-brand='dropto']) {
-  --color-brand-400: #a5b4fc;
-  --color-brand-500: #818cf8;
-  --color-brand-600: #6366f1;
-}
-
-/* dropto.space orange (data-brand is stamped on <html> by the boot script in index.html) */
-:root[data-brand='dropto'] {
-  --color-accent: #f97316;
-  --color-accent-hover: #ea580c;
-  --color-border-accent-1: #fb923c;
-  --color-text-on-accent: #121212;
-  --color-brand-50: #fff7ed;
-  --color-brand-100: #ffedd5;
-  --color-brand-200: #fed7aa;
-  --color-brand-300: #fdba74;
-  --color-brand-400: #fb923c;
-  --color-brand-500: #f97316;
-  --color-brand-600: #ea580c;
-  --color-brand-700: #c2410c;
-  --color-brand-800: #9a3412;
-  --color-brand-900: #7c2d12;
-  --color-brand-950: #431407;
-}
-
-/* Text on filled controls follows the fill: white on indigo, black on orange (Baseline 2026; the per-brand values above are the fallback) */
+/* Text on filled controls follows the fill (Baseline 2026; the fixed value above is the fallback) */
 @supports (color: contrast-color(red)) {
-  :root,
-  :root[data-brand='dropto'] {
+  :root {
     --color-text-on-accent: contrast-color(var(--color-accent));
   }
 }

@@ -1,19 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useProgressTitle } from '../hooks/useProgressTitle';
 
 describe('useProgressTitle', () => {
   beforeEach(() => {
-    document.title = 'DropWave';
+    document.title = 'dropto.space';
   });
 
-  afterEach(() => {
-    delete document.documentElement.dataset.brand;
-  });
-
-  it('shows rounded progress and the brand name in the tab while transferring', () => {
-    document.documentElement.dataset.brand = 'dropto';
-
+  it('shows rounded progress and the app name in the tab while transferring', () => {
     renderHook(() => useProgressTitle(41.6));
 
     expect(document.title).toBe('(42%) dropto.space — Transferring');
@@ -27,7 +21,7 @@ describe('useProgressTitle', () => {
 
     rerender({ percent: null });
 
-    expect(document.title).toBe('DropWave');
+    expect(document.title).toBe('dropto.space');
   });
 
   it('restores the original title when unmounted mid-transfer', () => {
@@ -35,12 +29,12 @@ describe('useProgressTitle', () => {
 
     unmount();
 
-    expect(document.title).toBe('DropWave');
+    expect(document.title).toBe('dropto.space');
   });
 
   it('leaves the title alone when nothing is transferring', () => {
     renderHook(() => useProgressTitle(null));
 
-    expect(document.title).toBe('DropWave');
+    expect(document.title).toBe('dropto.space');
   });
 });

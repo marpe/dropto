@@ -4,7 +4,7 @@ import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { SectionLabel } from './ui/SectionLabel';
 import { TextInput } from './ui/TextInput';
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 
 interface RoomCodeFormProps {
   roomCode: string;
@@ -41,7 +41,7 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
             size="lg"
             autoComplete="off"
             spellCheck={false}
-            placeholder={`${getActiveBrand().roomPrefix}-XXXXXX`}
+            placeholder={`${BRAND.roomPrefix}-XXXXXX`}
             value={roomCode}
             onChange={(e) => onRoomCodeChange(e.target.value)}
             className="sm:text-2xl font-bold"

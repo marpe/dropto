@@ -1,5 +1,5 @@
 // @env browser
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 
 function isSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -29,9 +29,9 @@ export class NotificationService {
       return;
     }
     try {
-      new Notification(getActiveBrand().name, {
+      new Notification(BRAND.name, {
         body: isSuccessful ? 'Transfer complete' : 'Transfer stopped',
-        icon: getActiveBrand().favicon,
+        icon: BRAND.favicon,
       });
     } catch (err) {
       // Some mobile browsers only allow notifications from a service worker

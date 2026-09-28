@@ -15,7 +15,7 @@ type Actions = ReceiverSession['actions'];
 
 function makeSession(state: Partial<ReceiverSessionState> = {}, actions: Partial<Actions> = {}): ReceiverSession {
   return {
-    state: { ...initialReceiverState, roomCode: 'DW-123456', ...state },
+    state: { ...initialReceiverState, roomCode: 'DT-123456', ...state },
     actions: {
       setRoomCode: vi.fn(),
       setPin: vi.fn(),
@@ -99,7 +99,7 @@ describe('ReceiverView Component UI & Interaction', () => {
     const { actions } = renderReceiver('waiting_approval');
 
     expect(screen.getByRole('heading', { name: /waiting for the sender to accept/i })).toBeDefined();
-    expect(screen.getByText('DW-123456')).toBeDefined();
+    expect(screen.getByText('DT-123456')).toBeDefined();
     expect(screen.queryByPlaceholderText(/XXXXXX/)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));

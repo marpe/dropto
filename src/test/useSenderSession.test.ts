@@ -38,7 +38,7 @@ async function renderSenderSession(configure?: (services: SessionServices) => vo
   const hook = renderHook(({ active }) => useSenderSession({ active, settings, services: fakes.services, reservedSlotMs }), {
     initialProps: { active: true },
   });
-  await waitFor(() => expect(hook.result.current.state.roomCode).toBe('DW-ROOM22'));
+  await waitFor(() => expect(hook.result.current.state.roomCode).toBe('DT-ROOM22'));
   return { ...fakes, ...hook, connection: fakes.connections[0] };
 }
 
@@ -128,7 +128,7 @@ describe('useSenderSession', () => {
 
     expect(fakes.connections).toHaveLength(2);
     expect(fakes.connections[0].destroy).toHaveBeenCalled();
-    expect(result.current.state.roomCode).toBe('DW-ROOM22');
+    expect(result.current.state.roomCode).toBe('DT-ROOM22');
     expect(result.current.state.roomError).toBeNull();
   });
 
@@ -1212,22 +1212,22 @@ describe('useSenderSession', () => {
   });
 
   it('reopens the previous room and link key after a reload, so shared links keep working', async () => {
-    sessionStorage.setItem(SENDER_ROOM_STORAGE_KEY, JSON.stringify({ roomCode: 'DW-ROOM22', shareKey: 'kept-key' }));
+    sessionStorage.setItem(SENDER_ROOM_STORAGE_KEY, JSON.stringify({ roomCode: 'DT-ROOM22', shareKey: 'kept-key' }));
 
     const { connection, result } = await renderSenderSession();
 
-    expect(connection.initSender).toHaveBeenCalledWith(settings, { preferredRoomId: 'DW-ROOM22' });
+    expect(connection.initSender).toHaveBeenCalledWith(settings, { preferredRoomId: 'DT-ROOM22' });
     expect(result.current.state.shareKey).toBe('kept-key');
   });
 
   it('forgets the old link key when the previous room could not be reopened', async () => {
-    sessionStorage.setItem(SENDER_ROOM_STORAGE_KEY, JSON.stringify({ roomCode: 'DW-GONE22', shareKey: 'old-key' }));
+    sessionStorage.setItem(SENDER_ROOM_STORAGE_KEY, JSON.stringify({ roomCode: 'DT-GONE22', shareKey: 'old-key' }));
 
     const { result } = await renderSenderSession();
 
     expect(result.current.state.shareKey).not.toBe('old-key');
     expect(JSON.parse(sessionStorage.getItem(SENDER_ROOM_STORAGE_KEY) ?? '{}')).toEqual({
-      roomCode: 'DW-ROOM22',
+      roomCode: 'DT-ROOM22',
       shareKey: result.current.state.shareKey,
       isShared: false,
     });

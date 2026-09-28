@@ -69,19 +69,10 @@ describe('WebRtcService.generateRoomId', () => {
     vi.restoreAllMocks();
   });
 
-  it('produces a DW- code from the unambiguous alphabet', () => {
+  it('produces a DT- code from the unambiguous alphabet', () => {
     const id = new WebRtcService().generateRoomId();
 
-    expect(id).toMatch(/^DW-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
-  });
-
-  it('uses the room-code prefix of the active brand', () => {
-    document.documentElement.dataset.brand = 'dropto';
-    try {
-      expect(new WebRtcService().generateRoomId()).toMatch(/^DT-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
-    } finally {
-      delete document.documentElement.dataset.brand;
-    }
+    expect(id).toMatch(/^DT-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   });
 
   // Room codes are the only barrier to a stranger requesting files, so they must not be predictable
@@ -248,18 +239,18 @@ describe('WebRtcService room creation', () => {
   });
 
   it('reopens the preferred room code, so links survive a sender reload', async () => {
-    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DW-KEEP22' });
+    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DT-KEEP22' });
 
-    expect(roomCode).toBe('DW-KEEP22');
+    expect(roomCode).toBe('DT-KEEP22');
   });
 
   it('falls back to a fresh room code when the preferred one is taken', async () => {
-    peerBehavior.takenIds.add('DW-KEEP22');
+    peerBehavior.takenIds.add('DT-KEEP22');
 
-    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DW-KEEP22' });
+    const roomCode = await new WebRtcService().initSender(undefined, { preferredRoomId: 'DT-KEEP22' });
 
-    expect(roomCode).not.toBe('DW-KEEP22');
-    expect(roomCode).toMatch(/^DW-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
+    expect(roomCode).not.toBe('DT-KEEP22');
+    expect(roomCode).toMatch(/^DT-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   });
 
   it('gives up after a few room-code collisions instead of retrying forever', async () => {
@@ -281,15 +272,15 @@ describe('WebRtcService connecting to a room', () => {
   });
 
   it('connects to the room', async () => {
-    const conn = await new WebRtcService().initReceiver('DW-ROOM22');
+    const conn = await new WebRtcService().initReceiver('DT-ROOM22');
 
-    expect(conn.peer).toBe('DW-ROOM22');
+    expect(conn.peer).toBe('DT-ROOM22');
   });
 
   it('gives up when the connection never opens, instead of spinning forever', async () => {
     vi.useFakeTimers();
     peerBehavior.isConnectionStalled = true;
-    const connecting = new WebRtcService().initReceiver('DW-ROOM22');
+    const connecting = new WebRtcService().initReceiver('DT-ROOM22');
     const outcome = connecting.catch((err: unknown) => err);
 
     await vi.advanceTimersByTimeAsync(30_000);

@@ -36,7 +36,7 @@ function renderReceiverSession(
 
 async function connect(session: ReturnType<typeof renderReceiverSession>) {
   act(() => {
-    session.result.current.actions.setRoomCode('DW-ROOM22');
+    session.result.current.actions.setRoomCode('DT-ROOM22');
   });
   await act(async () => {
     await session.result.current.actions.connect();
@@ -54,22 +54,22 @@ async function connectWithManifest(session: ReturnType<typeof renderReceiverSess
 
 describe('useReceiverSession', () => {
   it('starts with the room code from a share link', () => {
-    const { result } = renderReceiverSession('DW-SHARED');
+    const { result } = renderReceiverSession('DT-SHARED');
 
-    expect(result.current.state.roomCode).toBe('DW-SHARED');
+    expect(result.current.state.roomCode).toBe('DT-SHARED');
   });
 
   it('connects to the room and waits for the sender to approve', async () => {
     const session = renderReceiverSession();
     act(() => {
-      session.result.current.actions.setRoomCode('  dw-room22 ');
+      session.result.current.actions.setRoomCode('  dt-room22 ');
     });
 
     await act(async () => {
       await session.result.current.actions.connect();
     });
 
-    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DW-ROOM22', settings);
+    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DT-ROOM22', settings);
     expect(session.engines).toHaveLength(1);
     expect(session.result.current.state.status).toBe('waiting_approval');
   });
@@ -159,7 +159,7 @@ describe('useReceiverSession', () => {
     expect(connection.disconnectPeer).toHaveBeenCalled();
     expect(session.result.current.state.status).toBe('idle');
     expect(session.result.current.state.error).toBeNull();
-    expect(session.result.current.state.roomCode).toBe('DW-ROOM22');
+    expect(session.result.current.state.roomCode).toBe('DT-ROOM22');
   });
 
   it('clears the PIN field and shows remaining attempts after a wrong PIN', async () => {
@@ -239,14 +239,14 @@ describe('useReceiverSession', () => {
     const createConnection = session.services.createConnection;
     session.services.createConnection = (handlers) => {
       const connection = createConnection(handlers);
-      (connection.initReceiver as any).mockRejectedValueOnce(new Error('Could not connect to peer DW-ROOM22'));
+      (connection.initReceiver as any).mockRejectedValueOnce(new Error('Could not connect to peer DT-ROOM22'));
       return connection;
     };
 
     await connect(session);
 
     expect(session.result.current.state.status).toBe('error');
-    expect(session.result.current.state.error).toBe('Could not connect to peer DW-ROOM22');
+    expect(session.result.current.state.error).toBe('Could not connect to peer DT-ROOM22');
     expect(session.connections[0].destroy).toHaveBeenCalled();
   });
 
@@ -541,7 +541,7 @@ describe('useReceiverSession', () => {
   });
 
   it('waits for the user to connect when the link carries no key', () => {
-    const session = renderReceiverSession('DW-ROOM22');
+    const session = renderReceiverSession('DT-ROOM22');
 
     expect(session.connections).toHaveLength(0);
     expect(session.result.current.state.status).toBe('idle');
@@ -549,7 +549,7 @@ describe('useReceiverSession', () => {
 
   it('starts out connecting when opened through a share link, so the code form never flashes', () => {
     const fakes = createFakeServices();
-    const shareLink = { roomCode: 'DW-ROOM22', shareKey: 'link-key' };
+    const shareLink = { roomCode: 'DT-ROOM22', shareKey: 'link-key' };
     const firstStatuses: string[] = [];
     renderHook(() => {
       const session = useReceiverSession({
@@ -567,22 +567,22 @@ describe('useReceiverSession', () => {
   });
 
   it('connects straight away when opened through a share link, presenting its key', async () => {
-    const session = renderReceiverSession('DW-ROOM22', 'link-key');
+    const session = renderReceiverSession('DT-ROOM22', 'link-key');
 
     await waitFor(() => expect(session.result.current.state.status).toBe('waiting_approval'));
 
-    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DW-ROOM22', settings);
+    expect(session.connections[0].initReceiver).toHaveBeenCalledWith('DT-ROOM22', settings);
     expect(session.engines[0].options.shareKey).toBe('link-key');
     expect(session.engines[0].options.introduction).toEqual(expect.objectContaining({ timeZone: expect.any(String) }));
     expect(session.result.current.state.isInvited).toBe(true);
   });
 
   it('never presents the link key to a different room', async () => {
-    const session = renderReceiverSession('DW-ROOM22', 'link-key');
+    const session = renderReceiverSession('DT-ROOM22', 'link-key');
     await waitFor(() => expect(session.engines).toHaveLength(1));
 
     act(() => {
-      session.result.current.actions.setRoomCode('DW-OTHER2');
+      session.result.current.actions.setRoomCode('DT-OTHER2');
     });
     await act(async () => {
       await session.result.current.actions.connect();
@@ -608,16 +608,16 @@ describe('useReceiverSession', () => {
     const session = renderReceiverSession();
 
     act(() => {
-      session.result.current.actions.setRoomCode('dw-abc');
+      session.result.current.actions.setRoomCode('dt-abc');
     });
 
-    expect(session.result.current.state.roomCode).toBe('DW-ABC');
+    expect(session.result.current.state.roomCode).toBe('DT-ABC');
     expect(session.connections).toHaveLength(0);
   });
 
   describe('when the sender goes away before the download', () => {
     async function openLink(fakes = createFakeServices()) {
-      const session = renderReceiverSession('DW-ROOM22', 'link-key', fakes);
+      const session = renderReceiverSession('DT-ROOM22', 'link-key', fakes);
       await waitFor(() => expect(session.result.current.state.status).toBe('waiting_approval'));
       return session;
     }

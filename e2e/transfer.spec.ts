@@ -1,19 +1,19 @@
 import { test, expect, newLocalContext, LOCAL_PEER_SERVER_PORT } from './fixtures';
 import type { Browser, Page } from '@playwright/test';
 
-test.describe('DropWave Application End-to-End Tests', () => {
+test.describe('dropto.space Application End-to-End Tests', () => {
   test('landing page: drop area, receive-by-code link, settings with theme and about', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page).toHaveTitle(/DropWave/i);
+    await expect(page).toHaveTitle('dropto.space — 10GB P2P WebRTC Transfer');
     // An app: a title bar with the name, no marketing header
-    await expect(page.getByRole('heading', { level: 1, name: 'DropWave' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'dropto.space' })).toBeVisible();
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     // Receiving by code is one click away, and there is a way back
     await page.getByRole('button', { name: /receive files/i }).click();
     await expect(page.getByTestId('room-code-form')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name: 'DropWave' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'dropto.space' })).toBeVisible();
     await page.getByTitle('Send files instead').click();
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
@@ -58,14 +58,9 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(page.getByTestId('room-code-form')).toHaveCount(0);
   });
 
-  test('shows dropto.space branding and orange palette for the dropto brand', async ({ page, context }) => {
+  test('uses the orange palette and DT- room codes', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    // ?brand= is the dev-only stand-in for visiting https://dropto.space
-    await page.goto('/?brand=dropto');
-
-    await expect(page).toHaveTitle('dropto.space — 10GB P2P WebRTC Transfer');
-    await expect(page.locator('text=DropWave')).toHaveCount(0);
-    await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon-dropto.svg');
+    await page.goto('/');
     const brand500 = await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--color-brand-500').trim()
     );
@@ -75,18 +70,18 @@ test.describe('DropWave Application End-to-End Tests', () => {
   });
 
   test('switches to Receive tab when opening share link with ?room= parameter', async ({ page }) => {
-    await page.goto('/?room=DW-998877');
+    await page.goto('/?room=DT-998877');
 
     // Should automatically be in Receive mode with room code pre-filled
     await expect(page.getByTestId('room-code-form')).toBeVisible();
-    const roomInput = page.locator('input[placeholder="DW-XXXXXX"]');
-    await expect(roomInput).toHaveValue('DW-998877');
+    const roomInput = page.locator('input[placeholder="DT-XXXXXX"]');
+    await expect(roomInput).toHaveValue('DT-998877');
     await expect(page.getByTestId('connect')).toBeEnabled();
   });
 
   test('verifies "Select Save Location & Start Download" initiates stream and storage', async ({ page }) => {
     // Navigate to receiver page
-    await page.goto('/?room=DW-TEST01');
+    await page.goto('/?room=DT-TEST01');
 
     // Mock showSaveFilePicker in browser window
     await page.addInitScript(() => {
@@ -103,8 +98,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     });
 
     // Verify room code input is functional
-    const roomInput = page.locator('input[placeholder="DW-XXXXXX"]');
-    await expect(roomInput).toHaveValue('DW-TEST01');
+    const roomInput = page.locator('input[placeholder="DT-XXXXXX"]');
+    await expect(roomInput).toHaveValue('DT-TEST01');
 
     // Verify Connect button is clickable
     const connectBtn = page.getByTestId('connect');
@@ -161,7 +156,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await senderPage.goto('/');
     await addFile(senderPage, 'first.txt', 'one');
     const link = await shareFiles(senderPage);
-    expect(link).toMatch(/\?room=DW-[A-Z0-9]{6}#key=[\w-]{22}$/);
+    expect(link).toMatch(/\?room=DT-[A-Z0-9]{6}#key=[\w-]{22}$/);
 
     await receiverPage.goto(link);
     await expect(receiverPage.locator('text=first.txt')).toBeVisible({ timeout: 15000 });
@@ -249,7 +244,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
 
     await receiverPage.getByRole('button', { name: 'Cancel' }).click();
 
-    await expect(receiverPage.locator('input[placeholder="DW-XXXXXX"]')).toBeVisible();
+    await expect(receiverPage.locator('input[placeholder="DT-XXXXXX"]')).toBeVisible();
     await expect(senderPage.getByTestId('approve-peer')).toHaveCount(0, { timeout: 15000 });
     await close();
   });

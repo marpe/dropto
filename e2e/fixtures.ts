@@ -13,7 +13,7 @@ const LOCAL_SIGNALING_SETTINGS = {
 };
 
 // Must match STORAGE_KEY in src/hooks/useSettings.ts
-const SETTINGS_STORAGE_KEY = 'dropwave_settings';
+const SETTINGS_STORAGE_KEY = 'dropto_settings';
 
 async function applyLocalSignaling(context: BrowserContext) {
   await context.addInitScript(

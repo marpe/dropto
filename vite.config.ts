@@ -28,13 +28,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      // dropto.space assets are swapped in by the boot script in index.html
-      includeAssets: ['favicon.svg', 'favicon-dropto.svg', 'manifest-dropto.webmanifest'],
+      includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'DropWave - 10GB P2P WebRTC Transfer',
-        short_name: 'DropWave',
+        name: 'dropto.space - 10GB P2P WebRTC Transfer',
+        short_name: 'dropto.space',
         description: 'Direct browser-to-browser WebRTC file transfer supporting up to 10GB+ with zero memory bloat.',
-        theme_color: '#4F46E5',
+        theme_color: '#F97316',
         background_color: '#121212',
         display: 'standalone',
         icons: [

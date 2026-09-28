@@ -41,7 +41,7 @@ const pendingPeer: PendingPeer = { peerId: 'receiver-2', details: noDetails, isT
 
 function renderSenderView(state: Partial<SenderSessionState>) {
   const session = {
-    state: { ...createInitialSenderState(), roomCode: 'DW-ABC234', shareKey: 'link-key', files: [queuedFile], ...state },
+    state: { ...createInitialSenderState(), roomCode: 'DT-ABC234', shareKey: 'link-key', files: [queuedFile], ...state },
     status: 'waiting',
     focus: null,
     restorableCount: 0,

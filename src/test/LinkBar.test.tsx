@@ -12,8 +12,8 @@ const defaultOptions = (): SharingOptions => createInitialSenderState().options;
 
 function renderLinkBar(overrides: Partial<LinkBarProps> = {}) {
   const props: LinkBarProps = {
-    roomCode: 'DW-ABC234',
-    shareUrl: 'https://example.test/?room=DW-ABC234#key=link-key',
+    roomCode: 'DT-ABC234',
+    shareUrl: 'https://example.test/?room=DT-ABC234#key=link-key',
     roomNotice: null,
     options: defaultOptions(),
     onUpdateSharing: vi.fn(),

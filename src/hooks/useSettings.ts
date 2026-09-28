@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { soundService } from '../services/sound';
 import type { AppSettings } from '../types/transfer';
 
-const STORAGE_KEY = 'dropwave_settings';
+const STORAGE_KEY = 'dropto_settings';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   useCustomSignaling: false,

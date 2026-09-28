@@ -18,10 +18,10 @@ describe('useCopyToClipboard', () => {
     const { result } = renderHook(() => useCopyToClipboard(2000));
 
     await act(async () => {
-      await result.current[1]('DW-ABC234');
+      await result.current[1]('DT-ABC234');
     });
 
-    expect(writeText).toHaveBeenCalledWith('DW-ABC234');
+    expect(writeText).toHaveBeenCalledWith('DT-ABC234');
     expect(result.current[0]).toBe(true);
 
     act(() => {
@@ -36,7 +36,7 @@ describe('useCopyToClipboard', () => {
 
     let ok = true;
     await act(async () => {
-      ok = await result.current[1]('DW-ABC234');
+      ok = await result.current[1]('DT-ABC234');
     });
 
     expect(ok).toBe(false);

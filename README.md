@@ -1,18 +1,18 @@
-# DropWave 🌊 — 10GB Browser-to-Browser WebRTC File Transfer
+# dropto.space — 10GB Browser-to-Browser WebRTC File Transfer
 
 > A high-performance, zero-backend, browser-only web application to send files up to and exceeding **10 GB** directly between devices using WebRTC DataChannels.
 
-![DropWave License](https://img.shields.io/badge/license-MIT-blue.svg)
+![dropto.space License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![WebRTC](https://img.shields.io/badge/WebRTC-DTLS%20Encrypted-green.svg)
 ![Zero Cloud](https://img.shields.io/badge/Cloud%20Storage-0%20Bytes-orange.svg)
 
 ---
 
-## ⚡ The 10GB Problem & How DropWave Solves It
+## ⚡ The 10GB Problem & How dropto.space Solves It
 
 Standard web apps fail when transferring files larger than 1–2 GB in a browser because JavaScript tries to buffer the entire file into RAM (`Blob` / `ArrayBuffer`), triggering an immediate **Out-Of-Memory (OOM) tab crash**.
 
-**DropWave** overcomes this with a streaming architecture:
+**dropto.space** overcomes this with a streaming architecture:
 1. **Zero-RAM Disk Streaming**: Uses the **File System Access API** (`showSaveFilePicker` -> `createWritable`) on Chromium browsers (Chrome, Edge, Brave, Opera). Incoming 64 KB SCTP chunks write directly to disk as they arrive, keeping memory usage **under 50 MB** even when streaming a 100 GB file.
 2. **Active Backpressure Flow Control**: Monitors `RTCDataChannel.bufferedAmount`. When the buffer exceeds 1 MB (`HIGH_WATERMARK`), file slicing pauses and only resumes when the buffer drains below 256 KB (`onbufferedamountlow`), preventing packet drops and tab freezes.
 3. **Chunk-Indexed Protocol**: 64 KB slices indexed with 64-bit sequence numbers.
@@ -31,7 +31,7 @@ Standard web apps fail when transferring files larger than 1–2 GB in a browser
 - 📂 **Multi-File & Folder Queue**: Drag-and-drop multiple files or entire folder hierarchies with sequential transfers.
 - 📊 **Real-time Transfer Dashboard**: Live speedometer (MB/s gauge), dynamic ETA calculator, per-file and total progress bars, and dynamic tab title percentage.
 - 🔔 **Audio Chimes & Notifications**: Pleasant Web Audio synth chimes on peer connect and transfer completion (zero external media assets required).
-- 🌐 **Zero Server Setup**: Uses free public PeerJS cloud signaling (`0.peerjs.com`) with shareable 6-digit codes (`DW-XXXXXX`) and URLs.
+- 🌐 **Zero Server Setup**: Uses free public PeerJS cloud signaling (`0.peerjs.com`) with shareable 6-digit codes (`DT-XXXXXX`) and URLs.
 - ⚙️ **Enterprise Ready**: Built-in settings modal to configure custom signaling servers and private STUN/TURN relays for strict corporate NATs/firewalls.
 - 🌙 **Dark & Light Mode**: Auto-detects system theme with instant toggle and zero flash of unstyled content (FOUC).
 - 📦 **Installable PWA**: Offline asset caching and installable app icon for desktop and mobile.
@@ -56,22 +56,15 @@ Open `http://localhost:5173` in your browser.
 ```bash
 npm run build
 ```
-The output will be generated in `dist/`. Since DropWave is 100% static, you can deploy the `dist/` directory directly to GitHub Pages, Cloudflare Pages, Vercel, or Netlify.
+The output will be generated in `dist/`. Since dropto.space is 100% static, you can deploy the `dist/` directory directly to GitHub Pages, Cloudflare Pages, Vercel, or Netlify.
 
 ---
 
-## 🎨 Per-Domain Branding
+## 🎨 Branding
 
-One build serves two brands, picked from the hostname:
+The name, room-code prefix (`DT-`) and confetti palette live in `src/branding.ts`; the orange colour scale in `src/styles/tokens.css`; the static title, theme colour and favicon in `index.html`; the PWA manifest in `vite.config.ts`.
 
-| Domain | Name | Accent | Room codes |
-| :--- | :--- | :--- | :--- |
-| `dropto.space`, `www.dropto.space` | dropto.space | Orange `#F97316` | `DT-XXXXXX` |
-| any other host | DropWave | Indigo `#4F46E5` | `DW-XXXXXX` |
-
-The boot script in `index.html` detects the brand before first paint and stamps `data-brand` on `<html>`; colours come from CSS variables in `src/index.css`, and names/assets from `src/branding.ts`. Room codes work across both domains. In development, append `?brand=dropto` to preview the other brand locally.
-
-If you edit the inline boot script, regenerate its hash in the `vercel.json` CSP (`src/test/csp.test.ts` fails until you do).
+If you edit the inline theme script in `index.html`, regenerate its hash in the `vercel.json` CSP (`src/test/csp.test.ts` fails until you do).
 
 ---
 

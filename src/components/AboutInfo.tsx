@@ -1,7 +1,7 @@
 import React from 'react';
 import { GitHubIcon } from './ui/GitHubIcon';
 import { REPOSITORY_URL } from '../constants';
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 import { BUILD_INFO } from '../buildInfo';
 import type { BuildInfo } from '../buildInfo';
 
@@ -39,7 +39,7 @@ const BuildStamp: React.FC<{ buildInfo: BuildInfo }> = ({ buildInfo }) => {
 export const AboutInfo: React.FC<{ buildInfo?: BuildInfo }> = ({ buildInfo = BUILD_INFO }) => (
   <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-text-4">
     <span>
-      {getActiveBrand().name} · <BuildStamp buildInfo={buildInfo} />
+      {BRAND.name} · <BuildStamp buildInfo={buildInfo} />
     </span>
     <a
       href={REPOSITORY_URL}

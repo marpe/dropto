@@ -6,39 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="Direct browser-to-browser WebRTC file transfer supporting up to 10GB+ with zero memory bloat." />
-    <meta name="theme-color" content="#4F46E5" />
-    <title>DropWave — 10GB P2P WebRTC Transfer</title>
+    <meta name="theme-color" content="#F97316" />
+    <title>dropto.space — 10GB P2P WebRTC Transfer</title>
     <script>
-      // Brand detection runs before first paint so dropto.space never flashes DropWave's name or colours.
-      // Keep these values in sync with src/branding.ts (branding.test.ts checks them).
-      (function () {
-        var brand = /(^|\.)dropto\.space$/i.test(location.hostname) ? 'dropto' : 'dropwave';
-        if ('%MODE%' === 'development') {
-          var override = new URLSearchParams(location.search).get('brand');
-          if (override === 'dropto' || override === 'dropwave') {
-            brand = override;
-          }
-        }
-        document.documentElement.dataset.brand = brand;
-        if (brand !== 'dropto') {
-          return;
-        }
-        document.title = 'dropto.space — 10GB P2P WebRTC Transfer';
-        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#F97316');
-        document.querySelector('link[rel="icon"]').setAttribute('href', '/favicon-dropto.svg');
-        // The PWA plugin injects the manifest link after this script, so swap it once parsing is done
-        var swapManifest = function () {
-          var link = document.querySelector('link[rel="manifest"]');
-          if (link) {
-            link.setAttribute('href', '/manifest-dropto.webmanifest');
-          }
-        };
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', swapManifest);
-        } else {
-          swapManifest();
-        }
-      })();
       (function() {
         try {
           const stored = localStorage.getItem('theme');

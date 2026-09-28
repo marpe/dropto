@@ -205,7 +205,7 @@ describe('HandleStore', () => {
 
   it('uses the default database name', async () => {
     await new HandleStore({ indexedDB: fake.factory }).clear();
-    expect(fake.open).toHaveBeenCalledWith('dropwave-file-handles', 1);
+    expect(fake.open).toHaveBeenCalledWith('dropto-file-handles', 1);
   });
 
   it('resolves and warns when a transaction fails', async () => {

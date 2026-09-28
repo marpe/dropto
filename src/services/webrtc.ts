@@ -1,7 +1,7 @@
 import Peer from 'peerjs';
 import type { DataConnection, PeerOptions } from 'peerjs';
 import type { AppSettings, HelloPayload } from '../types/transfer';
-import { getActiveBrand } from '../branding';
+import { BRAND } from '../branding';
 import { parseControlMessage } from './transfer/protocol';
 
 /** The receiver's HELLO: its link key (null when the room code was typed in) and how it introduced itself. */
@@ -46,7 +46,7 @@ export class WebRtcService {
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     const bytes = crypto.getRandomValues(new Uint8Array(6));
     const code = Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
-    return `${getActiveBrand().roomPrefix}-${code}`;
+    return `${BRAND.roomPrefix}-${code}`;
   }
 
   /** Opens a room, reusing `preferredRoomId` when it is still free (e.g. after a sender reload). */
