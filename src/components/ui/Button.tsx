@@ -38,7 +38,7 @@ export const Button: React.FC<ButtonProps> = ({
     type={type}
     className={cn(
       // Every variant has a border (transparent unless coloured) so buttons side by side stay the same size
-      'inline-flex items-center justify-center rounded-xl border border-transparent transition-[transform,background-color,color,box-shadow] duration-150 motion-safe:active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none',
+      'inline-flex items-center justify-center rounded-xl border border-transparent transition-[transform,background-color,color,box-shadow] duration-150 motion-safe:active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none select-none',
       variantClasses[variant],
       sizeClasses[size],
       className

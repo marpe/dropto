@@ -189,7 +189,7 @@ export const FileTableRow: React.FC<FileTableRowProps> = ({
         <span className={cn(CELL.type, 'text-text-5')} style={widthStyle(widths.type)}>
           {fileExtension(file.name)}
         </span>
-        <span className={cn(CELL.size, 'text-text-4')} style={widthStyle(widths.size)}>
+        <span className={cn(CELL.size, 'text-text-4 whitespace-nowrap')} style={widthStyle(widths.size)}>
           {formatBytes(file.size)}
         </span>
         <span data-testid="file-modified" className={cn(CELL.modified, 'text-text-5')} style={widthStyle(widths.modified)}>

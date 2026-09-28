@@ -16,7 +16,7 @@ interface ToggleRowProps {
  */
 export const ToggleRow: React.FC<ToggleRowProps> = ({ label, description, isChecked, onChange, children }) => (
   <div className={optionBoxClassName}>
-    <label className="flex items-center justify-between gap-3 p-3">
+    <label className="flex items-center justify-between gap-3 p-3 select-none">
       <div className="min-w-0">
         <span className="text-sm font-medium text-text-2 block">{label}</span>
         {description && <span className="text-xs leading-snug text-text-5 block mt-0.5">{description}</span>}

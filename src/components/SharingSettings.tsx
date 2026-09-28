@@ -59,7 +59,7 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
 
   return (
     <>
-      <Modal title="Link settings" icon={Settings} onClose={onClose} footer={<Button onClick={onClose}>Done</Button>}>
+      <Modal title="Settings" icon={Settings} onClose={onClose} footer={<Button onClick={onClose}>Done</Button>}>
         <SharingOptionsForm options={options} onChange={change} />
       </Modal>
 

@@ -81,7 +81,6 @@ export const SharingOptionsForm: React.FC<SharingOptionsFormProps> = ({ options,
     />
     <OptionRow
       label="Simultaneous downloads"
-      description="Others wait in line"
       control={
         <NumberStepper
           label="Simultaneous downloads"
