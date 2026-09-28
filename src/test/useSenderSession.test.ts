@@ -31,10 +31,10 @@ const settings: AppSettings = {
 
 type Session = Awaited<ReturnType<typeof renderSenderSession>>;
 
-async function renderSenderSession(configure?: (services: SessionServices) => void) {
+async function renderSenderSession(configure?: (services: SessionServices) => void, { reservedSlotMs }: { reservedSlotMs?: number } = {}) {
   const fakes = createFakeServices();
   configure?.(fakes.services);
-  const hook = renderHook(({ active }) => useSenderSession({ active, settings, services: fakes.services }), {
+  const hook = renderHook(({ active }) => useSenderSession({ active, settings, services: fakes.services, reservedSlotMs }), {
     initialProps: { active: true },
   });
   await waitFor(() => expect(hook.result.current.state.roomCode).toBe('DW-ROOM22'));
@@ -65,8 +65,11 @@ async function startTransfer() {
 }
 
 /** Queues a file and creates the link with the given options. */
-async function shareWith(options: Parameters<ReturnType<typeof useSenderSession>['actions']['setSharingOptions']>[0]) {
-  const session = await renderSenderSession();
+async function shareWith(
+  options: Parameters<ReturnType<typeof useSenderSession>['actions']['setSharingOptions']>[0],
+  sessionOptions: { reservedSlotMs?: number } = {}
+) {
+  const session = await renderSenderSession(undefined, sessionOptions);
   act(() => {
     session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
     session.result.current.actions.setSharingOptions(options);
@@ -698,8 +701,8 @@ describe('useSenderSession', () => {
   });
 
   describe('with several people', () => {
-    async function shareWithLimit(maxSimultaneous = 2) {
-      return shareWith({ maxSimultaneous });
+    async function shareWithLimit(maxSimultaneous = 2, sessionOptions: { reservedSlotMs?: number } = {}) {
+      return shareWith({ maxSimultaneous }, sessionOptions);
     }
 
     /** Lets a connected receiver start downloading the first file. */
@@ -910,6 +913,108 @@ describe('useSenderSession', () => {
 
         expect(session.result.current.state.receivers.map((receiver) => receiver.peerId)).toEqual(['p1', 'p2']);
         expect(session.connection.disconnectPeer).not.toHaveBeenCalledWith('p1');
+      });
+
+      const cut = (finishedCount = 0) => ({ finishedCount, corruptedFiles: [], resume: null });
+      const tab = 'tab-aaaaaaaaaaaaaaaa';
+
+      it('holds their download slot while they reconnect, and carries on in it', async () => {
+        const session = await shareWithLimit(1);
+        const first = connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        connectPeer(session, 'p2', linkGreeting(session));
+
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+        // Otherwise the same tab coming back would count as a duplicated tab
+        Object.assign(first, { open: false });
+        expect(stages(session)).toEqual(['interrupted', 'choosing']);
+        // Someone else starting now waits: the slot is kept for the person reconnecting
+        startDownloading(session, 1);
+        expect(stages(session)).toEqual(['interrupted', 'queued']);
+
+        connectPeer(session, 'p1-again', fromTab(session, tab));
+        act(() => {
+          session.engines[2].events.onReceiverStarted?.([0], 64 * 1024);
+        });
+
+        expect(stages(session)).toEqual(['transferring', 'queued']);
+        expect(session.engines[2].holdUntil).not.toHaveBeenCalled();
+        expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
+      });
+
+      it('gives the slot to the next in line when they do not come back in time', async () => {
+        const session = await shareWithLimit(1, { reservedSlotMs: 10 });
+        connectPeer(session, 'p1', fromTab(session, tab));
+        connectPeer(session, 'p2', linkGreeting(session));
+        startDownloading(session, 0);
+        startDownloading(session, 1);
+
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+
+        await waitFor(() => expect(stages(session)).toEqual(['failed', 'transferring']));
+        expect(session.result.current.state.receivers[0].error).toBe('Connection lost');
+      });
+
+      it('marks the files finished before the cut as sent', async () => {
+        const session = await shareWithLimit(1);
+        connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut(1));
+        });
+
+        expect(session.result.current.state.receivers[0].sentFiles.map((file) => file.name)).toEqual(['hello.txt']);
+      });
+
+      it('treats a connection replaced before its drop was noticed as a cut, keeping the slot', async () => {
+        const session = await shareWithLimit(1);
+        const first = connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        session.engines[0].interrupt.mockReturnValue(cut());
+        Object.assign(first, { open: false });
+
+        connectPeer(session, 'p1-again', fromTab(session, tab));
+
+        expect(session.connection.disconnectPeer).toHaveBeenCalledWith('p1');
+        expect(session.effects.onTransferEnded).not.toHaveBeenCalled();
+        act(() => {
+          session.engines[1].events.onReceiverStarted?.([0], 64 * 1024);
+        });
+        expect(stages(session)).toEqual(['transferring']);
+      });
+
+      it('stops someone while they reconnect, freeing their slot', async () => {
+        const session = await shareWithLimit(1);
+        connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+
+        act(() => {
+          session.result.current.actions.stopReceiver('p1');
+        });
+
+        expect(session.result.current.state.receivers).toEqual([]);
+        expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
+      });
+
+      it('does not hold a slot for someone it could not recognise on return', async () => {
+        const session = await shareWithLimit(1);
+        connectPeer(session, 'p1', linkGreeting(session));
+        startDownloading(session, 0);
+
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+
+        expect(stages(session)).toEqual(['failed']);
+        expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
       });
     });
 
