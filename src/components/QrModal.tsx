@@ -37,7 +37,9 @@ export const QrModal: React.FC<QrModalProps> = ({ url, roomCode, onClose }) => {
 
       <div>
         <span className="text-2xs uppercase font-bold tracking-wider text-text-5 block mb-1">Room code</span>
-        <span className="font-mono text-2xl font-black tracking-widest text-brand-500">{roomCode}</span>
+        <span data-testid="room-code" className="font-mono text-2xl font-black tracking-widest text-brand-500">
+          {roomCode}
+        </span>
       </div>
     </Modal>
   );

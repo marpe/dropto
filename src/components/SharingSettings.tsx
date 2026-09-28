@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { IconButton } from './ui/IconButton';
 import { Modal } from './ui/Modal';
 import { SharingOptionsForm } from './SharingOptionsForm';
 import type { SharingOptions } from '../types/sharing';
@@ -10,6 +11,8 @@ interface SharingSettingsProps {
   /** People connected right now (downloading, choosing or in line) whom a stricter setting could stop */
   connectedCount: number;
   onUpdate: (options: SharingOptions, applyTo: 'new' | 'now') => void;
+  /** For the trigger button, so it matches the tools next to it */
+  className?: string;
 }
 
 /** What got stricter; only these can matter to someone already connected. */
@@ -29,22 +32,11 @@ function describeStricterChanges(current: SharingOptions, next: SharingOptions):
   return changes;
 }
 
-/** One line saying how the link is set up; the PIN is spelled out because the sender has to pass it on. */
-function summarizeOptions({ pin, requireApproval, allowMultiple, maxSimultaneous }: SharingOptions): string {
-  return [
-    pin ? `PIN ${pin}` : 'No PIN',
-    requireApproval ? 'you approve each person' : null,
-    allowMultiple ? `${maxSimultaneous} at once` : 'one download',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
 /**
- * The live link's settings: a summary, and the options in a dialog. Each change applies at once; a stricter one while people are connected
+ * The live link's settings, behind an icon that opens them in a dialog. Each change applies at once; a stricter one while people are connected
  * first asks whether it is for new connections only or should also stop everyone connected now.
  */
-export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, connectedCount, onUpdate }) => {
+export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, connectedCount, onUpdate, className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [pending, setPending] = useState<SharingOptions | null>(null);
   const stricterChanges = pending ? describeStricterChanges(options, pending) : [];
@@ -65,12 +57,10 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
   };
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-      <Button data-testid="open-link-settings" variant="secondary" size="sm" onClick={() => setIsOpen(true)}>
-        <Settings2 className="w-3.5 h-3.5" />
-        Settings
-      </Button>
-      <span className="min-w-0 text-xs text-text-4 tabular-nums">{summarizeOptions(options)}</span>
+    <>
+      <IconButton data-testid="open-link-settings" title="Link settings" onClick={() => setIsOpen(true)} className={className}>
+        <Settings2 className="w-4 h-4" />
+      </IconButton>
 
       {isOpen && (
         <Modal
@@ -112,6 +102,6 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
           </ul>
         </Modal>
       )}
-    </div>
+    </>
   );
 };

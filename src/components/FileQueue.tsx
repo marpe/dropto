@@ -122,7 +122,7 @@ export const FileQueue: React.FC<FileQueueProps> = ({
   const onSort = (key: SortKey) => setSort((current) => nextSort(current, key));
 
   return (
-    <Card padding="sm">
+    <Card padding="sm" data-testid="file-queue">
       <div className="flex items-center justify-between gap-3 mb-3">
         <h2 className="text-sm font-bold text-text-1">Send files</h2>
         <button

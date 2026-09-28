@@ -217,20 +217,31 @@ describe('SenderView', () => {
     expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\?room=DW-ABC234#key=link-key$/));
   });
 
-  it('shows the link is waiting for someone until they arrive', () => {
+  it('shows nothing below the link until someone connects', () => {
     renderSenderView({ state: shared() });
 
-    expect(screen.getByTestId('share-waiting')).toBeDefined();
+    expect(screen.queryAllByTestId('receiver-row')).toHaveLength(0);
+  });
+
+  it('puts the link where the Share button was, outside the files card, with its tools as icons', () => {
+    renderSenderView({ state: shared() });
+
+    expect(screen.getByTestId('link-bar').closest('[data-testid="file-queue"]')).toBeNull();
+    for (const tool of ['Copy link', 'Link settings', 'Show QR code and room code', 'Stop sharing']) {
+      expect(screen.getByTitle(tool)).toBeDefined();
+    }
   });
 
   it('shows that the receiver is choosing where to save, while files can still change', () => {
     const receiver = makeReceiver();
     const actions = renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver });
 
-    expect(screen.getByText(/choosing where to save/i)).toBeDefined();
-    expect(screen.queryByTestId('share-waiting')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /disconnect/i }));
-    expect(actions.cancel).toHaveBeenCalledTimes(1);
+    // One person or several, whoever is connected is listed under the link
+    const row = screen.getByTestId('receiver-row');
+    expect(within(row).getByText(/choosing where to save/i)).toBeDefined();
+    fireEvent.click(within(row).getByTitle('Stop download'));
+    fireEvent.click(screen.getByTestId('confirm'));
+    expect(actions.stopReceiver).toHaveBeenCalledWith('receiver-1');
 
     expect(screen.getByText('report.pdf')).toBeDefined();
     expect(screen.getByTestId('pick-files')).toBeDefined();
@@ -553,10 +564,11 @@ describe('SenderView', () => {
       expect(actions.clearFiles).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the PIN so it can be passed on', () => {
+    it('shows the PIN in the settings so it can be passed on', () => {
       renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, pin: '2468' } }) });
+      openSettings();
 
-      expect(screen.getByText(/PIN 2468/)).toBeDefined();
+      expect((screen.getByTestId('pin-input') as HTMLInputElement).value).toBe('2468');
     });
 
     it('removes straight away when nobody is choosing', () => {
