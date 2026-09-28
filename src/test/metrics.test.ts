@@ -85,4 +85,22 @@ describe('TransferMetricsTracker', () => {
     expect(metrics?.elapsedSeconds).toBe(2);
     expect(metrics?.averageSpeed).toBe(5_000);
   });
+
+  it('carries on from bytes that arrived before, without counting them towards speed or time', () => {
+    const clock = { nowMs: 0 };
+    const tracker = new TransferMetricsTracker(10_000, 1, () => clock.nowMs, 6_000);
+    clock.nowMs = 5_000;
+    tracker.recordBytes(1_000);
+    clock.nowMs = 6_000;
+    tracker.recordBytes(1_000);
+
+    expect(tracker.snapshot(0, 'a.bin', 80)).toMatchObject({
+      bytesTransferred: 8_000,
+      overallPercent: 80,
+      currentSpeed: 2_000,
+      averageSpeed: 2_000,
+      elapsedSeconds: 1,
+      etaSeconds: 1,
+    });
+  });
 });
