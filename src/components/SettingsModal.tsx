@@ -9,7 +9,6 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import type { SegmentOption } from './ui/SegmentedControl';
 import { AboutInfo } from './AboutInfo';
 import type { ThemePreference } from '../hooks/useTheme';
-import { notificationService } from '../services/notifications';
 import type { AppSettings, IceServerConfig } from '../types/transfer';
 import { IceServerRow } from './IceServerRow';
 
@@ -20,8 +19,6 @@ interface SettingsModalProps {
   themePreference: ThemePreference;
   /** Applied immediately (not part of the saved draft) so the choice can be previewed */
   onThemeChange: (preference: ThemePreference) => void;
-  /** Resolves true when the browser allows notifications; injectable for tests */
-  requestNotificationPermission?: () => Promise<boolean>;
 }
 
 const THEME_OPTIONS: SegmentOption<ThemePreference>[] = [
@@ -89,25 +86,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
   themePreference,
   onThemeChange,
-  requestNotificationPermission = () => notificationService.requestPermission(),
 }) => {
   const [form, setForm] = useState<AppSettings>(settings);
   const [showRelayErrors, setShowRelayErrors] = useState(false);
-  const [isNotificationBlocked, setIsNotificationBlocked] = useState(false);
   // Theme changes apply instantly and are not part of the draft
   const isDirty = JSON.stringify(form) !== JSON.stringify(settings);
 
   const update = (changes: Partial<AppSettings>) => setForm({ ...form, ...changes });
-
-  const toggleNotifications = async (isEnabling: boolean) => {
-    if (!isEnabling) {
-      update({ enableNotifications: false });
-      return;
-    }
-    const isAllowed = await requestNotificationPermission();
-    setIsNotificationBlocked(!isAllowed);
-    setForm((current) => ({ ...current, enableNotifications: isAllowed }));
-  };
 
   const updateRelay = (index: number, server: IceServerConfig) => {
     update({ customStunTurn: form.customStunTurn.map((s, i) => (i === index ? server : s)) });
@@ -154,25 +139,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <SettingsSection icon={Volume2} title="Transfers">
           <ToggleRow
-            label="Play a sound when a transfer finishes"
+            label="Sound"
             isChecked={form.enableAudioAlerts}
             onChange={(enableAudioAlerts) => update({ enableAudioAlerts })}
-          />
-          <ToggleRow
-            label="Keep the screen on"
-            description="So a sleeping device does not interrupt a long transfer"
-            isChecked={form.enableWakeLock}
-            onChange={(enableWakeLock) => update({ enableWakeLock })}
-          />
-          <ToggleRow
-            label="Notify when done"
-            description={
-              isNotificationBlocked
-                ? 'Notifications are blocked for this site; allow them in your browser settings.'
-                : 'A system notification if this tab is in the background'
-            }
-            isChecked={form.enableNotifications}
-            onChange={toggleNotifications}
           />
         </SettingsSection>
 
@@ -189,7 +158,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <SettingsSection icon={Server} title="Signaling server">
               <ToggleRow
                 label="Use my own signaling server"
-                description="By default the free public 0.peerjs.com introduces the two devices"
+                description="Default: 0.peerjs.com"
                 isChecked={form.useCustomSignaling}
                 onChange={(useCustomSignaling) => update({ useCustomSignaling })}
               />
@@ -237,8 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             <SettingsSection icon={Radio} title="Relay servers (TURN/STUN)">
               <p className="text-xs text-text-5">
-                Needed when either device is behind a strict firewall or corporate NAT. Public Google STUN servers are
-                always included.
+                For strict firewalls. Google STUN is always included.
               </p>
               {form.customStunTurn.map((server, index) => (
                 <IceServerRow
@@ -256,7 +224,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="text-brand-500 hover:bg-brand-500/10"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add relay server
+                Add server
               </Button>
             </SettingsSection>
           </div>

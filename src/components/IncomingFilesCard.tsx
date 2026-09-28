@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, HardDriveDownload } from 'lucide-react';
+import { AlertTriangle, HardDriveDownload } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { Card } from './ui/Card';
@@ -110,24 +110,13 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         ))}
       </ul>
 
-
       {/* Only Chromium can stream to disk; elsewhere files are buffered in RAM */}
-      <p
-        data-testid="storage-note"
-        className={cn(
-          'flex items-start justify-center gap-1.5 mt-3 text-xs text-center',
-          isNativeFSA ? 'text-text-5' : 'text-text-warning-1'
-        )}
-      >
-        {isNativeFSA ? (
-          <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-px" />
-        ) : (
+      {!isNativeFSA && (
+        <p data-testid="storage-note" className="flex items-start justify-center gap-1.5 mt-3 text-xs text-center text-text-warning-1">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-        )}
-        {isNativeFSA
-          ? 'Saves straight to disk, so any size works.'
-          : 'Files are held in memory until they finish in this browser; for anything over about 1 GB, use Chrome or Edge.'}
-      </p>
+          This browser keeps files in memory. For over 1 GB, use Chrome or Edge.
+        </p>
+      )}
     </Card>
     <BottomBar>
       <Button

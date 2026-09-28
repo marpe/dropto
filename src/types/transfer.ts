@@ -133,7 +133,4 @@ export interface AppSettings {
   signalingSecure: boolean;
   customStunTurn: IceServerConfig[];
   enableAudioAlerts: boolean;
-  enableWakeLock: boolean;
-  /** System notification when a transfer ends in a background tab */
-  enableNotifications: boolean;
 }

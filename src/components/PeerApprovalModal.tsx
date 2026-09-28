@@ -77,7 +77,7 @@ export const PeerApprovalModal: React.FC<PeerApprovalModalProps> = ({
 
       {!hasFiles && (
         <div className="mt-5 space-y-3">
-          <p className="text-xs text-text-warning-1">Nothing is queued yet — add files before accepting.</p>
+          <p className="text-xs text-text-warning-1">No files yet. Add some before accepting.</p>
           <Button data-testid="add-files" variant="secondary" onClick={onSelectFiles} className="w-full">
             <FileUp className="w-4 h-4" />
             <span>Add files</span>

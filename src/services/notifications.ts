@@ -7,15 +7,13 @@ function isSupported(): boolean {
 
 /** System notifications when a transfer ends while the user is looking at another tab or app. */
 export class NotificationService {
-  public enabled = false;
-
-  /** Must run from a user gesture; browsers ignore permission prompts otherwise. */
+  /** Must run from a user gesture; browsers ignore permission prompts otherwise. Asks at most once. */
   public async requestPermission(): Promise<boolean> {
     if (!isSupported()) {
       return false;
     }
-    if (Notification.permission === 'granted') {
-      return true;
+    if (Notification.permission !== 'default') {
+      return Notification.permission === 'granted';
     }
     try {
       return (await Notification.requestPermission()) === 'granted';
@@ -27,12 +25,12 @@ export class NotificationService {
 
   public notifyTransferEnded(isSuccessful: boolean) {
     // Someone watching the page already sees the result
-    if (!this.enabled || !isSupported() || Notification.permission !== 'granted' || !document.hidden) {
+    if (!isSupported() || Notification.permission !== 'granted' || !document.hidden) {
       return;
     }
     try {
       new Notification(getActiveBrand().name, {
-        body: isSuccessful ? 'Transfer complete — every file arrived and was verified.' : 'The transfer stopped.',
+        body: isSuccessful ? 'Transfer complete' : 'Transfer stopped',
         icon: getActiveBrand().favicon,
       });
     } catch (err) {

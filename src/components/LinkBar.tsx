@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Check, Copy, QrCode, Share2, ShieldAlert, Unlink } from 'lucide-react';
+import { Check, Copy, Menu as MenuIcon, QrCode, Settings, Share2, ShieldAlert, Unlink } from 'lucide-react';
 import { Button } from './ui/Button';
 import { ConfirmDialog } from './ui/ConfirmDialog';
-import { IconButton } from './ui/IconButton';
+import { Menu, MenuItem } from './ui/Menu';
 import { Notice } from './ui/Notice';
 import { QrModal } from './QrModal';
 import { SharingSettings } from './SharingSettings';
@@ -10,7 +10,6 @@ import { useCopyToClipboard } from '../hooks/useCopyToClipboard';
 import { getActiveBrand } from '../branding';
 import { isAbortError } from '../utils/errors';
 import type { SharingOptions } from '../types/sharing';
-import { cn } from '../utils/cn';
 
 interface LinkBarProps {
   roomCode: string;
@@ -24,11 +23,13 @@ interface LinkBarProps {
   connectedCount: number;
 }
 
+type OpenDialog = 'settings' | 'qr' | 'stop' | null;
+
 const canWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
 async function shareLink(url: string) {
   try {
-    await navigator.share({ title: getActiveBrand().name, text: 'Files for you', url });
+    await navigator.share({ title: getActiveBrand().name, url });
   } catch (err) {
     // Closing the share sheet rejects with AbortError; that is the user's choice, not a failure
     if (!isAbortError(err)) {
@@ -37,11 +38,9 @@ async function shareLink(url: string) {
   }
 }
 
-const TOOL_CLASSES = 'border border-border-2 bg-surface-1';
-
 /**
- * The shared link, where the Share button was: the link with Copy joined to it, then icon tools for the
- * link's settings, the QR code (with the room code, for reading out), the share sheet and stopping the share.
+ * The shared link, where the Share button was: the link with Copy and a menu joined to it. The menu holds
+ * the link's settings, the QR code (with the room code, for reading out), the share sheet and stopping.
  */
 export const LinkBar: React.FC<LinkBarProps> = ({
   roomCode,
@@ -52,14 +51,14 @@ export const LinkBar: React.FC<LinkBarProps> = ({
   onStopSharing,
   connectedCount,
 }) => {
-  const [isQrOpen, setIsQrOpen] = useState(false);
-  const [isConfirmingStop, setIsConfirmingStop] = useState(false);
+  const [openDialog, setOpenDialog] = useState<OpenDialog>(null);
   const [isCopied, copyLink] = useCopyToClipboard();
   const isReady = roomCode !== '';
+  const close = () => setOpenDialog(null);
 
   const requestStopSharing = () => {
     if (connectedCount > 0) {
-      setIsConfirmingStop(true);
+      setOpenDialog('stop');
     } else {
       onStopSharing();
     }
@@ -73,64 +72,59 @@ export const LinkBar: React.FC<LinkBarProps> = ({
         </Notice>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {/* The whole row on a phone; the tools then wrap underneath */}
-        <div className="flex basis-full sm:basis-0 grow min-w-0 rounded-xl border border-border-2 bg-surface-1 overflow-hidden shadow-sm focus-within:border-brand-500/60 transition-colors">
-          <input
-            readOnly
-            aria-label="Share link"
-            value={isReady ? shareUrl : 'Creating link…'}
-            onFocus={(e) => e.currentTarget.select()}
-            className="flex-1 min-w-0 truncate bg-transparent px-3 py-2.5 font-mono text-xs text-text-3 outline-none"
-          />
-          <Button
-            disabled={!isReady}
-            onClick={() => copyLink(shareUrl)}
-            aria-label={isCopied ? 'Copied' : 'Copy link'}
-            title={isCopied ? 'Copied' : 'Copy link'}
-            className="shrink-0 rounded-none shadow-none hover:shadow-none active:scale-100 px-3.5"
-          >
-            {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} className={TOOL_CLASSES} />
-          <IconButton title="Show QR code and room code" disabled={!isReady} onClick={() => setIsQrOpen(true)} className={TOOL_CLASSES}>
-            <QrCode className="w-4 h-4" />
-          </IconButton>
+      <div className="flex items-stretch rounded-xl border border-border-2 bg-surface-1 overflow-hidden shadow-sm focus-within:border-brand-500/60 transition-colors">
+        <input
+          readOnly
+          aria-label="Share link"
+          value={isReady ? shareUrl : 'Creating link…'}
+          onFocus={(e) => e.currentTarget.select()}
+          className="flex-1 min-w-0 truncate bg-transparent px-3 py-2.5 font-mono text-xs text-text-3 outline-none"
+        />
+        <Button
+          disabled={!isReady}
+          onClick={() => copyLink(shareUrl)}
+          aria-label={isCopied ? 'Copied' : 'Copy link'}
+          title={isCopied ? 'Copied' : 'Copy link'}
+          className="shrink-0 rounded-none shadow-none hover:shadow-none active:scale-100 px-3.5"
+        >
+          {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        </Button>
+        <Menu title="Link options" icon={MenuIcon} anchorName="--link-menu" triggerClassName="rounded-none border-l border-border-2 px-3">
+          <MenuItem data-testid="open-link-settings" icon={Settings} onSelect={() => setOpenDialog('settings')}>
+            Link settings
+          </MenuItem>
+          <MenuItem icon={QrCode} disabled={!isReady} onSelect={() => setOpenDialog('qr')}>
+            QR code and room code
+          </MenuItem>
           {canWebShare && (
-            <IconButton title="Share" disabled={!isReady} onClick={() => shareLink(shareUrl)} className={TOOL_CLASSES}>
-              <Share2 className="w-4 h-4" />
-            </IconButton>
+            <MenuItem icon={Share2} disabled={!isReady} onSelect={() => shareLink(shareUrl)}>
+              Share…
+            </MenuItem>
           )}
-          <IconButton
-            data-testid="stop-sharing"
-            title="Stop sharing"
-            onClick={requestStopSharing}
-            className={cn(TOOL_CLASSES, 'hover:text-text-danger-1 hover:bg-surface-danger-1')}
-          >
-            <Unlink className="w-4 h-4" />
-          </IconButton>
-        </div>
+          <MenuItem data-testid="stop-sharing" icon={Unlink} tone="danger" onSelect={requestStopSharing}>
+            Stop sharing
+          </MenuItem>
+        </Menu>
       </div>
 
-      {isQrOpen && <QrModal onClose={() => setIsQrOpen(false)} roomCode={roomCode} url={shareUrl} />}
-
-      {isConfirmingStop && (
+      {openDialog === 'settings' && (
+        <SharingSettings options={options} connectedCount={connectedCount} onUpdate={onUpdateSharing} onClose={close} />
+      )}
+      {openDialog === 'qr' && <QrModal onClose={close} roomCode={roomCode} url={shareUrl} />}
+      {openDialog === 'stop' && (
         <ConfirmDialog
           title="Stop sharing?"
           confirmLabel="Stop sharing"
           tone="danger"
           onConfirm={() => {
-            setIsConfirmingStop(false);
+            close();
             onStopSharing();
           }}
-          onCancel={() => setIsConfirmingStop(false)}
+          onCancel={close}
         >
           <p>
-            {connectedCount === 1 ? 'Someone is' : `${connectedCount} people are`} connected; their downloads stop. The
-            link stops working, and your files stay here to share again.
+            {connectedCount === 1 ? 'Someone is' : `${connectedCount} people are`} connected. Their downloads stop and the
+            link stops working.
           </p>
         </ConfirmDialog>
       )}

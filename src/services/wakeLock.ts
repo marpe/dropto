@@ -1,7 +1,6 @@
 class WakeLockService {
   private wakeLock: WakeLockSentinel | null = null;
   private isRequested: boolean = false;
-  public enabled: boolean = true;
 
   constructor() {
     if (typeof document !== 'undefined') {
@@ -15,9 +14,6 @@ class WakeLockService {
   }
 
   public async acquire(): Promise<boolean> {
-    if (!this.enabled) {
-      return false;
-    }
     this.isRequested = true;
     if ('wakeLock' in navigator) {
       try {

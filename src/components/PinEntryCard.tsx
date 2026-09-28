@@ -23,7 +23,7 @@ export const PinEntryCard: React.FC<PinEntryCardProps> = ({ pin, prompt, onPinCh
     <StatusCard
       badge={<IconBadge icon={Lock} />}
       title="Enter the PIN"
-      description="Ask the sender for the session PIN to see and download the files."
+      description="Ask the sender for the PIN."
     >
       {prompt.isIncorrect && (
         <p className="mb-4 text-xs font-semibold text-text-danger-1">

@@ -24,7 +24,7 @@ describe('PeerApprovalModal', () => {
 
     const accept = screen.getByRole('button', { name: /accept/i });
     expect((accept as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/nothing is queued/i)).toBeDefined();
+    expect(screen.getByText(/no files yet/i)).toBeDefined();
 
     fireEvent.click(accept);
     expect(onApprove).not.toHaveBeenCalled();
