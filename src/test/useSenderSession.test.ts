@@ -1106,6 +1106,25 @@ describe('useSenderSession', () => {
         expect(session.engines).toHaveLength(1);
       });
 
+      it('lets their tab back in when they open the link again after being told', async () => {
+        const session = await shareWithLimit(1);
+        connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+        act(() => {
+          session.result.current.actions.stopReceiver('p1');
+        });
+        connectPeer(session, 'p1-again', fromTab(session, tab));
+
+        // Like someone stopped while connected: the link still works for them
+        connectPeer(session, 'p1-rejoined', fromTab(session, tab));
+
+        expect(session.engines).toHaveLength(2);
+        expect(session.result.current.state.receivers.map((receiver) => receiver.peerId)).toEqual(['p1-rejoined']);
+      });
+
       it('does not hold a slot for someone it could not recognise on return', async () => {
         const session = await shareWithLimit(1);
         connectPeer(session, 'p1', linkGreeting(session));

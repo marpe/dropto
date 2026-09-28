@@ -79,7 +79,7 @@ export class SenderRoom {
   private readonly lastConnOfSession = new Map<string, DataConnection>();
   // Downloads cut off by a dropped connection, by browser tab, until they carry on or give up
   private readonly reservations = new Map<string, Reservation>();
-  // Tabs stopped while reconnecting: they would keep coming back, so they are turned away for the rest of the share
+  // Tabs stopped while reconnecting, told so when they next come back (otherwise they would carry on)
   private readonly stoppedSessions = new Set<string>();
   private readonly reservedSlotMs: number;
   // Device effects (wake lock, sounds) span from the first slot taken to the last one freed
@@ -248,7 +248,9 @@ export class SenderRoom {
 
   private handleIncoming(conn: DataConnection, greeting: ReceiverGreeting) {
     if (greeting.sessionId && this.stoppedSessions.has(greeting.sessionId)) {
-      // The cancel they missed while away; it ends their reconnecting, where a plain close would be retried
+      // The cancel they missed while away; it ends their reconnecting, where a plain close would be retried.
+      // Said once: like anyone stopped while connected, they may open the link again
+      this.stoppedSessions.delete(greeting.sessionId);
       sendControlMessage(conn, { type: 'TRANSFER_CANCEL' });
       this.connection?.disconnectPeer(conn.peer);
       return;
