@@ -23,7 +23,6 @@ export const WaitingForPeopleCard: React.FC = () => (
       </div>
       <div>
         <p className="text-sm font-medium text-text-2">Waiting for connections</p>
-        <p className="mt-0.5 text-xs text-text-4">People who open the link show up here.</p>
       </div>
     </div>
   </Card>

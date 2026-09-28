@@ -113,8 +113,8 @@ export const App: React.FC = () => {
 
       {isConfirmingHome && leaveCost && (
         <ConfirmDialog
-          title="Start over?"
-          confirmLabel="Start over"
+          title="Stop sharing"
+          confirmLabel="OK"
           tone="danger"
           onConfirm={goHome}
           onCancel={() => setIsConfirmingHome(false)}

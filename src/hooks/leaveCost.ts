@@ -21,7 +21,7 @@ export function describeLeaveCost({ mode, isShared, receivers, receiverStatus }:
   }
   const connected = receivers.filter((receiver) => receiver.stage !== 'completed' && receiver.stage !== 'failed').length;
   if (connected > 0) {
-    return `${connected === 1 ? 'Someone is' : `${connected} people are`} connected. Their downloads stop and the link stops working.`;
+    return `${connected === 1 ? 'Someone is' : `${connected} people are`} connected. Navigating away from this page will stop the current file sharing session.`;
   }
-  return isShared ? 'The link stops working.' : null;
+  return isShared ? 'Navigating away from this page will stop the current file sharing session.' : null;
 }
