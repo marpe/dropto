@@ -469,7 +469,7 @@ describe('useSenderSession', () => {
     ]);
 
     act(() => {
-      result.current.actions.removeFile(result.current.state.files[0].id);
+      result.current.actions.removeFiles([result.current.state.files[0].id]);
     });
     expect(engine.updateFiles).toHaveBeenLastCalledWith([expect.objectContaining({ name: 'more.txt' })]);
   });
@@ -1141,7 +1141,7 @@ describe('useSenderSession', () => {
       await waitFor(() => expect(kept.size).toBe(2));
 
       act(() => {
-        session.result.current.actions.removeFile(session.result.current.state.files[0].id);
+        session.result.current.actions.removeFiles([session.result.current.state.files[0].id]);
       });
       await waitFor(() => expect(kept.size).toBe(1));
 

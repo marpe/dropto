@@ -59,7 +59,7 @@ function makeReceiver(overrides: Partial<SenderReceiver> = {}): SenderReceiver {
 function makeActions(overrides: Partial<SenderSession['actions']> = {}): SenderSession['actions'] {
   return {
     addFiles: vi.fn(),
-    removeFile: vi.fn(),
+    removeFiles: vi.fn(),
     restoreFiles: vi.fn(),
     clearFiles: vi.fn(),
     startOver: vi.fn(),
@@ -349,6 +349,41 @@ describe('SenderView', () => {
     expect(screen.getByTestId('file-totals').textContent).toMatch(/^1 file\s*·\s*2 KB$/);
   });
 
+  describe('ticking files to remove', () => {
+    const second: TransferFile = { ...queuedFile, id: 'f2', name: 'notes.txt', rawFile: new File(['y'], 'notes.txt') };
+
+    it('removes the ticked files together, and goes back to the totals afterwards', () => {
+      const actions = renderSenderView({ state: { files: [queuedFile, second] } });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /report.pdf/ }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /notes.txt/ }));
+      expect(screen.getByTestId('ticked-count').textContent).toBe('2 selected');
+      fireEvent.click(screen.getByTestId('remove-ticked'));
+
+      expect(actions.removeFiles).toHaveBeenCalledWith(['f1', 'f2']);
+      expect(screen.getByTestId('file-totals')).toBeDefined();
+    });
+
+    it('asks first when someone may be choosing from those files', () => {
+      const actions = renderSenderView({ state: shared({ files: [queuedFile, second], receivers: [makeReceiver()] }) });
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /report.pdf/ }));
+      fireEvent.click(screen.getByRole('checkbox', { name: /notes.txt/ }));
+      fireEvent.click(screen.getByTestId('remove-ticked'));
+
+      expect(screen.getByRole('heading', { name: 'Remove 2 files?' })).toBeDefined();
+      expect(actions.removeFiles).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId('confirm'));
+      expect(actions.removeFiles).toHaveBeenCalledWith(['f1', 'f2']);
+    });
+
+    it('offers no ticking with a single file', () => {
+      renderSenderView({ state: { files: [queuedFile] } });
+
+      expect(screen.queryByRole('checkbox', { name: /report.pdf/ })).toBeNull();
+    });
+  });
+
   it('lists files from before a reload faded, asking for them again, and drops one without asking', () => {
     const missing = { id: 'm1', name: 'holiday.jpg', size: 4096, type: 'image/jpeg', lastModified: 1 };
     const actions = renderSenderView({ state: { missingFiles: [missing] } });
@@ -360,7 +395,7 @@ describe('SenderView', () => {
 
     fireEvent.click(within(row).getByTitle('Remove holiday.jpg'));
 
-    expect(actions.removeFile).toHaveBeenCalledWith('m1');
+    expect(actions.removeFiles).toHaveBeenCalledWith(['m1']);
     expect(screen.queryByTestId('confirm')).toBeNull();
   });
 
@@ -577,10 +612,10 @@ describe('SenderView', () => {
       const actions = renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver });
 
       fireEvent.click(screen.getByTitle('Remove report.pdf'));
-      expect(actions.removeFile).not.toHaveBeenCalled();
+      expect(actions.removeFiles).not.toHaveBeenCalled();
       fireEvent.click(screen.getByTestId('confirm'));
 
-      expect(actions.removeFile).toHaveBeenCalledWith('f1');
+      expect(actions.removeFiles).toHaveBeenCalledWith(['f1']);
     });
 
     it('warns that clearing everything after sharing replaces the link', () => {
@@ -606,7 +641,7 @@ describe('SenderView', () => {
 
       fireEvent.click(screen.getByTitle('Remove report.pdf'));
 
-      expect(actions.removeFile).toHaveBeenCalledWith('f1');
+      expect(actions.removeFiles).toHaveBeenCalledWith(['f1']);
     });
   });
 });

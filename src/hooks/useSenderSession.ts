@@ -152,11 +152,12 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     setLockedHandles(locked);
   };
 
-  const removeFile = (fileId: string) => {
-    const file = [...state.files, ...state.missingFiles].find((candidate) => candidate.id === fileId);
-    dispatch({ type: 'FILE_REMOVED', fileId });
-    if (file && services.fileHandles) {
-      void services.fileHandles.store.remove([fileIdentity(file)]);
+  const removeFiles = (fileIds: string[]) => {
+    const removed = new Set(fileIds);
+    const files = [...state.files, ...state.missingFiles].filter((file) => removed.has(file.id));
+    dispatch({ type: 'FILES_REMOVED', fileIds });
+    if (files.length > 0 && services.fileHandles) {
+      void services.fileHandles.store.remove(files.map(fileIdentity));
     }
   };
 
@@ -217,7 +218,7 @@ export function useSenderSession({ active, settings, services = defaultSessionSe
     restorableCount: restorable.length,
     actions: {
       addFiles,
-      removeFile,
+      removeFiles,
       restoreFiles,
       clearFiles,
       startOver,

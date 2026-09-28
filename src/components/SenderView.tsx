@@ -24,13 +24,20 @@ interface SenderViewProps {
   onSwitchToReceive?: () => void;
 }
 
-const REMOVAL_TITLES = {
-  file: 'Remove this file?',
-  all: 'Remove all files?',
-  restart: 'Start over?',
-} as const;
+/** `files` are the ones someone may be choosing from; `fileIds` also holds missing ones, which go too */
+type PendingRemoval = { kind: 'files'; files: TransferFile[]; fileIds: string[] } | { kind: 'all' } | { kind: 'restart' };
 
-type PendingRemoval = { kind: 'file'; file: TransferFile } | { kind: 'all' } | { kind: 'restart' };
+/** One file by its path, several by how many */
+function describeFiles(files: TransferFile[]): string {
+  return files.length === 1 ? displayPath(files[0]) : `${files.length} files`;
+}
+
+function removalTitle(removal: PendingRemoval): string {
+  if (removal.kind === 'files') {
+    return removal.files.length === 1 ? 'Remove this file?' : `Remove ${removal.files.length} files?`;
+  }
+  return removal.kind === 'all' ? 'Remove all files?' : 'Start over?';
+}
 
 export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToReceive }) => {
   const { state, status, actions } = session;
@@ -50,11 +57,14 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
   const hasRoomError = !roomCode && !!state.roomError;
   const isLanding = !hasList && !isAwaitingReceiver && pendingPeers.length === 0;
 
-  const requestRemoveFile = (file: TransferFile) => {
-    if (isSomeoneChoosing) {
-      setPendingRemoval({ kind: 'file', file });
+  const requestRemoveFiles = (fileIds: string[]) => {
+    const chosen = new Set(fileIds);
+    // Only files on offer can be in someone's list; missing ones never were, so they alone go without asking
+    const offered = files.filter((file) => chosen.has(file.id));
+    if (isSomeoneChoosing && offered.length > 0) {
+      setPendingRemoval({ kind: 'files', files: offered, fileIds });
     } else {
-      actions.removeFile(file.id);
+      actions.removeFiles(fileIds);
     }
   };
   const requestClearFiles = () => {
@@ -67,8 +77,8 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
     }
   };
   const confirmRemoval = () => {
-    if (pendingRemoval?.kind === 'file') {
-      actions.removeFile(pendingRemoval.file.id);
+    if (pendingRemoval?.kind === 'files') {
+      actions.removeFiles(pendingRemoval.fileIds);
     } else if (pendingRemoval) {
       actions.clearFiles();
     }
@@ -79,15 +89,15 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
     <Screen key={hasList ? 'files' : 'landing'}>
       {pendingRemoval && (
         <ConfirmDialog
-          title={REMOVAL_TITLES[pendingRemoval.kind]}
+          title={removalTitle(pendingRemoval)}
           confirmLabel={pendingRemoval.kind === 'restart' ? 'Start over' : 'Remove'}
           tone="danger"
           onConfirm={confirmRemoval}
           onCancel={() => setPendingRemoval(null)}
         >
           <p>
-            {pendingRemoval.kind === 'file' &&
-              `${displayPath(pendingRemoval.file)} will disappear from the list someone is choosing from.`}
+            {pendingRemoval.kind === 'files' &&
+              `${describeFiles(pendingRemoval.files)} will disappear from the list someone is choosing from.`}
             {pendingRemoval.kind === 'all' &&
               'Someone is choosing files; their list will be empty.'}
             {pendingRemoval.kind === 'restart' &&
@@ -129,15 +139,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
           onRestoreFiles={() => void actions.restoreFiles()}
           onAddFiles={actions.addFiles}
           fileInputRef={fileInputRef}
-          onRemoveFile={(fileId) => {
-            const file = files.find((candidate) => candidate.id === fileId);
-            if (file) {
-              requestRemoveFile(file);
-            } else {
-              // A missing file was never offered to anyone, so it goes without asking
-              actions.removeFile(fileId);
-            }
-          }}
+          onRemoveFiles={requestRemoveFiles}
           onClearFiles={requestClearFiles}
         />
       )}

@@ -32,7 +32,7 @@ export type SenderAction =
   | { type: 'ROOM_CLOSED' }
   | { type: 'LOCKED_DOWN'; notice: string }
   | { type: 'FILES_ADDED'; files: TransferFile[] }
-  | { type: 'FILE_REMOVED'; fileId: string }
+  | { type: 'FILES_REMOVED'; fileIds: string[] }
   | { type: 'QUEUE_EMPTIED' }
   | { type: 'FILES_CLEARED' }
   | { type: 'OPTIONS_CHANGED'; options: Partial<SharingOptions> }
@@ -170,12 +170,14 @@ export function senderReducer(state: SenderSessionState, action: SenderAction): 
       return { ...state, options: { ...state.options, requireApproval: true }, roomNotice: action.notice };
     case 'FILES_ADDED':
       return addFiles(state, action.files);
-    case 'FILE_REMOVED':
+    case 'FILES_REMOVED': {
+      const removed = new Set(action.fileIds);
       return {
         ...state,
-        files: state.files.filter((file) => file.id !== action.fileId),
-        missingFiles: state.missingFiles.filter((file) => file.id !== action.fileId),
+        files: state.files.filter((file) => !removed.has(file.id)),
+        missingFiles: state.missingFiles.filter((file) => !removed.has(file.id)),
       };
+    }
     case 'QUEUE_EMPTIED':
       return { ...state, files: [], missingFiles: [] };
     case 'FILES_CLEARED':
