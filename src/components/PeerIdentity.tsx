@@ -37,8 +37,8 @@ export const PeerIdentity: React.FC<PeerIdentityProps> = ({ details, presence, s
         {browser && meta && <span aria-hidden>·</span>}
         {meta && <span className="truncate">{meta}</span>}
         {<>
-	        <span aria-hidden>·</span><span className="truncate">OS: {name}</span>
-				</>}
+          <span aria-hidden>·</span><span className="truncate">OS: {name}</span>
+        </>}
         {/* Firefox and Safari hold a download in memory until it is done, so very large files can fail */}
         {details.storage === 'memory' && (
           <>
