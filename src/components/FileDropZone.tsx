@@ -1,7 +1,6 @@
 import React from 'react';
 import type { RefObject } from 'react';
 import { UploadCloud } from 'lucide-react';
-import { IconBadge } from './ui/IconBadge';
 import { FilePickerButtons } from './FilePickerButtons';
 
 // Line breaks may only fall between facts, never inside one
@@ -16,16 +15,16 @@ interface FileDropZoneProps {
 /** The empty landing state; once files are queued, the list itself offers File / Folder. */
 export const FileDropZone: React.FC<FileDropZoneProps> = ({ onAddFiles, fileInputRef }) => (
   // Dropping is handled page-wide (usePageFileDrop); this is the visible invitation plus the pickers
+  // A plain empty state on a phone (nothing to drag there); a dashed drop target inside the panel on desktop
   <div
     data-testid="drop-zone"
-    className="group border-2 border-dashed text-center transition-colors border-border-2 hover:border-brand-500/60 bg-surface-1 p-8 -mx-4 border-x-0 sm:mx-0 sm:border-x-2 sm:rounded-3xl"
+    className="group text-center bg-surface-1 border-y border-border-1 px-4 py-10 sm:border-y-0 sm:m-5 sm:py-10 sm:border-2 sm:border-dashed sm:border-border-2 sm:rounded-xl sm:hover:border-brand-500/60 sm:transition-colors"
   >
-    <IconBadge
-      icon={UploadCloud}
-      className="mx-auto mb-4 motion-safe:group-hover:scale-110 transition-transform"
-      iconClassName="motion-safe:animate-float"
-    />
-    <h1 className="text-lg font-bold text-text-1 mb-1">Drop files to send</h1>
+    <UploadCloud className="mx-auto mb-3 w-10 h-10 text-brand-500" strokeWidth={1.5} />
+    <h2 className="text-lg sm:text-base font-semibold text-text-1 mb-1">
+      <span className="sm:hidden">Choose files to send</span>
+      <span className="hidden sm:inline">Drop files to send</span>
+    </h2>
     <p className="text-xs text-text-4 mb-6 max-w-xl mx-auto">
       {FACTS.map((fact, index) => (
         <React.Fragment key={fact}>

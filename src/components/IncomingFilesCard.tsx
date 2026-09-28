@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { DownloadCloud, ShieldCheck, AlertTriangle, HardDriveDownload } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, HardDriveDownload } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { Card } from './ui/Card';
-import { IconBadge } from './ui/IconBadge';
+import { BottomBar } from './ui/BottomBar';
 import { FileTypeIcon } from './ui/FileTypeIcon';
 import { LinkButton } from './ui/LinkButton';
 import type { ManifestFile, TransferManifest } from '../types/transfer';
@@ -29,8 +29,8 @@ const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, i
   <li className="transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1 [content-visibility:auto] [contain-intrinsic-size:auto_2.5rem]">
     <label
       className={cn(
-        'flex items-center gap-3 text-xs p-2.5 rounded-xl bg-surface-1 border border-border-1 transition-[border-color,opacity]',
-        isSelectable && 'cursor-pointer hover:border-brand-500/30',
+        'flex items-center gap-3 text-sm sm:text-xs px-1 py-3 sm:py-2 transition-opacity',
+        isSelectable && 'cursor-pointer',
         !isSelected && 'opacity-50'
       )}
     >
@@ -38,8 +38,8 @@ const IncomingFileRow: React.FC<IncomingFileRowProps> = ({ file, isSelectable, i
         <input type="checkbox" checked={isSelected} onChange={onToggle} className="w-4 h-4 shrink-0 accent-brand-500" />
       )}
       <FileTypeIcon name={file.name} mimeType={file.type} />
-      <span className="flex-1 min-w-0 font-semibold text-text-2 truncate">{displayPath(file)}</span>
-      <span className="font-mono text-text-4 shrink-0">{formatBytes(file.size)}</span>
+      <span className="flex-1 min-w-0 font-medium text-text-2 truncate">{displayPath(file)}</span>
+      <span className="tabular-nums text-text-4 shrink-0">{formatBytes(file.size)}</span>
     </label>
   </li>
 );
@@ -76,11 +76,11 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
   };
 
   return (
-    <Card data-testid="incoming-files">
-      <div className="flex items-center gap-3 mb-6">
-        <IconBadge icon={DownloadCloud} size="md" iconClassName="motion-safe:animate-float" />
+    <>
+    <Card data-testid="incoming-files" padding="sm">
+      <div className="flex items-center gap-3 mb-2">
         <div className="min-w-0 flex-1">
-          <h3 className="text-lg font-bold text-text-1">Incoming files</h3>
+          <h2 className="text-base sm:text-sm font-semibold text-text-1">Incoming files</h2>
           <p className="text-xs text-text-4 tabular-nums">
             {isEverythingSelected
               ? `${manifest.files.length} ${isMultiFile ? 'files' : 'file'}`
@@ -98,7 +98,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         )}
       </div>
 
-      <ul className="p-3 bg-surface-2 rounded-2xl border border-border-2 mb-6 max-h-56 overflow-y-auto overscroll-contain space-y-2 scroll-fade [--scroll-fade-color:var(--color-surface-2)]">
+      <ul className="max-h-80 overflow-y-auto overscroll-contain divide-y divide-border-1 border-y border-border-1 scroll-fade">
         {manifest.files.map((file) => (
           <IncomingFileRow
             key={file.id}
@@ -110,25 +110,6 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
         ))}
       </ul>
 
-      <Button
-        data-testid="start-download"
-        size="lg"
-        onClick={handleStartSaveClick}
-        disabled={isPreparingSave || selectedIndices.length === 0}
-        className="w-full rounded-2xl shadow-xl disabled:opacity-75"
-      >
-        {isPreparingSave ? (
-          <>
-            <Spinner className="w-5 h-5" />
-            <span>{isMultiFile ? 'Opening folder picker…' : 'Opening save dialog…'}</span>
-          </>
-        ) : (
-          <>
-            <HardDriveDownload className="w-5 h-5" />
-            <span>{isMultiFile ? 'Choose a folder and download' : 'Choose where to save and download'}</span>
-          </>
-        )}
-      </Button>
 
       {/* Only Chromium can stream to disk; elsewhere files are buffered in RAM */}
       <p
@@ -148,5 +129,26 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({ manifest, 
           : 'Files are held in memory until they finish in this browser; for anything over about 1 GB, use Chrome or Edge.'}
       </p>
     </Card>
+    <BottomBar>
+      <Button
+        data-testid="start-download"
+        size="lg"
+        onClick={handleStartSaveClick}
+        disabled={isPreparingSave || selectedIndices.length === 0}
+      >
+        {isPreparingSave ? (
+          <>
+            <Spinner className="w-5 h-5" />
+            <span>{isMultiFile ? 'Opening folder picker…' : 'Opening save dialog…'}</span>
+          </>
+        ) : (
+          <>
+            <HardDriveDownload className="w-5 h-5" />
+            <span>{isMultiFile ? 'Download to a folder' : 'Download'}</span>
+          </>
+        )}
+      </Button>
+    </BottomBar>
+    </>
   );
 };

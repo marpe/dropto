@@ -22,8 +22,8 @@ const toneClasses: Record<IconBadgeTone, { badge: string; ping: string }> = {
 };
 
 const sizeClasses: Record<IconBadgeSize, { box: string; icon: string }> = {
-  md: { box: 'w-12 h-12', icon: 'w-6 h-6' },
-  lg: { box: 'w-16 h-16', icon: 'w-8 h-8' },
+  md: { box: 'w-10 h-10', icon: 'w-5 h-5' },
+  lg: { box: 'w-14 h-14', icon: 'w-7 h-7' },
 };
 
 export const IconBadge: React.FC<IconBadgeProps> = ({
@@ -36,11 +36,11 @@ export const IconBadge: React.FC<IconBadgeProps> = ({
 }) => (
   <div className={cn('relative shrink-0', sizeClasses[size].box, className)}>
     {isPulsing && (
-      <span className={cn('absolute inset-0 rounded-2xl motion-safe:animate-ping', toneClasses[tone].ping)} />
+      <span className={cn('absolute inset-0 rounded-full motion-safe:animate-ping', toneClasses[tone].ping)} />
     )}
     <div
       className={cn(
-        'relative w-full h-full rounded-2xl border flex items-center justify-center',
+        'relative w-full h-full rounded-full flex items-center justify-center',
         toneClasses[tone].badge
       )}
     >

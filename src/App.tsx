@@ -4,6 +4,8 @@ import { SenderView } from './components/SenderView';
 import { ReceiverView } from './components/ReceiverView';
 import { SettingsModal } from './components/SettingsModal';
 import { IconButton } from './components/ui/IconButton';
+import { AppBar } from './components/ui/AppBar';
+import { getActiveBrand } from './branding';
 import { DropOverlay } from './components/DropOverlay';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
@@ -64,16 +66,23 @@ export const App: React.FC = () => {
   const canTakeFiles =
     mode === 'send' ? CAN_ADD_FILES.includes(sender.status) : CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
   const { isDraggingFiles } = usePageFileDrop(canTakeFiles ? addDroppedFiles : null);
+  // Leaving mid-connection would tear it down; back is offered from the code form and its errors
+  const canLeaveReceiving = CAN_SWITCH_TO_SENDING.includes(receiver.state.status);
 
   return (
-    <div className="min-h-dvh flex flex-col page-glow">
-      <IconButton
-        title="Settings"
-        onClick={() => setIsSettingsOpen(true)}
-        className="fixed right-4 top-[max(1rem,env(safe-area-inset-top))] z-40"
-      >
-        <Settings className="w-5 h-5" />
-      </IconButton>
+    // Phone: a full-screen app. Desktop: a small utility panel centred on a plain background
+    <div className="min-h-dvh bg-background sm:py-16">
+      <div className="flex flex-col min-h-dvh sm:min-h-0 sm:max-w-[30rem] sm:mx-auto sm:rounded-xl sm:border sm:border-border-2 sm:bg-surface-1 sm:shadow-sm sm:overflow-clip">
+      <AppBar
+        title={mode === 'send' ? 'Send files' : 'Receive files'}
+        onBack={mode === 'receive' && canLeaveReceiving ? () => setMode('send') : undefined}
+        backLabel="Send files instead"
+        actions={
+          <IconButton title="Settings" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="w-5 h-5" />
+          </IconButton>
+        }
+      />
 
       {isDraggingFiles && <DropOverlay />}
 
@@ -87,7 +96,8 @@ export const App: React.FC = () => {
         />
       )}
 
-      <main className="flex-1 w-full max-w-xl mx-auto px-4 pt-14 pb-10 sm:pt-20 space-y-4 sm:space-y-8">
+      {/* Room at the bottom on a phone for the pinned action bar */}
+      <main className="flex-1 pt-4 pb-28 sm:py-0">
         {mode === 'send' ? (
           <SenderView session={sender} onSwitchToReceive={isSessionBusy ? undefined : () => setMode('receive')} />
         ) : (
@@ -111,12 +121,16 @@ export const App: React.FC = () => {
             corruptedFiles={receiver.state.corruptedFiles}
             onReset={receiver.actions.reset}
             isInvited={receiver.state.isInvited}
-            onSwitchToSend={() => setMode('send')}
             selectedFileIndices={receiver.state.selectedFileIndices}
             queuePosition={receiver.state.queuePosition}
           />
         )}
       </main>
+      <footer className="hidden sm:flex items-center justify-between gap-3 px-5 py-2 border-t border-border-1 text-2xs text-text-5">
+        <span>{getActiveBrand().name}</span>
+        <span>Straight from your device to theirs · nothing stored</span>
+      </footer>
+      </div>
     </div>
   );
 };

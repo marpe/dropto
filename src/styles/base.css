@@ -96,9 +96,3 @@
   }
 }
 
-/* Faint brand-coloured light at the top of the page, with a softer second source for depth */
-.page-glow {
-  background-image:
-    radial-gradient(circle 600px at 50% -5%, color-mix(in srgb, var(--color-brand-500) 12%, transparent), transparent 70%),
-    radial-gradient(circle 420px at 85% 15%, color-mix(in srgb, var(--color-brand-300) 6%, transparent), transparent 70%);
-}

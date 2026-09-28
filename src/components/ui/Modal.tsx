@@ -83,14 +83,16 @@ export const Modal: React.FC<ModalProps> = ({
       className={cn(
         'open:flex flex-col m-auto p-0 w-full max-w-none text-text-1 bg-surface-1 shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-xs',
         'transition-[opacity,translate] duration-200 ease-out starting:opacity-0',
-        // Phone: full-screen drawer from the bottom
-        'h-full max-h-full rounded-none starting:translate-y-full',
+        // Phone: a bottom sheet that slides up, as tall as its content
+        'mb-0 h-fit max-h-[92dvh] rounded-t-xl rounded-b-none starting:translate-y-full',
         // sm and up: centred panel; a modal dialog is fixed to inset 0, so auto height would stretch it
-        'sm:h-fit sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
+        'sm:mb-auto sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
         sizeClasses[size]
       )}
     >
-      <header className="shrink-0 flex items-center gap-2 px-6 pt-[max(1.25rem,env(safe-area-inset-top))] pb-4 sm:pt-5 border-b border-border-1">
+      {/* The sheet's grab handle: a familiar cue that it closes by going back down */}
+      <div aria-hidden="true" className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-border-3" />
+      <header className="shrink-0 flex items-center gap-2 px-5 pt-3 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border-1">
         {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
         <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
           {title}

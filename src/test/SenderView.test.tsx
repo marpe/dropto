@@ -315,10 +315,9 @@ describe('SenderView', () => {
     expect(document.querySelector('[data-status="pending"]')?.textContent).toContain('notes.txt');
   });
 
-  it('heads the list "Send files", with the file count and total size below it', () => {
+  it('shows the file count and total size under the list', () => {
     renderSenderView({ state: { files: [queuedFile] } });
 
-    expect(screen.getByRole('heading', { name: 'Send files' })).toBeDefined();
     expect(screen.getByText('1 file · 2 KB')).toBeDefined();
   });
 
