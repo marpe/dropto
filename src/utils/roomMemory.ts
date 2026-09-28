@@ -3,6 +3,8 @@ export const SENDER_ROOM_STORAGE_KEY = 'sender-room';
 export interface RememberedRoom {
   roomCode: string;
   shareKey: string;
+  /** The link was handed out, so after a reload it is shown again and people holding it are expected */
+  isShared: boolean;
 }
 
 /** The sender's room from earlier in this tab, so a reload keeps already-shared links working. */
@@ -15,7 +17,8 @@ export function recallRoom(): RememberedRoom | null {
       typeof (parsed as RememberedRoom).roomCode === 'string' &&
       typeof (parsed as RememberedRoom).shareKey === 'string'
     ) {
-      return { roomCode: (parsed as RememberedRoom).roomCode, shareKey: (parsed as RememberedRoom).shareKey };
+      const room = parsed as RememberedRoom;
+      return { roomCode: room.roomCode, shareKey: room.shareKey, isShared: room.isShared === true };
     }
   } catch (err) {
     console.warn('Could not read the remembered room:', err);

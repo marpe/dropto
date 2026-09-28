@@ -2,11 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { DataConnection } from 'peerjs';
 import { useSenderSession } from '../hooks/useSenderSession';
-import { BUSY_MESSAGE, LINK_USED_MESSAGE } from '../hooks/senderRoom';
 import type { AppSettings } from '../types/transfer';
 import type { ReceiverGreeting } from '../services/webrtc';
 import { SENDER_ROOM_STORAGE_KEY } from '../utils/roomMemory';
-import { MAX_SIMULTANEOUS_STORAGE_KEY } from '../utils/sharingMemory';
+import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
 import {
   createFakePeerConnection,
   createFakeServices,
@@ -148,7 +147,7 @@ describe('useSenderSession', () => {
     expect(session.result.current.focus?.peerId).toBe('receiver-1');
   });
 
-  it('does not start a transfer when a receiver is accepted with nothing queued', async () => {
+  it('lets someone in with nothing queued yet, and offers the files once they are added', async () => {
     const session = await renderSenderSession();
     connectPeer(session, 'receiver-1');
 
@@ -156,9 +155,16 @@ describe('useSenderSession', () => {
       session.result.current.actions.approvePeer('receiver-1');
     });
 
-    expect(session.engines).toHaveLength(0);
-    expect(session.result.current.status).toBe('waiting');
-    expect(session.result.current.state.pendingPeers.map((peer) => peer.peerId)).toEqual(['receiver-1']);
+    // They wait on an empty list rather than as a request
+    expect(session.engines).toHaveLength(1);
+    expect(session.engines[0].start).toHaveBeenCalledWith([], '');
+    expect(session.result.current.state.pendingPeers).toEqual([]);
+
+    act(() => {
+      session.result.current.actions.addFiles([new File(['hello'], 'hello.txt')]);
+    });
+
+    expect(session.engines[0].updateFiles).toHaveBeenCalledWith([expect.objectContaining({ name: 'hello.txt' })]);
   });
 
   it('closes a rejected receiver without starting a transfer', async () => {
@@ -207,11 +213,37 @@ describe('useSenderSession', () => {
     const { engine, result } = await startTransfer();
 
     act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
+    act(() => {
       engine.events.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
     });
 
     expect(result.current.status).toBe('completed');
-    expect(result.current.focus?.corruptedFiles).toEqual(['hello.txt']);
+    const fileId = result.current.state.files[0].id;
+    expect(result.current.focus?.finishedFiles[fileId]?.isCorrupted).toBe(true);
+  });
+
+  it('keeps every file sent to a receiver across its downloads, not the ones it left out', async () => {
+    const { engine, result } = await startTransfer();
+    act(() => {
+      result.current.actions.addFiles([new File(['more'], 'more.txt'), new File(['skip'], 'skip.txt')]);
+    });
+
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+    act(() => {
+      engine.events.onReceiverStarted?.([0, 1]);
+    });
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    expect(result.current.focus?.sentFiles.map((file) => file.name)).toEqual(['hello.txt', 'more.txt']);
   });
 
   it('shows a failed transfer and frees the room for the next receiver', async () => {
@@ -226,7 +258,7 @@ describe('useSenderSession', () => {
     expect(connection.disconnectPeer).toHaveBeenCalledWith('receiver-1');
 
     act(() => {
-      result.current.actions.dismissError();
+      result.current.actions.dismissReceiver('receiver-1');
     });
     expect(result.current.status).toBe('waiting');
     expect(result.current.focus).toBeNull();
@@ -248,7 +280,7 @@ describe('useSenderSession', () => {
     const { engine, connection, result } = await startTransfer();
 
     act(() => {
-      result.current.actions.cancel();
+      result.current.actions.stopReceiver('receiver-1');
     });
 
     expect(engine.cancel).toHaveBeenCalled();
@@ -258,6 +290,12 @@ describe('useSenderSession', () => {
 
   it('holds device effects (wake lock, sounds) for exactly the length of the transfer', async () => {
     const { engine, effects } = await startTransfer();
+    // Someone choosing is not a transfer yet
+    expect(effects.onTransferStarted).not.toHaveBeenCalled();
+
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
     expect(effects.onTransferStarted).toHaveBeenCalledTimes(1);
     expect(effects.onTransferEnded).not.toHaveBeenCalled();
 
@@ -270,6 +308,9 @@ describe('useSenderSession', () => {
 
   it('ends device effects as unsuccessful when the transfer fails', async () => {
     const { engine, effects } = await startTransfer();
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
 
     act(() => {
       engine.events.onError?.('Connection to peer lost');
@@ -282,7 +323,7 @@ describe('useSenderSession', () => {
     const { engine, result } = await startTransfer();
 
     act(() => {
-      result.current.actions.togglePause();
+      result.current.actions.togglePauseReceiver('receiver-1');
     });
     expect(engine.togglePause).toHaveBeenCalled();
 
@@ -305,6 +346,28 @@ describe('useSenderSession', () => {
     expect(result.current.focus).toBeNull();
   });
 
+  it('counts someone connected without downloading as idle, and someone who left after finishing as left', async () => {
+    const { engine, result } = await startTransfer();
+    const idleSince = () => result.current.focus?.idleSinceMs ?? null;
+    expect(idleSince()).not.toBeNull();
+
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
+    expect(idleSince()).toBeNull();
+
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+    expect(idleSince()).not.toBeNull();
+
+    act(() => {
+      engine.events.onPeerLeft?.();
+    });
+    expect(result.current.focus?.hasLeft).toBe(true);
+    expect(idleSince()).toBeNull();
+  });
+
   it('starts over with an empty queue after "send more files"', async () => {
     const { engine, connection, result } = await startTransfer();
     act(() => {
@@ -320,6 +383,22 @@ describe('useSenderSession', () => {
     expect(connection.disconnectPeer).toHaveBeenCalled();
   });
 
+  it('starts over from nothing, even while someone is choosing where to save', async () => {
+    const { connection, result } = await startTransfer();
+    act(() => {
+      result.current.actions.createLink();
+    });
+
+    act(() => {
+      result.current.actions.startOver();
+    });
+
+    expect(result.current.state.files).toEqual([]);
+    expect(result.current.state.isShared).toBe(false);
+    expect(result.current.state.receivers).toEqual([]);
+    expect(connection.disconnectPeer).toHaveBeenCalled();
+  });
+
   it('shows the transfer once the receiver starts downloading, with the files it chose', async () => {
     const { engine, result } = await startTransfer();
 
@@ -328,7 +407,7 @@ describe('useSenderSession', () => {
     });
 
     expect(result.current.status).toBe('transferring');
-    expect(result.current.focus?.fileIndices).toEqual([0]);
+    expect(result.current.focus?.downloadFiles.map((file) => file.name)).toEqual(['hello.txt']);
   });
 
   it('admits a receiver holding the link key without asking', async () => {
@@ -410,11 +489,44 @@ describe('useSenderSession', () => {
 
     act(() => {
       (peerConn as { open: boolean }).open = false;
-      engine.events.onError?.('Connection to peer lost');
+      engine.events.onPeerLeft?.();
     });
 
     expect(result.current.status).toBe('waiting');
     expect(result.current.focus).toBeNull();
+  });
+
+  it('keeps a finished receiver connected, so they can download again', async () => {
+    const { engine, connection, effects, result } = await startTransfer();
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    expect(engine.cancel).not.toHaveBeenCalled();
+    expect(connection.disconnectPeer).not.toHaveBeenCalledWith('receiver-1');
+    expect(result.current.status).toBe('completed');
+
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+    });
+
+    expect(result.current.status).toBe('transferring');
+    expect(effects.onTransferStarted).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps someone who finished listed as done when they leave', async () => {
+    const { engine, result } = await startTransfer();
+    act(() => {
+      engine.events.onReceiverStarted?.([0]);
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    act(() => {
+      engine.events.onPeerLeft?.();
+    });
+
+    expect(result.current.state.receivers.map((receiver) => receiver.stage)).toEqual(['completed']);
   });
 
   it('still reports errors raised before the download while the receiver is connected', async () => {
@@ -460,9 +572,6 @@ describe('useSenderSession', () => {
       });
       if (attempt < 2) {
         expect(session.connections).toHaveLength(1);
-        act(() => {
-          session.result.current.actions.dismissError();
-        });
       }
     }
 
@@ -564,137 +673,127 @@ describe('useSenderSession', () => {
     });
   });
 
-  describe('with one person at a time', () => {
-    it('turns away a second person, with the reason, while the link is in use', async () => {
-      const session = await shareWith({});
-      connectPeer(session, 'receiver-1', linkGreeting(session));
-
-      const second = connectPeer(session, 'receiver-2', linkGreeting(session));
-
-      expect(session.engines).toHaveLength(1);
-      expect(sentMessages(second)).toEqual([{ type: 'ERROR', payload: { message: BUSY_MESSAGE } }]);
-      expect(session.connection.disconnectPeer).toHaveBeenCalledWith('receiver-2');
-    });
-
-    it('stops admitting anyone once the files have been downloaded', async () => {
-      const session = await shareWith({});
-      connectPeer(session, 'receiver-1', linkGreeting(session));
-      act(() => {
-        session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
-      });
-
-      const late = connectPeer(session, 'receiver-2', linkGreeting(session));
-
-      expect(session.engines).toHaveLength(1);
-      expect(sentMessages(late)).toEqual([{ type: 'ERROR', payload: { message: LINK_USED_MESSAGE } }]);
-    });
-
-    it('lets the person try again after a failed download', async () => {
-      const session = await shareWith({});
-      connectPeer(session, 'receiver-1', linkGreeting(session));
-      act(() => {
-        session.engines[0].events.onError?.('Disk full');
-      });
-
-      connectPeer(session, 'receiver-1-again', linkGreeting(session));
-
-      expect(session.engines).toHaveLength(2);
-      expect(session.result.current.focus?.peerId).toBe('receiver-1-again');
-      expect(stages(session)).toEqual(['choosing']);
-    });
-  });
-
   describe('with several people', () => {
-    async function shareWithSeveral(maxSimultaneous = 2) {
-      return shareWith({ allowMultiple: true, maxSimultaneous });
+    async function shareWithLimit(maxSimultaneous = 2) {
+      return shareWith({ maxSimultaneous });
     }
 
-    it('lets people download at the same time up to the limit, and lines up the rest', async () => {
-      const session = await shareWithSeveral(2);
-
-      connectPeer(session, 'p1', linkGreeting(session));
-      connectPeer(session, 'p2', linkGreeting(session));
-      const third = connectPeer(session, 'p3', linkGreeting(session));
-
-      expect(session.engines).toHaveLength(2);
-      expect(stages(session)).toEqual(['choosing', 'choosing', 'queued']);
-      expect(lastQueuedPosition(third)).toBe(1);
-      // Nobody is shown full screen: the link and the list of people stay on screen
-      expect(session.result.current.focus).toBeNull();
-      expect(session.result.current.status).toBe('waiting');
-    });
-
-    it('starts the next person in line when a download finishes', async () => {
-      const session = await shareWithSeveral(2);
-      connectPeer(session, 'p1', linkGreeting(session));
-      connectPeer(session, 'p2', linkGreeting(session));
-      const third = connectPeer(session, 'p3', linkGreeting(session));
-
+    /** Lets a connected receiver start downloading the first file. */
+    function startDownloading(session: Session, engineIndex: number) {
       act(() => {
-        session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
+        session.engines[engineIndex].events.onReceiverStarted?.([0]);
       });
+    }
+
+    it('lets everyone with the link in to choose, however many are downloading', async () => {
+      const session = await shareWithLimit(1);
+
+      connectPeer(session, 'p1', linkGreeting(session));
+      startDownloading(session, 0);
+      connectPeer(session, 'p2', linkGreeting(session));
+      connectPeer(session, 'p3', linkGreeting(session));
 
       expect(session.engines).toHaveLength(3);
-      expect(session.engines[2].conn).toBe(third);
-      expect(stages(session)).toEqual(['completed', 'choosing', 'choosing']);
+      expect(stages(session)).toEqual(['transferring', 'choosing', 'choosing']);
+      expect(session.result.current.focus).toBeNull();
     });
 
-    it('keeps admitting people after someone has finished', async () => {
-      const session = await shareWithSeveral(2);
+    it('lets people download at the same time up to the limit, and lines up the rest when they start', async () => {
+      const session = await shareWithLimit(2);
       connectPeer(session, 'p1', linkGreeting(session));
+      connectPeer(session, 'p2', linkGreeting(session));
+      const third = connectPeer(session, 'p3', linkGreeting(session));
+
+      startDownloading(session, 0);
+      startDownloading(session, 1);
+      startDownloading(session, 2);
+
+      expect(stages(session)).toEqual(['transferring', 'transferring', 'queued']);
+      expect(session.engines[2].holdUntil).toHaveBeenCalledTimes(1);
+      expect(lastQueuedPosition(third)).toBe(1);
+    });
+
+    it('starts the next download in line when one finishes', async () => {
+      const session = await shareWithLimit(1);
+      connectPeer(session, 'p1', linkGreeting(session));
+      connectPeer(session, 'p2', linkGreeting(session));
+      startDownloading(session, 0);
+      startDownloading(session, 1);
+
       act(() => {
         session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
       });
 
-      connectPeer(session, 'p2', linkGreeting(session));
+      await expect(session.engines[1].holdUntil.mock.calls[0][0]).resolves.toBeUndefined();
+      expect(stages(session)).toEqual(['completed', 'transferring']);
+    });
 
-      expect(session.engines).toHaveLength(2);
+    it('lines up someone who finished and downloads again while every slot is taken', async () => {
+      const session = await shareWithLimit(1);
+      const first = connectPeer(session, 'p1', linkGreeting(session));
+      startDownloading(session, 0);
+      act(() => {
+        session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
+      });
+      connectPeer(session, 'p2', linkGreeting(session));
+      startDownloading(session, 1);
+
+      startDownloading(session, 0);
+
+      expect(stages(session)).toEqual(['queued', 'transferring']);
+      expect(lastQueuedPosition(first)).toBe(1);
     });
 
     it('starts people waiting in line when the limit is raised', async () => {
-      const session = await shareWithSeveral(1);
+      const session = await shareWithLimit(1);
       connectPeer(session, 'p1', linkGreeting(session));
       connectPeer(session, 'p2', linkGreeting(session));
-      expect(session.engines).toHaveLength(1);
+      startDownloading(session, 0);
+      startDownloading(session, 1);
 
       act(() => {
         session.result.current.actions.updateSharing({ ...session.result.current.state.options, maxSimultaneous: 2 }, 'new');
       });
 
-      expect(session.engines).toHaveLength(2);
+      expect(stages(session)).toEqual(['transferring', 'transferring']);
     });
 
     it('never interrupts downloads when the limit is lowered', async () => {
-      const session = await shareWithSeveral(2);
+      const session = await shareWithLimit(2);
       connectPeer(session, 'p1', linkGreeting(session));
       connectPeer(session, 'p2', linkGreeting(session));
+      startDownloading(session, 0);
+      startDownloading(session, 1);
 
       act(() => {
         session.result.current.actions.updateSharing({ ...session.result.current.state.options, maxSimultaneous: 1 }, 'new');
       });
       const third = connectPeer(session, 'p3', linkGreeting(session));
+      startDownloading(session, 2);
 
-      expect(session.engines.map((engine) => engine.cancel.mock.calls.length)).toEqual([0, 0]);
+      expect(session.engines.map((engine) => engine.cancel.mock.calls.length)).toEqual([0, 0, 0]);
       expect(lastQueuedPosition(third)).toBe(1);
     });
 
     it('moves the line up when someone waiting leaves', async () => {
-      const session = await shareWithSeveral(1);
+      const session = await shareWithLimit(1);
       connectPeer(session, 'p1', linkGreeting(session));
       connectPeer(session, 'p2', linkGreeting(session));
       const last = connectPeer(session, 'p3', linkGreeting(session));
+      startDownloading(session, 0);
+      startDownloading(session, 1);
+      startDownloading(session, 2);
       expect(lastQueuedPosition(last)).toBe(2);
 
       act(() => {
-        session.connection.handlers.onDisconnected?.('p2');
+        session.engines[1].events.onError?.('Connection to peer lost');
       });
 
       expect(lastQueuedPosition(last)).toBe(1);
-      expect(stages(session)).toEqual(['choosing', 'queued']);
     });
 
     it('stops one person and leaves the others downloading', async () => {
-      const session = await shareWithSeveral(2);
+      const session = await shareWithLimit(2);
       connectPeer(session, 'p1', linkGreeting(session));
       connectPeer(session, 'p2', linkGreeting(session));
 
@@ -708,37 +807,27 @@ describe('useSenderSession', () => {
     });
 
     it('stops everyone, including people in line, when stricter settings apply now', async () => {
-      const session = await shareWithSeveral(1);
+      const session = await shareWithLimit(1);
       connectPeer(session, 'p1', linkGreeting(session));
-      const waiting = connectPeer(session, 'p2', linkGreeting(session));
+      connectPeer(session, 'p2', linkGreeting(session));
+      startDownloading(session, 0);
+      startDownloading(session, 1);
 
       act(() => {
         session.result.current.actions.updateSharing({ ...session.result.current.state.options, pin: '1234' }, 'now');
       });
 
-      expect(session.engines).toHaveLength(1);
-      expect(session.engines[0].cancel).toHaveBeenCalled();
-      expect(sentMessages(waiting).at(-1)?.type).toBe('ERROR');
+      expect(session.engines.every((engine) => engine.cancel.mock.calls.length > 0)).toBe(true);
       expect(session.result.current.state.receivers).toEqual([]);
     });
 
-    it('turns away people in line when sharing goes back to one person', async () => {
-      const session = await shareWithSeveral(1);
-      connectPeer(session, 'p1', linkGreeting(session));
-      const waiting = connectPeer(session, 'p2', linkGreeting(session));
-
-      act(() => {
-        session.result.current.actions.updateSharing({ ...session.result.current.state.options, allowMultiple: false }, 'new');
-      });
-
-      expect(sentMessages(waiting).at(-1)).toEqual({ type: 'ERROR', payload: { message: BUSY_MESSAGE } });
-      expect(session.engines[0].cancel).not.toHaveBeenCalled();
-    });
-
-    it('keeps the device awake until the last download ends', async () => {
-      const session = await shareWithSeveral(2);
+    it('keeps the device awake from the first download until the last one ends', async () => {
+      const session = await shareWithLimit(2);
       connectPeer(session, 'p1', linkGreeting(session));
       connectPeer(session, 'p2', linkGreeting(session));
+      expect(session.effects.onTransferStarted).not.toHaveBeenCalled();
+      startDownloading(session, 0);
+      startDownloading(session, 1);
 
       act(() => {
         session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
@@ -752,8 +841,56 @@ describe('useSenderSession', () => {
       expect(session.effects.onTransferEnded).toHaveBeenCalledWith(true);
     });
 
+    describe('someone reconnecting from the same tab', () => {
+      const fromTab = (session: Session, sessionId: string) => ({ ...linkGreeting(session), sessionId });
+
+      it('takes over their earlier place, keeping what they downloaded', async () => {
+        const session = await shareWithLimit(2);
+        const first = connectPeer(session, 'p1', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+        startDownloading(session, 0);
+        act(() => {
+          session.engines[0].events.onAllCompleted?.({ corruptedFiles: [] });
+        });
+        Object.assign(first, { open: false });
+        act(() => {
+          session.engines[0].events.onPeerLeft?.();
+        });
+
+        connectPeer(session, 'p1-again', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+
+        const receivers = session.result.current.state.receivers;
+        expect(receivers.map((receiver) => receiver.peerId)).toEqual(['p1-again']);
+        expect(receivers[0].stage).toBe('choosing');
+        expect(receivers[0].sentFiles.map((file) => file.name)).toEqual(['hello.txt']);
+      });
+
+      it('replaces a connection whose drop has not been noticed yet', async () => {
+        const session = await shareWithLimit(2);
+        const first = connectPeer(session, 'p1', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+        startDownloading(session, 0);
+        Object.assign(first, { open: false });
+
+        connectPeer(session, 'p1-again', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+
+        expect(session.connection.disconnectPeer).toHaveBeenCalledWith('p1');
+        expect(session.result.current.state.receivers.map((receiver) => receiver.peerId)).toEqual(['p1-again']);
+        // The dropped download no longer holds a slot
+        expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
+      });
+
+      it('counts a second open tab with the same id (a duplicated tab) as someone else', async () => {
+        const session = await shareWithLimit(2);
+        connectPeer(session, 'p1', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+
+        connectPeer(session, 'p2', fromTab(session, 'tab-aaaaaaaaaaaaaaaa'));
+
+        expect(session.result.current.state.receivers.map((receiver) => receiver.peerId)).toEqual(['p1', 'p2']);
+        expect(session.connection.disconnectPeer).not.toHaveBeenCalledWith('p1');
+      });
+    });
+
     it('asks for approval instead of closing the room when PIN guessing starts while others download', async () => {
-      const session = await shareWithSeveral(5);
+      const session = await shareWithLimit(5);
       act(() => {
         session.result.current.actions.updateSharing({ ...session.result.current.state.options, pin: '1234' }, 'new');
       });
@@ -776,8 +913,8 @@ describe('useSenderSession', () => {
     });
 
     it('labels people with the device and place they introduced, then their address once known', async () => {
-      const session = await shareWithSeveral(2);
-      session.services.readAddress = async () => '203.0.113.7';
+      const session = await shareWithLimit(2);
+      session.services.readAddress = async () => ({ ip: '203.0.113.7', route: 'direct' });
 
       act(() => {
         session.connection.handlers.onIncomingConnection?.(createFakePeerConnection('p1'), {
@@ -804,16 +941,15 @@ describe('useSenderSession', () => {
     });
   });
 
-  it('remembers the download limit for next time', async () => {
+  it('starts every share at the default download limit', async () => {
     const first = await renderSenderSession();
     act(() => {
       first.result.current.actions.setSharingOptions({ maxSimultaneous: 5 });
     });
-    expect(localStorage.getItem(MAX_SIMULTANEOUS_STORAGE_KEY)).toBe('5');
 
     const second = await renderSenderSession();
 
-    expect(second.result.current.state.options.maxSimultaneous).toBe(5);
+    expect(second.result.current.state.options.maxSimultaneous).toBe(DEFAULT_SIMULTANEOUS);
   });
 
   it('uses a fresh link key for every new room', async () => {
@@ -843,6 +979,31 @@ describe('useSenderSession', () => {
     expect(JSON.parse(sessionStorage.getItem(SENDER_ROOM_STORAGE_KEY) ?? '{}')).toEqual({
       roomCode: 'DW-ROOM22',
       shareKey: result.current.state.shareKey,
+      isShared: false,
     });
+  });
+
+  it('remembers that the link was shared, so a reload shows it again', async () => {
+    const first = await shareWith({});
+    expect(JSON.parse(sessionStorage.getItem(SENDER_ROOM_STORAGE_KEY) ?? '{}').isShared).toBe(true);
+    first.unmount();
+
+    const second = await renderSenderSession();
+
+    expect(second.result.current.state.isShared).toBe(true);
+    expect(second.result.current.state.shareKey).toBe(first.result.current.state.shareKey);
+  });
+
+  it('does not bring back a link that was stopped', async () => {
+    const first = await shareWith({});
+    act(() => {
+      first.result.current.actions.stopSharing();
+    });
+    await waitFor(() => expect(first.connections).toHaveLength(2));
+    first.unmount();
+
+    const second = await renderSenderSession();
+
+    expect(second.result.current.state.isShared).toBe(false);
   });
 });

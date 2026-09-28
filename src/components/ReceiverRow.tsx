@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle2, Clock, FolderOpen, Pause, UserRound, X } from 'lucide-react';
+import { Pause, Play, X } from 'lucide-react';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconButton } from './ui/IconButton';
-import { ProgressBar } from './ui/ProgressBar';
+import { FILE_PROGRESS_COLUMN } from './FileProgressCell';
+import { FileTable, FileTableRow } from './FileTable';
+import { PeerIdentity } from './PeerIdentity';
+import type { Presence } from './ui/StatusDot';
+import { useNow } from '../hooks/useNow';
 import type { SenderReceiver } from '../types/sharing';
 import { cn } from '../utils/cn';
-import { formatSpeed } from '../utils/format';
+import { formatElapsed, formatSpeed } from '../utils/format';
 import { describePeer } from '../utils/deviceInfo';
+import { getSentFiles } from '../utils/transferProgress';
 
 interface ReceiverRowProps {
   receiver: SenderReceiver;
@@ -14,14 +19,28 @@ interface ReceiverRowProps {
   queuePosition: number | null;
   onStop: () => void;
   onDismiss: () => void;
+  onTogglePause: () => void;
 }
 
-function describeStage(receiver: SenderReceiver, queuePosition: number | null): string {
+/** Whether they are still there; the dot says it, so the text only says what they are doing */
+function presenceOf(receiver: SenderReceiver): Presence {
+  if (receiver.hasLeft) {
+    return 'gone';
+  }
+  return receiver.stage === 'failed' ? 'failed' : 'connected';
+}
+
+/** What they are doing: downloading, in line, idle since their last download (or arrival), or why it failed */
+function describeActivity(receiver: SenderReceiver, queuePosition: number | null, nowMs: number): string | null {
+  if (receiver.hasLeft) {
+    return null;
+  }
+  if (receiver.idleSinceMs !== null) {
+    return `Idle for ${formatElapsed(receiver.idleSinceMs, nowMs)}`;
+  }
   switch (receiver.stage) {
     case 'queued':
       return queuePosition === 1 ? 'Next in line' : `In line · #${queuePosition ?? '?'}`;
-    case 'choosing':
-      return 'Choosing where to save';
     case 'transferring': {
       if (receiver.isPaused) {
         return 'Paused';
@@ -29,69 +48,74 @@ function describeStage(receiver: SenderReceiver, queuePosition: number | null): 
       const metrics = receiver.metrics;
       return metrics ? `${Math.floor(metrics.overallPercent)}% · ${formatSpeed(metrics.currentSpeed)}` : 'Starting…';
     }
-    case 'completed': {
-      const count = receiver.corruptedFiles.length;
-      return count === 0 ? 'Done' : `Done · ${count === 1 ? '1 file' : `${count} files`} may be corrupted`;
-    }
     case 'failed':
       return receiver.error ?? 'Failed';
+    default:
+      return null;
   }
 }
 
-const STAGE_ICONS = {
-  queued: Clock,
-  choosing: FolderOpen,
-  transferring: UserRound,
-  completed: CheckCircle2,
-  failed: AlertCircle,
+const STOP_TITLES = {
+  queued: { button: 'Remove from line', dialog: 'Remove from the line?' },
+  transferring: { button: 'Stop download', dialog: 'Stop this download?' },
+  idle: { button: 'Disconnect', dialog: 'Disconnect?' },
 } as const;
 
-const STAGE_TONES = {
-  queued: 'text-text-5',
-  choosing: 'text-brand-500',
-  transferring: 'text-brand-500',
-  completed: 'text-brand-500',
-  failed: 'text-text-danger-1',
-} as const;
-
-/** One person on a link shared with several people: where they are, and a way to stop them. */
-export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePosition, onStop, onDismiss }) => {
+/** One person on the link: where they are, the files sent to them, and a way to stop them. */
+export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePosition, onStop, onDismiss, onTogglePause }) => {
   const [isConfirmingStop, setIsConfirmingStop] = useState(false);
+  const nowMs = useNow(1000, receiver.idleSinceMs !== null);
   const { name, meta } = describePeer(receiver.details);
-  const isFinished = receiver.stage === 'completed' || receiver.stage === 'failed';
-  const Icon = receiver.isPaused ? Pause : STAGE_ICONS[receiver.stage];
+  // Still connected after a download counts as idle, and can be disconnected; only the gone can be dismissed
+  const isGone = receiver.hasLeft || receiver.stage === 'failed';
+  const stopTitles = STOP_TITLES[receiver.stage === 'queued' || receiver.stage === 'transferring' ? receiver.stage : 'idle'];
+  const sent = getSentFiles(receiver);
+  const activity = describeActivity(receiver, queuePosition, nowMs);
 
   return (
-    <li data-testid="receiver-row" data-stage={receiver.stage} className="flex items-center gap-3 py-2.5 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
-      <Icon className={cn('w-4 h-4 shrink-0', STAGE_TONES[receiver.stage])} />
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-sm font-medium text-text-2">{name}</span>
-          <span className="shrink-0 text-xs text-text-4 tabular-nums">{describeStage(receiver, queuePosition)}</span>
-        </div>
-        {meta && <p className="text-2xs text-text-5 tabular-nums truncate">{meta}</p>}
+    <li data-testid="receiver-row" data-stage={receiver.stage} className="py-2.5 space-y-2 transition-[opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1">
+      <div className="flex items-center gap-3">
+        <PeerIdentity
+          details={receiver.details}
+          presence={presenceOf(receiver)}
+          status={
+            activity && (
+              <span
+                className={cn('shrink-0 text-xs tabular-nums', receiver.stage === 'failed' ? 'text-text-danger-1' : 'text-text-4')}
+              >
+                {activity}
+              </span>
+            )
+          }
+        />
         {receiver.stage === 'transferring' && (
-          <ProgressBar percent={receiver.metrics?.overallPercent ?? 0} variant="subtle" />
+          <IconButton title={receiver.isPaused ? 'Resume' : 'Pause'} size="sm" onClick={onTogglePause}>
+            {receiver.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+          </IconButton>
+        )}
+        {isGone ? (
+          <IconButton title="Remove from list" size="sm" onClick={onDismiss}>
+            <X className="w-4 h-4" />
+          </IconButton>
+        ) : (
+          <IconButton title={stopTitles.button} size="sm" onClick={() => setIsConfirmingStop(true)}>
+            <X className="w-4 h-4" />
+          </IconButton>
         )}
       </div>
-      {isFinished ? (
-        <IconButton title="Remove from list" size="sm" onClick={onDismiss}>
-          <X className="w-4 h-4" />
-        </IconButton>
-      ) : (
-        <IconButton
-          title={receiver.stage === 'queued' ? 'Remove from line' : 'Stop download'}
-          size="sm"
-          onClick={() => setIsConfirmingStop(true)}
-        >
-          <X className="w-4 h-4" />
-        </IconButton>
+
+      {sent.files.length > 0 && (
+        <FileTable
+          files={sent.files}
+          trailClassName={FILE_PROGRESS_COLUMN}
+          renderRow={(file, index) => <FileTableRow key={file.id} file={file} progress={sent.progress[index]} />}
+        />
       )}
 
       {isConfirmingStop && (
         <ConfirmDialog
-          title={receiver.stage === 'queued' ? 'Take them out of the line?' : 'Stop this download?'}
-          confirmLabel="Stop"
+          title={stopTitles.dialog}
+          confirmLabel={receiver.stage === 'transferring' ? 'Stop' : 'Disconnect'}
           tone="danger"
           onConfirm={() => {
             setIsConfirmingStop(false);
@@ -101,7 +125,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
         >
           <p>
             {name}
-            {meta && ` (${meta})`} is disconnected. With the link they can come back and start again.
+            {meta && ` (${meta})`} will be disconnected. They can reconnect with the link.
           </p>
         </ConfirmDialog>
       )}

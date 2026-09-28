@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useId, useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { iconButtonClassName } from './iconButtonStyles';
+import { IconButton } from './IconButton';
 
 const CloseMenuContext = createContext<() => void>(() => {});
 
@@ -27,16 +27,15 @@ export const Menu: React.FC<MenuProps> = ({ title, icon: Icon, anchorName, trigg
 
   return (
     <>
-      <button
-        type="button"
+      <IconButton
         title={title}
         aria-label={title}
         popoverTarget={menuId}
         style={{ anchorName } as React.CSSProperties}
-        className={iconButtonClassName('md', triggerClassName)}
+        className={triggerClassName}
       >
         <Icon className="w-4 h-4" />
-      </button>
+      </IconButton>
       <div
         ref={menuRef}
         id={menuId}

@@ -26,7 +26,11 @@
      the text colour is set per brand; with it, the browser picks black or white (see the end of this file) */
   --color-accent: #4f46e5;
   --color-accent-hover: #4338ca;
+  /* A primary button's edge: one step lighter than its fill */
+  --color-border-accent-1: #6366f1;
   --color-text-on-accent: #ffffff;
+
+  --color-text-muted: color-mix(in oklab, currentColor, contrast-color(currentColor) 20%);
 
   /* Status */
   --color-text-danger-1: #dc2626;
@@ -184,6 +188,7 @@
 :root[data-brand='dropto'] {
   --color-accent: #f97316;
   --color-accent-hover: #ea580c;
+  --color-border-accent-1: #fb923c;
   --color-text-on-accent: #121212;
   --color-brand-50: #fff7ed;
   --color-brand-100: #ffedd5;

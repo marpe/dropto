@@ -139,19 +139,21 @@ test.describe('DropWave Application End-to-End Tests', () => {
     });
 
     await expect(senderPage.getByTestId('approve-peer')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.getByText('1 file', { exact: true })).toBeVisible();
+    await expect(senderPage.getByRole('dialog').getByText('1 file', { exact: true })).toBeVisible();
     await senderPage.getByTestId('approve-peer').click();
 
     await expect(receiverPage.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await expect(receiverPage.locator('text=sample-dataset.dat')).toBeVisible();
-    await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
+    await expect(senderPage.getByTestId('receiver-row')).toContainText(/Idle for/);
 
     const saveButton = receiverPage.getByTestId('start-download');
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
 
-    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    // Both stay where they were: the receiver on the file list, the sender on the link and the people list
+    await expect(receiverPage.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
+    await expect(receiverPage.locator('[data-status=done]')).toContainText('sample-dataset.dat');
+    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(1, { timeout: 15000 });
     await close();
   });
 
@@ -170,7 +172,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await receiverPage.goto(link);
     await expect(receiverPage.locator('text=first.txt')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.getByTestId('approve-peer')).toHaveCount(0);
-    await expect(senderPage.getByText(/choosing where to save/i)).toBeVisible();
+    await expect(senderPage.getByTestId('receiver-row')).toContainText(/Idle for/);
     // The key must not linger in the address bar or history
     expect(receiverPage.url()).not.toContain('key=');
 
@@ -181,34 +183,34 @@ test.describe('DropWave Application End-to-End Tests', () => {
     // Only take the second file
     await receiverPage.getByRole('checkbox', { name: /first.txt/ }).uncheck();
     await receiverPage.getByTestId('start-download').click();
-    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
-    // Only the chosen file counts, and the stats stay on screen after the transfer
-    await expect(senderPage.getByTestId('stat-files')).toContainText('1');
-    await expect(receiverPage.getByTestId('stat-size')).toBeVisible();
+    await expect(receiverPage.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
+    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(1, { timeout: 15000 });
+    // Only the chosen file was downloaded
+    await expect(receiverPage.locator('[data-status=done]')).toHaveCount(1);
+    await expect(receiverPage.locator('[data-status=done]')).toContainText('second.txt');
 
-    // A one-person link serves a single download; someone else arriving later is told why
+    // Still connected: the receiver can go back for the file it skipped
+    await receiverPage.getByRole('checkbox', { name: /first.txt/ }).check();
+    await receiverPage.getByTestId('start-download').click();
+    await expect(receiverPage.locator('[data-status=done]')).toHaveCount(2, { timeout: 15000 });
+
+    // The link keeps working for anyone else who has it
     const latecomer = await openReceiver(browser);
     await latecomer.page.goto(link);
-    await expect(latecomer.page.getByText(/single-use/i)).toBeVisible({ timeout: 15000 });
+    await expect(latecomer.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await latecomer.close();
-
-    // The same files can go to someone else on a new link
-    await senderPage.getByTestId('send-again').click();
-    await senderPage.getByTestId('share-files').click();
-    const newCode = await readRoomCode(senderPage);
-    expect(newCode).not.toBe(readRoomCodeFromLink(link));
     await close();
   });
 
-  test('several people: two download at once while the next waits in line, then gets their turn', async ({ browser }) => {
+  test('several people: everyone with the link can come in and choose, and each downloads', async ({ browser }) => {
     const { senderPage, receiverPage: first, close } = await openPeers(browser);
     const second = await openReceiver(browser);
     const third = await openReceiver(browser);
 
     await senderPage.goto('/');
     await addFile(senderPage, 'for-everyone.txt', 'shared with several people');
-    await shareFiles(senderPage, { simultaneous: 2 });
+    // Downloads beyond the limit wait in line, but connecting and choosing never does
+    await shareFiles(senderPage, { simultaneous: 1 });
     await readRoomCode(senderPage);
     const link = await senderPage.getByLabel('Share link').inputValue();
 
@@ -217,23 +219,20 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await second.page.goto(link);
     await expect(second.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await third.page.goto(link);
-    await expect(third.page.getByRole('heading', { name: /in line/i })).toBeVisible({ timeout: 15000 });
-    await expect(third.page.getByText(/you.re next/i)).toBeVisible();
+    await expect(third.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await expect(senderPage.getByTestId('receiver-row')).toHaveCount(3);
     // People are told apart by the device they introduced, plus their address once the route is known
     const firstPerson = senderPage.getByTestId('receiver-row').first();
-    await expect(firstPerson).toContainText(/Chrome on [A-Za-z]+/);
+    await expect(firstPerson.getByRole('img', { name: 'Chrome' })).toBeVisible();
     await expect(firstPerson).toContainText(/(\d{1,3}\.){3}\d{1,3}|[0-9a-f]*:[0-9a-f:]+/, { timeout: 10000 });
 
     await first.getByTestId('start-download').click();
-    await expect(first.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(first.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
 
-    // A slot freed up: the next person gets the files without doing anything
-    await expect(third.page.getByTestId('incoming-files')).toBeVisible({ timeout: 15000 });
     await second.page.getByTestId('start-download').click();
     await third.page.getByTestId('start-download').click();
-    await expect(second.page.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
-    await expect(third.page.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(second.page.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
+    await expect(third.page.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
 
     await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(3);
     // The link stays on screen for more people
@@ -291,8 +290,8 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await expect(receiverPage.locator('text=secret-plans.pdf')).toBeVisible({ timeout: 15000 });
 
     await receiverPage.getByTestId('start-download').click();
-    await expect(receiverPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
-    await expect(senderPage.getByTestId('stat-files')).toBeVisible({ timeout: 15000 });
+    await expect(receiverPage.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
+    await expect(senderPage.locator('[data-testid=receiver-row][data-stage=completed]')).toHaveCount(1, { timeout: 15000 });
     await close();
   });
 });
@@ -357,6 +356,9 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
     const limit = page.getByRole('status', { name: /simultaneous downloads/i });
     while (Number(await limit.textContent()) < simultaneous) {
       await page.getByTitle('More').click();
+    }
+    while (Number(await limit.textContent()) > simultaneous) {
+      await page.getByTitle('Fewer').click();
     }
   }
   await page.getByRole('button', { name: 'Done' }).click();

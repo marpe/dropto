@@ -3,6 +3,7 @@ import { TransferReceiver } from '../services/transfer/receiver';
 import type { ReceiverOptions } from '../services/transfer/receiver';
 import { TransferSender } from '../services/transfer/sender';
 import { readRemoteAddress } from '../services/peerAddress';
+import type { RemoteAddress } from '../services/peerAddress';
 import { defaultTransferEffects } from '../services/transferEffects';
 import type { TransferEffects } from '../services/transferEffects';
 import { WebRtcService } from '../services/webrtc';
@@ -11,7 +12,7 @@ import type { ReceiverEvents, SenderEvents } from '../types/transfer';
 
 export type SessionConnection = Pick<WebRtcService, 'initSender' | 'initReceiver' | 'disconnectPeer' | 'destroy'>;
 
-export type SessionSender = Pick<TransferSender, 'start' | 'updateFiles' | 'togglePause' | 'cancel'>;
+export type SessionSender = Pick<TransferSender, 'start' | 'updateFiles' | 'holdUntil' | 'togglePause' | 'cancel'>;
 
 export type SessionReceiver = Pick<TransferReceiver, 'startReceiving' | 'submitPin' | 'togglePause' | 'cancel'>;
 
@@ -20,8 +21,8 @@ export interface SessionServices {
   createConnection(handlers: ConnectionEventHandler): SessionConnection;
   createSender(conn: DataConnection, events: SenderEvents): SessionSender;
   createReceiver(conn: DataConnection, events: ReceiverEvents, options?: ReceiverOptions): SessionReceiver;
-  /** The receiver's IP as the connection sees it, when it can be known */
-  readAddress(conn: DataConnection): Promise<string | null>;
+  /** The receiver's IP and route as the connection sees them, when they can be known */
+  readAddress(conn: DataConnection): Promise<RemoteAddress | null>;
   effects: TransferEffects;
 }
 

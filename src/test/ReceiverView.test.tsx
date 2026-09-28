@@ -87,12 +87,12 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onStartSaving).toHaveBeenCalledTimes(1);
 
     // Verify loading feedback immediately appears
-    expect(screen.getByText(/opening save dialog/i)).toBeDefined();
+    expect((saveButton as HTMLButtonElement).disabled).toBe(true);
 
     // Resolve the promise
     resolveSave();
     await waitFor(() => {
-      expect(screen.queryByText(/opening save dialog/i)).toBeNull();
+      expect((saveButton as HTMLButtonElement).disabled).toBe(false);
     });
   });
 
@@ -223,9 +223,9 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(screen.getByText(/incorrect pin/i).textContent).toMatch(/2 attempts left/i);
   });
 
-  it('displays the metrics dashboard once connectionState is transferring', () => {
+  it('shows the download in the same file list, with progress on each file', () => {
     const dummyMetrics: TransferMetrics = {
-      currentSpeed: 1048576 * 15, // 15 MB/s
+      currentSpeed: 1048576 * 15,
       averageSpeed: 1048576 * 14,
       elapsedSeconds: 1,
       etaSeconds: 5,
@@ -238,33 +238,41 @@ describe('ReceiverView Component UI & Interaction', () => {
       currentFilePercent: 50,
       fileSeconds: [],
     };
+    const onTogglePause = vi.fn();
+    renderWaiting('transferring', { manifest: dummyManifest, transferMetrics: dummyMetrics, onTogglePause });
 
-    render(
-      <ReceiverView
-        roomCode="DW-123456"
-        onRoomCodeChange={() => {}}
-        pin=""
-        onPinChange={() => {}}
-        onConnect={() => {}}
-        connectionState="transferring"
-        pinPrompt={null}
-        onSubmitPin={() => {}}
-        manifest={dummyManifest}
-        transferMetrics={dummyMetrics}
-        onStartSaving={() => {}}
-        onTogglePause={() => {}}
-        onCancelTransfer={() => {}}
-        isPaused={false}
-        errorMessage={null}
-        isNativeFSA={true}
-        corruptedFiles={[]}
-        onReset={() => {}}
-      />
-    );
-
-    expect(screen.getByText('Receiving')).toBeDefined();
-    expect(screen.getByText('Speed')).toBeDefined();
+    expect(screen.getByTestId('incoming-files')).toBeDefined();
+    expect(document.querySelector('[data-status="active"]')?.textContent).toContain('archive.zip');
     expect(screen.getByTestId('overall-percent').textContent).toBe('50%');
+    expect(screen.queryByTestId('start-download')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /pause/i }));
+    expect(onTogglePause).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers to download again after finishing, keeping the list', () => {
+    const onStartSaving = vi.fn();
+    renderWaiting('completed', {
+      manifest: dummyManifest,
+      finishedFiles: { f1: { seconds: 2, isCorrupted: false } },
+      onStartSaving,
+    });
+
+    expect(document.querySelector('[data-status="done"]')?.textContent).toContain('archive.zip');
+    const again = screen.getByTestId('start-download');
+    expect(again.textContent).toBe('Download');
+    fireEvent.click(again);
+    expect(onStartSaving).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the sender left instead of offering another download', () => {
+    renderWaiting('completed', {
+      manifest: dummyManifest,
+      finishedFiles: { f1: { seconds: 2, isCorrupted: false } },
+      hasSenderLeft: true,
+    });
+
+    expect(screen.queryByTestId('start-download')).toBeNull();
+    expect(screen.getByText(/sender disconnected/i)).toBeDefined();
   });
 
   it('waits for the files, not for approval, after opening the sender link', () => {
@@ -325,19 +333,6 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the place in line while the sender is busy with others', () => {
-    renderWaiting('queued', { queuePosition: 3 });
-
-    expect(screen.getByRole('heading', { name: /in line/i })).toBeDefined();
-    expect(screen.getByText(/2 people ahead of you/i)).toBeDefined();
-  });
-
-  it('says so when next in line', () => {
-    renderWaiting('queued', { queuePosition: 1 });
-
-    expect(screen.getByText(/you.re next/i)).toBeDefined();
-  });
-
   it('shows that it is reconnecting while the sender is briefly away', () => {
     const { onCancelTransfer } = renderWaiting('reconnecting', { isInvited: true });
 
@@ -374,6 +369,15 @@ describe('ReceiverView Component UI & Interaction', () => {
       expect(onStartSaving).toHaveBeenCalledWith(undefined);
     });
 
+    it('counts only the ticked files under the list', () => {
+      renderWaiting('connected', { manifest: twoFiles });
+      expect(screen.getByTestId('file-totals').textContent).toMatch(/^2 files/);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /archive.zip/ }));
+
+      expect(screen.getByTestId('file-totals').textContent).toMatch(/^1 of 2 files/);
+    });
+
     it('cannot start with nothing ticked', () => {
       renderWaiting('connected', { manifest: twoFiles });
 
@@ -383,10 +387,52 @@ describe('ReceiverView Component UI & Interaction', () => {
       expect((screen.getByTestId('start-download') as HTMLButtonElement).disabled).toBe(true);
     });
 
-    it('shows progress and results for the chosen files only', () => {
-      renderWaiting('completed', { manifest: twoFiles, selectedFileIndices: [1], corruptedFiles: [] });
+    it('keeps what was ticked through the download and after it', () => {
+      const props = {
+        roomCode: 'DW-123456',
+        onRoomCodeChange: () => {},
+        pin: '',
+        onPinChange: () => {},
+        onConnect: () => {},
+        pinPrompt: null,
+        onSubmitPin: () => {},
+        manifest: twoFiles,
+        transferMetrics: null,
+        onStartSaving: () => {},
+        onTogglePause: () => {},
+        onCancelTransfer: () => {},
+        isPaused: false,
+        errorMessage: null,
+        isNativeFSA: true,
+        corruptedFiles: [],
+        onReset: () => {},
+      };
+      const { rerender } = render(<ReceiverView {...props} connectionState="connected" />);
+      fireEvent.click(screen.getByRole('checkbox', { name: /archive.zip/ }));
 
-      expect(screen.getByTestId('stat-files').textContent).toMatch(/1$/);
+      rerender(<ReceiverView {...props} connectionState="transferring" selectedFileIndices={[1]} />);
+      rerender(
+        <ReceiverView
+          {...props}
+          connectionState="completed"
+          selectedFileIndices={[1]}
+          finishedFiles={{ f2: { seconds: 1, isCorrupted: false } }}
+        />
+      );
+
+      expect((screen.getByRole('checkbox', { name: /archive.zip/ }) as HTMLInputElement).checked).toBe(false);
+    });
+
+    it('marks only the files that were downloaded as done', () => {
+      renderWaiting('completed', {
+        manifest: twoFiles,
+        selectedFileIndices: [1],
+        corruptedFiles: [],
+        finishedFiles: { f2: { seconds: 1, isCorrupted: false } },
+      });
+
+      expect(document.querySelectorAll('[data-status="done"]')).toHaveLength(1);
+      expect(document.querySelector('[data-status="done"]')?.textContent).toContain('photo.jpg');
     });
   });
 });

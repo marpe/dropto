@@ -121,6 +121,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onClose={onClose}
       isDirty={isDirty}
       size="md"
+      placement="drawer"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

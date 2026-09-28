@@ -5,9 +5,11 @@ import { IconButton } from './IconButton';
 import { cn } from '../../utils/cn';
 
 type ModalSize = 'sm' | 'md';
+/** How it comes in on a phone; from `sm` up both are a centred panel */
+type ModalPlacement = 'sheet' | 'drawer';
 
 interface ModalProps {
-  title: React.ReactNode;
+  title?: React.ReactNode;
   icon?: LucideIcon;
   children: React.ReactNode;
   /** Pinned below the scrolling body, e.g. the dialog's actions */
@@ -17,8 +19,17 @@ interface ModalProps {
   /** Unsaved edits: Escape and clicking outside are ignored so nothing is lost by accident */
   isDirty?: boolean;
   size?: ModalSize;
+  placement?: ModalPlacement;
   bodyClassName?: string;
 }
+
+const placementClasses: Record<ModalPlacement, string> = {
+  // A bottom sheet that slides up, as tall as its content
+  sheet: 'mb-0 h-fit max-h-[92dvh] rounded-t-xl rounded-b-none starting:translate-y-full',
+  // A full-height panel that slides in from the left, clear of the notch
+  drawer:
+    'ml-0 my-0 h-dvh max-h-dvh w-[min(85vw,22rem)] rounded-r-xl rounded-l-none pt-[env(safe-area-inset-top)] starting:-translate-x-full sm:w-full sm:pt-0 sm:starting:translate-x-0',
+};
 
 const sizeClasses: Record<ModalSize, string> = {
   sm: 'sm:max-w-sm',
@@ -30,17 +41,18 @@ const supportsClosedBy = typeof HTMLDialogElement !== 'undefined' && 'closedBy' 
 
 /**
  * A native <dialog> opened with showModal(): top layer, inert page behind it, focus handled by the browser.
- * A centred panel from `sm` up; below that a full-screen drawer that slides up. Header and footer stay put
- * while the body scrolls.
+ * A centred panel from `sm` up; below that a bottom sheet, or with `placement="drawer"` a full-height panel
+ * from the left. Header and footer stay put while the body scrolls.
  */
 export const Modal: React.FC<ModalProps> = ({
-  title,
+  title = '',
   icon: Icon,
   children,
   footer,
   onClose,
   isDirty = false,
   size = 'sm',
+  placement = 'sheet',
   bodyClassName,
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -83,26 +95,32 @@ export const Modal: React.FC<ModalProps> = ({
       className={cn(
         'open:flex flex-col m-auto p-0 w-full max-w-none text-text-1 bg-surface-1 shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-xs',
         'transition-[opacity,translate] duration-200 ease-out starting:opacity-0',
-        // Phone: a bottom sheet that slides up, as tall as its content
-        'mb-0 h-fit max-h-[92dvh] rounded-t-xl rounded-b-none starting:translate-y-full',
+        placementClasses[placement],
         // sm and up: centred panel; a modal dialog is fixed to inset 0, so auto height would stretch it
-        'sm:mb-auto sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
+        'sm:m-auto sm:h-fit sm:max-h-[85vh] sm:rounded-2xl sm:border sm:border-border-2 sm:starting:translate-y-2',
         sizeClasses[size]
       )}
     >
       {/* The sheet's grab handle: a familiar cue that it closes by going back down */}
-      <div aria-hidden="true" className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-border-3" />
-      <header className="shrink-0 flex items-center gap-2 px-5 pt-3 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border-1">
-        {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
-        <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
-          {title}
-        </h2>
-        {onClose && (
-          <IconButton title="Close" size="sm" onClick={onClose} className="-mr-2">
-            <X className="w-5 h-5" />
-          </IconButton>
-        )}
-      </header>
+      {placement === 'sheet' && <div aria-hidden="true" className="sm:hidden mx-auto mt-2 h-1 w-10 rounded-full bg-border-3" />}
+
+	    {(Icon || title) && <header className="shrink-0 flex items-center gap-2 px-5 pt-3 pb-3 sm:px-6 sm:pt-5 sm:pb-4 border-b border-border-1">
+		    {Icon && <Icon className="w-5 h-5 shrink-0 text-brand-500" />}
+		    <h2 id={titleId} className="min-w-0 flex-1 text-lg font-bold text-text-1">
+			    {title}
+		    </h2>
+		    {onClose && (
+			    <IconButton title="Close" size="sm" onClick={onClose} className="-mr-2">
+				    <X className="w-5 h-5" />
+			    </IconButton>
+		    )}
+	    </header>}
+
+	    {!Icon && !title &&  onClose && (
+		    <IconButton title="Close" size="sm" onClick={onClose} className="absolute right-0 top-0">
+			    <X className="w-5 h-5" />
+		    </IconButton>
+	    )}
 
       <div className="scroll-fade flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div className={cn('px-6 py-5', bodyClassName)}>{children}</div>

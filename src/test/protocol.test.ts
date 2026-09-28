@@ -23,6 +23,8 @@ describe('parseControlMessage', () => {
     [{ type: 'HELLO', payload: { shareKey: 'abc_DEF-123' } }],
     [{ type: 'HELLO', payload: { shareKey: null } }],
     [{ type: 'HELLO', payload: { shareKey: null, device: 'Chrome on Android', timeZone: 'Europe/Stockholm' } }],
+    [{ type: 'HELLO', payload: { shareKey: 'k', sessionId: '0f8c3b4e-7a52-4d0b-9a57-2d1c6e8b9f10' } }],
+    [{ type: 'HELLO', payload: { shareKey: 'k', formFactor: 'tablet', model: 'SM-X710', storage: 'memory' } }],
     [{ type: 'AUTH_REQUEST', payload: { attemptsLeft: 3, isIncorrect: false } }],
     [{ type: 'AUTH_RESPONSE', payload: { pin: '1234' } }],
     [{ type: 'MANIFEST', payload: manifest }],
@@ -68,6 +70,9 @@ describe('parseControlMessage', () => {
 
     expect(parse({ device: 42, timeZone: 'Not a zone!' })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
     expect(parse({ device: 'x'.repeat(200) })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
+    expect(parse({ sessionId: 'short' })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
+    expect(parse({ formFactor: 'fridge', storage: 'cloud', model: '<b>x</b>' })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
+    expect(parse({ sessionId: '<script>alert(1)</script>xx' })).toEqual({ type: 'HELLO', payload: { shareKey: 'k' } });
   });
 
   it('drops fields it does not know about', () => {

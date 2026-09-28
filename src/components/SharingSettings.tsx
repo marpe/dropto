@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Settings } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { SharingOptionsForm } from './SharingOptionsForm';
 import type { SharingOptions } from '../types/sharing';
 
@@ -17,40 +18,43 @@ interface SharingSettingsProps {
 function describeStricterChanges(current: SharingOptions, next: SharingOptions): string[] {
   const changes: string[] = [];
   if (next.pin && next.pin !== current.pin) {
-    changes.push(current.pin ? 'The PIN changes' : 'A PIN becomes required');
+    changes.push(current.pin ? 'New connections need the new PIN.' : 'New connections need a PIN.');
   }
   if (next.requireApproval && !current.requireApproval) {
-    changes.push('New connections need your approval');
+    changes.push('New connections need your approval.');
   }
-  if (current.allowMultiple && !next.allowMultiple) {
-    changes.push('One download; anyone in line is turned away');
-  } else if (next.allowMultiple && next.maxSimultaneous < current.maxSimultaneous) {
-    changes.push(`At most ${next.maxSimultaneous} at a time`);
+  if (next.maxSimultaneous < current.maxSimultaneous) {
+    changes.push(
+      next.maxSimultaneous === 1 ? 'One person can download at a time.' : `Up to ${next.maxSimultaneous} people can download at a time.`
+    );
   }
   return changes;
 }
 
+interface StricterChange {
+  options: SharingOptions;
+  descriptions: string[];
+}
+
 /**
- * The live link's settings dialog. Each change applies at once; a stricter one while people are connected
- * first asks whether it is for new connections only or should also stop everyone connected now.
+ * The live link's settings dialog. Each change applies to new connections at once; a stricter one while
+ * people are connected then asks whether to stop them too, so they reconnect under the new rules.
  */
 export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, connectedCount, onUpdate, onClose }) => {
-  const [pending, setPending] = useState<SharingOptions | null>(null);
-  const stricterChanges = pending ? describeStricterChanges(options, pending) : [];
-  const isSeveral = connectedCount > 1;
+  const [stricter, setStricter] = useState<StricterChange | null>(null);
 
   const change = (next: SharingOptions) => {
-    if (connectedCount > 0 && describeStricterChanges(options, next).length > 0) {
-      setPending(next);
-    } else {
-      onUpdate(next, 'new');
+    onUpdate(next, 'new');
+    const descriptions = describeStricterChanges(options, next);
+    if (connectedCount > 0 && descriptions.length > 0) {
+      setStricter({ options: next, descriptions });
     }
   };
-  const finish = (applyTo: 'new' | 'now') => {
-    if (pending) {
-      onUpdate(pending, applyTo);
+  const stopCurrent = () => {
+    if (stricter) {
+      onUpdate(stricter.options, 'now');
     }
-    setPending(null);
+    setStricter(null);
   };
 
   return (
@@ -59,34 +63,19 @@ export const SharingSettings: React.FC<SharingSettingsProps> = ({ options, conne
         <SharingOptionsForm options={options} onChange={change} />
       </Modal>
 
-      {pending && (
-        <Modal
-          title={isSeveral ? 'Apply to people already connected?' : 'Apply to the current receiver?'}
-          onClose={() => setPending(null)}
-          footer={
-            <div className="flex flex-wrap justify-end gap-3 w-full">
-              <Button variant="ghost" onClick={() => setPending(null)}>
-                Back
-              </Button>
-              <Button data-testid="apply-now" variant="danger" onClick={() => finish('now')}>
-                {isSeveral ? 'Apply now and stop all transfers' : 'Apply now and stop their transfer'}
-              </Button>
-              <Button data-testid="apply-to-new" onClick={() => finish('new')}>
-                New connections only
-              </Button>
-            </div>
-          }
+      {stricter && (
+        <ConfirmDialog
+          title="Stop current downloads?"
+          confirmLabel="Stop"
+          tone="danger"
+          onConfirm={stopCurrent}
+          onCancel={() => setStricter(null)}
         >
-          <p className="text-sm text-text-3 mb-3">
-            {isSeveral ? `${connectedCount} people are` : 'Someone is'} connected right now under the old settings. You
-            can leave them be, or stop their transfers so they have to reconnect under the new ones.
+          <p>
+            {stricter.descriptions.join(' ')} {connectedCount > 1 ? `${connectedCount} people are` : 'Someone is'} still
+            connected with the old settings.
           </p>
-          <ul className="text-sm text-text-2 list-disc pl-5 space-y-1">
-            {stricterChanges.map((description) => (
-              <li key={description}>{description}</li>
-            ))}
-          </ul>
-        </Modal>
+        </ConfirmDialog>
       )}
     </>
   );

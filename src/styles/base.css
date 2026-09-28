@@ -120,6 +120,20 @@
   .menu-popover::backdrop {
     background: rgb(0 0 0 / 0.4);
   }
+
+  /* The sheet covers the page like a dialog: a tap outside only closes it (light dismiss still sees the
+     tap on the root), and the page behind neither reacts nor scrolls */
+  html:has(.menu-popover:popover-open) {
+    overflow: hidden;
+  }
+
+  body:has(.menu-popover:popover-open) {
+    pointer-events: none;
+  }
+
+  .menu-popover {
+    pointer-events: auto;
+  }
 }
 
 @supports (anchor-name: --menu) {

@@ -28,7 +28,6 @@ export type ReceiverStatus =
   | 'connecting'
   | 'reconnecting'
   | 'waiting_approval'
-  | 'queued'
   | 'pin_required'
   | 'verifying_pin'
   | 'connected'
@@ -54,7 +53,18 @@ export interface HelloPayload {
   device?: string;
   /** IANA time zone, a rough self-reported location */
   timeZone?: string;
+  /** Random per browser tab, kept across reloads, so the sender recognises someone reconnecting */
+  sessionId?: string;
+  formFactor?: FormFactor;
+  /** e.g. "Pixel 8"; only Chromium on Android tells */
+  model?: string;
+  storage?: StorageMode;
 }
+
+export type FormFactor = 'phone' | 'tablet' | 'desktop';
+
+/** Where a receiver's downloads go: streamed to disk, or held in memory until done (Firefox, Safari) */
+export type StorageMode = 'disk' | 'memory';
 
 /** JSON control messages; file data travels separately as binary chunks. */
 export type ControlMessage =
@@ -94,19 +104,29 @@ export interface TransferMetrics {
 }
 
 /** Events a transfer reports to the UI; shared by the sender and receiver. */
+/** A file this receiver has downloaded on the current connection. */
+export interface FinishedFile {
+  /** How long it took; null when too quick to measure */
+  seconds: number | null;
+  isCorrupted: boolean;
+}
+
 export interface TransferEvents {
   onMetrics?: (metrics: TransferMetrics) => void;
   onFileComplete?: (fileIndex: number, isVerified: boolean) => void;
+  /** One download finished; the connection stays open, so the receiver can download again */
   onAllCompleted?: (result: TransferResult) => void;
   onError?: (message: string) => void;
   onPaused?: (isPaused: boolean) => void;
   onCancelled?: () => void;
   /** The connection dropped mid-transfer; when provided it replaces the generic onError for that case */
   onConnectionLost?: () => void;
+  /** The connection closed while no download was running (before the first or between two): nothing was lost */
+  onPeerLeft?: () => void;
 }
 
 export interface SenderEvents extends TransferEvents {
-  /** The receiver chose a destination and requested the first file; the file list is now fixed */
+  /** The receiver chose a destination and requested the first file of a download; the file list is fixed until it ends */
   onReceiverStarted?: (fileIndices: number[]) => void;
   /** A receiver used up its PIN attempts; the transfer then fails as usual */
   onPinLockout?: () => void;

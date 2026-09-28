@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { SenderView } from '../components/SenderView';
 import type { SenderSession, SenderSessionState } from '../hooks/useSenderSession';
 import { createInitialSenderState } from '../hooks/senderState';
+import { DEFAULT_SIMULTANEOUS } from '../utils/sharingLimits';
 import type { SenderReceiver } from '../types/sharing';
 import type { SenderStatus, TransferFile, TransferMetrics } from '../types/transfer';
 
@@ -37,15 +38,20 @@ const metrics: TransferMetrics = {
 const noDetails = { device: null, timeZone: null, ip: null };
 
 function makeReceiver(overrides: Partial<SenderReceiver> = {}): SenderReceiver {
+  const stage = overrides.stage ?? 'choosing';
   return {
     peerId: 'receiver-1',
     details: noDetails,
-    stage: 'choosing',
-    fileIndices: null,
+    stage,
+    // Connected without downloading (choosing, or after a download) counts as idle
+    idleSinceMs: stage === 'choosing' || stage === 'completed' ? Date.now() : null,
+    hasLeft: false,
+    downloadFiles: [],
+    sentFiles: [],
+    finishedFiles: {},
     metrics: null,
     isPaused: false,
     error: null,
-    corruptedFiles: [],
     ...overrides,
   };
 }
@@ -55,17 +61,16 @@ function makeActions(overrides: Partial<SenderSession['actions']> = {}): SenderS
     addFiles: vi.fn(),
     removeFile: vi.fn(),
     clearFiles: vi.fn(),
+    startOver: vi.fn(),
+    togglePauseReceiver: vi.fn(),
     setSharingOptions: vi.fn(),
     createLink: vi.fn(),
     updateSharing: vi.fn(),
     stopSharing: vi.fn(),
     approvePeer: vi.fn(),
     rejectPeer: vi.fn(),
-    togglePause: vi.fn(),
-    cancel: vi.fn(),
     stopReceiver: vi.fn(),
     dismissReceiver: vi.fn(),
-    dismissError: vi.fn(),
     retryRoom: vi.fn(),
     ...overrides,
   };
@@ -97,23 +102,28 @@ const openSettings = () => fireEvent.click(screen.getByTestId('open-link-setting
 const shared = (state: Partial<SenderSessionState> = {}) => ({ files: [queuedFile], isShared: true, ...state });
 
 describe('SenderView', () => {
-  it('offers Resume while the transfer is paused', () => {
-    renderSenderView({ status: 'transferring', focus: makeReceiver({ stage: 'transferring', metrics, isPaused: true }) });
-
-    expect(screen.getByRole('button', { name: /resume/i })).toBeDefined();
-    expect(screen.queryByRole('button', { name: /pause/i })).toBeNull();
-  });
-
-  it('shows why the transfer failed and returns to the link', () => {
+  it('offers Resume on the row of someone whose download is paused', () => {
     const actions = renderSenderView({
-      state: shared(),
-      status: 'failed',
-      focus: makeReceiver({ stage: 'failed', error: 'Connection to peer lost' }),
+      state: shared({ receivers: [makeReceiver({ stage: 'transferring', metrics, isPaused: true })] }),
+      status: 'transferring',
     });
 
-    expect(screen.getByText('Connection to peer lost')).toBeDefined();
-    fireEvent.click(screen.getByTestId('dismiss-error'));
-    expect(actions.dismissError).toHaveBeenCalledTimes(1);
+    const row = screen.getByTestId('receiver-row');
+    fireEvent.click(within(row).getByTitle('Resume'));
+    expect(within(row).queryByTitle('Pause')).toBeNull();
+    expect(actions.togglePauseReceiver).toHaveBeenCalledWith('receiver-1');
+  });
+
+  it('shows a failed download on the person’s row, keeping the link on screen', () => {
+    const actions = renderSenderView({
+      state: shared({ receivers: [makeReceiver({ stage: 'failed', error: 'Connection to peer lost' })] }),
+      status: 'failed',
+    });
+
+    expect(within(screen.getByTestId('receiver-row')).getByText('Connection to peer lost')).toBeDefined();
+    expect(screen.getByTestId('link-bar')).toBeDefined();
+    fireEvent.click(screen.getByTitle('Remove from list'));
+    expect(actions.dismissReceiver).toHaveBeenCalledWith('receiver-1');
   });
 
   it('shows a room setup error with a retry instead of generating forever', () => {
@@ -155,24 +165,17 @@ describe('SenderView', () => {
   });
 
   describe('sharing settings', () => {
-    it('turns on simultaneous downloads by raising the number above one', () => {
+    it('raises the number of simultaneous downloads from the default', () => {
       const actions = renderSenderView({ state: shared() });
       openSettings();
-      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('1');
+      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe(String(DEFAULT_SIMULTANEOUS));
 
       fireEvent.click(screen.getByTitle('More'));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(
-        expect.objectContaining({ allowMultiple: true, maxSimultaneous: 2 }),
+        expect.objectContaining({ maxSimultaneous: DEFAULT_SIMULTANEOUS + 1 }),
         'new'
       );
-    });
-
-    it('shows the download limit when several people may download', () => {
-      renderSenderView({ state: shared({ options: { ...createInitialSenderState().options, allowMultiple: true, maxSimultaneous: 4 } }) });
-
-      openSettings();
-      expect(screen.getByRole('status', { name: /simultaneous downloads/i }).textContent).toBe('4');
     });
 
     const withPin = (pin: string) => shared({ options: { ...createInitialSenderState().options, pin } });
@@ -238,14 +241,14 @@ describe('SenderView', () => {
     expect(items).toEqual(['Link settings', 'QR code and room code', 'Stop sharing']);
   });
 
-  it('shows that the receiver is choosing where to save, while files can still change', () => {
+  it('shows a receiver who has not started downloading as connected, while files can still change', () => {
     const receiver = makeReceiver();
     const actions = renderSenderView({ state: shared({ receivers: [receiver] }), status: 'awaiting_receiver', focus: receiver });
 
     // One person or several, whoever is connected is listed under the link
     const row = screen.getByTestId('receiver-row');
-    expect(within(row).getByText(/choosing where to save/i)).toBeDefined();
-    fireEvent.click(within(row).getByTitle('Stop download'));
+    expect(within(row).getByText(/idle for [0-9]+ s/i)).toBeDefined();
+    fireEvent.click(within(row).getByTitle('Disconnect'));
     fireEvent.click(screen.getByTestId('confirm'));
     expect(actions.stopReceiver).toHaveBeenCalledWith('receiver-1');
 
@@ -253,14 +256,28 @@ describe('SenderView', () => {
     expect(screen.getByTestId('pick-files')).toBeDefined();
   });
 
-  it('asks for files, not approval, when a receiver opened the link early', () => {
+  it('lists someone who opened the link early as waiting for files, with nothing to accept', () => {
     renderSenderView({ state: { pendingPeers: [{ peerId: 'receiver-1', isTrusted: true, details: noDetails }] } });
 
-    expect(screen.getByText(/opened your link/i)).toBeDefined();
+    expect(within(screen.getByTestId('pending-peer')).getByText(/waiting for files/i)).toBeDefined();
     expect(screen.queryByRole('button', { name: /accept/i })).toBeNull();
   });
 
-  it('asks about the first person waiting for approval, and answers for that person', () => {
+  it('shows someone asking to connect straight away, even on the empty page after a reload', () => {
+    renderSenderView({ state: { pendingPeers: [{ peerId: 'p', isTrusted: false, details: noDetails }] } });
+
+    expect(within(screen.getByTestId('pending-peer')).getByRole('img', { name: 'Waiting' })).toBeDefined();
+    // No files yet is fine: they wait on an empty list until some are added
+    expect((screen.getByTestId('approve-peer') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('says someone with the link joins once the files are shared', () => {
+    renderSenderView({ state: { files: [queuedFile], pendingPeers: [{ peerId: 'p', isTrusted: true, details: noDetails }] } });
+
+    expect(within(screen.getByTestId('pending-peer')).getByText(/joins when you share/i)).toBeDefined();
+  });
+
+  it('lists people asking to connect with Accept and Decline, answering for that person', () => {
     const actions = renderSenderView({
       state: shared({
         pendingPeers: [
@@ -271,8 +288,9 @@ describe('SenderView', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: /accept/i }));
-
     expect(actions.approvePeer).toHaveBeenCalledWith('typed-code');
+    fireEvent.click(screen.getByRole('button', { name: /decline/i }));
+    expect(actions.rejectPeer).toHaveBeenCalledWith('typed-code');
   });
 
   it('says which device is asking to connect', () => {
@@ -284,9 +302,9 @@ describe('SenderView', () => {
       }),
     });
 
+    expect(screen.getByRole('img', { name: 'Firefox' })).toBeDefined();
     expect(screen.getByText('Firefox on Linux')).toBeDefined();
-    expect(screen.getByText('198.51.100.4')).toBeDefined();
-    expect(screen.getByText('Oslo')).toBeDefined();
+    expect(screen.getByText('198.51.100.4 · Time zone: Oslo')).toBeDefined();
   });
 
   it('marks queued files with an icon for their type', () => {
@@ -309,22 +327,23 @@ describe('SenderView', () => {
     expect(screen.queryByRole('button', { name: /receive files/i })).toBeNull();
   });
 
-  it('lists every file with its progress while a multi-file transfer runs', () => {
+  it('stays on the file list while someone downloads, showing their progress on their row', () => {
     const second: TransferFile = { ...queuedFile, id: 'f2', name: 'notes.txt', type: 'text/plain' };
+    const downloading = makeReceiver({ stage: 'transferring', metrics });
     renderSenderView({
-      state: { files: [queuedFile, second] },
+      state: shared({ files: [queuedFile, second], receivers: [downloading] }),
       status: 'transferring',
-      focus: makeReceiver({ stage: 'transferring', metrics }),
+      focus: downloading,
     });
 
-    expect(document.querySelector('[data-status="active"]')?.textContent).toContain('report.pdf');
-    expect(document.querySelector('[data-status="pending"]')?.textContent).toContain('notes.txt');
+    expect(screen.getByTestId('file-queue')).toBeDefined();
+    expect(within(screen.getByTestId('receiver-row')).getByText(/50%/)).toBeDefined();
   });
 
   it('shows the file count and total size under the list', () => {
     renderSenderView({ state: { files: [queuedFile] } });
 
-    expect(screen.getByText('1 file · 2 KB')).toBeDefined();
+    expect(screen.getByTestId('file-totals').textContent).toMatch(/^1 file\s*·\s*2 KB$/);
   });
 
   it('sorts the files by the column clicked, then the other way, then back to the order they were added', () => {
@@ -352,41 +371,25 @@ describe('SenderView', () => {
     expect(screen.getByText('This is a new room.')).toBeDefined();
   });
 
-  it('summarises only the files the receiver chose', () => {
-    const second: TransferFile = { ...queuedFile, id: 'f2', name: 'notes.txt', type: 'text/plain' };
+  it('lists under each person the files sent to them, with how each went', () => {
+    const sent = { id: 'a', name: 'sent.txt', size: 10, type: 'text/plain' };
+    const bad = { id: 'b', name: 'bad.txt', size: 10, type: 'text/plain' };
     renderSenderView({
-      state: { files: [queuedFile, second] },
-      status: 'completed',
-      focus: makeReceiver({ stage: 'completed', fileIndices: [1] }),
+      state: shared({
+        receivers: [
+          makeReceiver({
+            stage: 'completed',
+            downloadFiles: [sent, bad],
+            sentFiles: [sent, bad],
+            finishedFiles: { a: { seconds: 1, isCorrupted: false }, b: { seconds: 1, isCorrupted: true } },
+          }),
+        ],
+      }),
     });
 
-    expect(screen.getByTestId('stat-files').textContent).toMatch(/1$/);
-  });
-
-  it('offers the same files to someone else, or other files, once the download is done', () => {
-    const actions = renderSenderView({ state: shared(), status: 'completed', focus: makeReceiver({ stage: 'completed' }) });
-
-    fireEvent.click(screen.getByTestId('send-again'));
-    fireEvent.click(screen.getByTestId('send-other-files'));
-
-    expect(actions.stopSharing).toHaveBeenCalledTimes(1);
-    expect(actions.clearFiles).toHaveBeenCalledTimes(1);
-  });
-
-  it('offers Share again for the same files after sending them to someone', () => {
-    const session = {
-      // Last seen on the file list (e.g. after adding a file), not on the link
-      state: { ...createInitialSenderState(), roomCode: 'DW-ABC234', shareKey: 'link-key', files: [queuedFile] },
-      status: 'completed' as SenderStatus,
-      focus: makeReceiver({ stage: 'completed' }),
-      actions: makeActions(),
-    } as SenderSession;
-    const { rerender } = render(<SenderView session={session} />);
-    fireEvent.click(screen.getByTestId('send-again'));
-
-    rerender(<SenderView session={{ ...session, status: 'waiting', focus: null }} />);
-
-    expect(screen.getByTestId('share-files')).toBeDefined();
+    const row = screen.getByTestId('receiver-row');
+    expect(within(row).getAllByTestId('file-row').map((file) => file.dataset.status)).toEqual(['done', 'corrupted']);
+    expect(row.textContent).not.toMatch(/done/i);
   });
 
   describe('stopping the share', () => {
@@ -401,7 +404,7 @@ describe('SenderView', () => {
     it('asks first when it would stop someone’s download', () => {
       const actions = renderSenderView({
         state: shared({
-          options: { ...createInitialSenderState().options, allowMultiple: true },
+          options: createInitialSenderState().options,
           receivers: [makeReceiver({ stage: 'transferring', metrics })],
         }),
       });
@@ -416,7 +419,7 @@ describe('SenderView', () => {
 
   describe('sharing with several people', () => {
     const several = (receivers: SenderReceiver[]) =>
-      shared({ options: { ...createInitialSenderState().options, allowMultiple: true, maxSimultaneous: 2 }, receivers });
+      shared({ options: { ...createInitialSenderState().options, maxSimultaneous: 2 }, receivers });
 
     it('lists everyone with where they are, keeping the link on screen', () => {
       renderSenderView({
@@ -459,12 +462,16 @@ describe('SenderView', () => {
       });
 
       const row = screen.getByTestId('receiver-row');
+      expect(within(row).getByRole('img', { name: 'Chrome' })).toBeDefined();
       expect(within(row).getByText('Chrome on Android')).toBeDefined();
-      expect(within(row).getByText('203.0.113.7 · Stockholm')).toBeDefined();
+      expect(within(row).getByText('203.0.113.7 · Time zone: Stockholm')).toBeDefined();
     });
 
-    it('removes finished people from the list without asking', () => {
-      const actions = renderSenderView({ state: several([makeReceiver({ peerId: 'a', stage: 'completed' })]) });
+    it('removes people who left from the list without asking', () => {
+      const actions = renderSenderView({
+        state: several([makeReceiver({ peerId: 'a', stage: 'completed', idleSinceMs: null, hasLeft: true })]),
+      });
+      expect(within(screen.getByTestId('receiver-row')).getByRole('img', { name: 'Left' })).toBeDefined();
 
       fireEvent.click(screen.getByTitle('Remove from list'));
 
@@ -477,11 +484,10 @@ describe('SenderView', () => {
       });
       openSettings();
       fireEvent.click(screen.getByTitle('Fewer'));
-      expect(actions.updateSharing).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByTestId('apply-to-new'));
 
-      // Down to one is the one-person link again
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ allowMultiple: false }), 'new');
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ maxSimultaneous: 1 }), 'new');
+      expect(screen.getByRole('heading', { name: 'Stop current downloads?' })).toBeDefined();
+      expect(screen.getByText(/2 people are still connected/i)).toBeDefined();
     });
   });
 
@@ -500,36 +506,37 @@ describe('SenderView', () => {
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
     });
 
-    it('asks whether a stricter setting should also stop the current receiver', () => {
+    it('applies a stricter setting to new connections, then asks whether to stop the current download', () => {
       const actions = renderWithSomeoneConnected();
 
       openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
-      expect(actions.updateSharing).not.toHaveBeenCalled();
 
-      fireEvent.click(screen.getByTestId('apply-to-new'));
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: expect.stringMatching(/^\d{4}$/) }), 'new');
+      expect(screen.getByRole('heading', { name: 'Stop current downloads?' })).toBeDefined();
+      expect(screen.getByText(/new connections need a pin\. someone is still connected/i)).toBeDefined();
     });
 
-    it('can apply a stricter setting to the current receiver too', () => {
+    it('stops the current download too when asked', () => {
       const actions = renderWithSomeoneConnected();
 
       openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
-      fireEvent.click(screen.getByTestId('apply-now'));
+      fireEvent.click(screen.getByTestId('confirm'));
 
-      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'now');
+      expect(actions.updateSharing).toHaveBeenLastCalledWith(expect.objectContaining({ requireApproval: true }), 'now');
     });
 
-    it('leaves the settings as they were when the question is dismissed', () => {
+    it('lets the current download go on when the question is dismissed', () => {
       const actions = renderWithSomeoneConnected();
 
       openSettings();
       fireEvent.click(screen.getByRole('checkbox', { name: /require connection approval/i }));
-      fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-      expect(actions.updateSharing).not.toHaveBeenCalled();
-      expect((screen.getByRole('checkbox', { name: /require connection approval/i }) as HTMLInputElement).checked).toBe(false);
+      expect(actions.updateSharing).toHaveBeenCalledTimes(1);
+      expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ requireApproval: true }), 'new');
+      expect(screen.queryByRole('heading', { name: 'Stop current downloads?' })).toBeNull();
     });
 
     it('applies without asking when the change only loosens things', () => {
@@ -542,7 +549,7 @@ describe('SenderView', () => {
       fireEvent.click(screen.getByRole('checkbox', { name: /require a pin/i }));
 
       expect(actions.updateSharing).toHaveBeenCalledWith(expect.objectContaining({ pin: '' }), 'new');
-      expect(screen.queryByTestId('apply-now')).toBeNull();
+      expect(screen.queryByTestId('confirm')).toBeNull();
     });
   });
 
