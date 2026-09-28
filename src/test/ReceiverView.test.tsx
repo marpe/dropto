@@ -6,6 +6,11 @@ import { initialReceiverState } from '../hooks/receiverState';
 import type { ReceiverSessionState } from '../hooks/receiverState';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
 
+// canvas-confetti needs a real canvas; a finished download would otherwise throw after the test ends
+vi.mock('../services/confetti', () => ({
+  fireCelebration: vi.fn(),
+}));
+
 type Actions = ReceiverSession['actions'];
 
 function makeSession(state: Partial<ReceiverSessionState> = {}, actions: Partial<Actions> = {}): ReceiverSession {
