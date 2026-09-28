@@ -70,7 +70,7 @@ test.describe('DropWave Application End-to-End Tests', () => {
     expect(brand500).toBe('#f97316');
     await addFile(page, 'brand.txt', 'orange');
     await shareFiles(page);
-    await expect(page.getByTestId('room-code')).toHaveText(/^DT-[A-Z0-9]{6}$/, { timeout: 15000 });
+    await expect(page.getByLabel('Share link')).toHaveValue(/[?]room=DT-[A-Z0-9]{6}#/, { timeout: 15000 });
   });
 
   test('switches to Receive tab when opening share link with ?room= parameter', async ({ page }) => {
@@ -360,14 +360,14 @@ async function shareFiles(page: Page, { pin, simultaneous }: ShareOptions = {}) 
   await page.getByRole('button', { name: 'Done' }).click();
 }
 
-/** The room code is shown once the link has been created. */
+/** The room code, read from the link once it has been created. */
 
 function readRoomCodeFromLink(link: string): string {
   return new URL(link).searchParams.get('room') ?? '';
 }
 
 async function readRoomCode(page: Page): Promise<string> {
-  const roomCodeElement = page.getByTestId('room-code');
-  await expect(roomCodeElement).toHaveText(/^DW-[A-Z0-9]{6}$/, { timeout: 15000 });
-  return (await roomCodeElement.textContent())?.trim() ?? '';
+  const link = page.getByLabel('Share link');
+  await expect(link).toHaveValue(/[?]room=DW-[A-Z0-9]{6}#/, { timeout: 15000 });
+  return readRoomCodeFromLink(await link.inputValue());
 }

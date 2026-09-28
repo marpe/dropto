@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
+import { Card } from './ui/Card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconBadge } from './ui/IconBadge';
 import { LinkButton } from './ui/LinkButton';
@@ -18,8 +19,8 @@ import { MetricsDashboard } from './MetricsDashboard';
 import { PeerApprovalModal } from './PeerApprovalModal';
 import { FileDropZone } from './FileDropZone';
 import { FileQueue } from './FileQueue';
-import { LinkSection } from './LinkSection';
-import { ReceiverChoosingCard } from './ReceiverChoosingCard';
+import { LinkBar } from './LinkBar';
+import { ReceiverList } from './ReceiverList';
 
 interface SenderViewProps {
   session: SenderSession;
@@ -188,8 +189,6 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
         </Notice>
       )}
 
-      {isAwaitingReceiver && focus && <ReceiverChoosingCard details={focus.details} onCancel={actions.cancel} />}
-
       {hasEarlyVisitor && (
         <Notice tone="brand" icon={Link2}>
           Someone opened your link. Add files and share them to let them in.
@@ -220,19 +219,18 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
             }
           }}
           onClearFiles={requestClearFiles}
-          footer={
-            !isShared && (
-              <Button data-testid="share-files" onClick={actions.createLink} className="w-full">
-                <Link2 className="w-4 h-4" />
-                <span>Share</span>
-              </Button>
-            )
-          }
         />
       )}
 
+      {files.length > 0 && !isShared && (
+        <Button data-testid="share-files" size="lg" onClick={actions.createLink} className="w-full">
+          <Link2 className="w-5 h-5" />
+          <span>Share</span>
+        </Button>
+      )}
+
       {isShared && files.length > 0 && (
-        <LinkSection
+        <LinkBar
           roomCode={roomCode}
           shareUrl={shareUrl}
           roomNotice={state.roomNotice}
@@ -240,10 +238,14 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
           onUpdateSharing={actions.updateSharing}
           onStopSharing={actions.stopSharing}
           connectedCount={connectedCount}
-          receivers={receivers}
-          onStopReceiver={actions.stopReceiver}
-          onDismissReceiver={actions.dismissReceiver}
         />
+      )}
+
+      {/* Whoever is connected, one person or several, is listed under the link */}
+      {isShared && receivers.length > 0 && (
+        <Card padding="sm">
+          <ReceiverList receivers={receivers} onStopReceiver={actions.stopReceiver} onDismissReceiver={actions.dismissReceiver} />
+        </Card>
       )}
     </Screen>
   );
