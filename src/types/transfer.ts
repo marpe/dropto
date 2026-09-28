@@ -86,7 +86,8 @@ export type ControlMessage =
   | { type: 'AUTH_RESPONSE'; payload: { pin: string } }
   | { type: 'MANIFEST'; payload: TransferManifest }
   | { type: 'FILE_SELECTION'; payload: { fileIndices: number[] } }
-  | { type: 'FILE_START'; payload: { fileIndex: number } }
+  /** `fromChunk` carries on a file cut off by a dropped connection; only on a download's first file */
+  | { type: 'FILE_START'; payload: { fileIndex: number; fromChunk?: number } }
   | { type: 'FILE_COMPLETE'; payload: { fileIndex: number; checksum: string } }
   | { type: 'FILE_ACK'; payload: { fileIndex: number; isVerified: boolean } }
   | { type: 'TRANSFER_PAUSE' }
