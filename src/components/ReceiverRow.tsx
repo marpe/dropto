@@ -134,6 +134,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
         <FileTable
           files={sent.files}
           trailClassName={FILE_PROGRESS_COLUMN}
+          hasHeader={false}
           renderRow={(file, index) => <FileTableRow key={file.id} file={file} progress={sent.progress[index]} />}
         />
       )}
