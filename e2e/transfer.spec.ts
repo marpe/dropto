@@ -254,6 +254,31 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await close();
   });
 
+  test('sender reload mid-download: the receiver reconnects and offers what is left', async ({ browser }) => {
+    // 4 MB at 100 ms per 64 KB chunk takes about 6 s, long enough to reload the sender partway
+    const { senderPage, receiverPage, close } = await openPeers(browser, { writeDelayMs: 100 });
+
+    await senderPage.goto('/');
+    await addFile(senderPage, 'small.txt', 'first');
+    await addFile(senderPage, 'large.bin', 'x'.repeat(4 * 1024 * 1024), 'application/octet-stream');
+    const link = await shareFiles(senderPage);
+
+    await receiverPage.goto(link);
+    await receiverPage.getByTestId('start-download').click();
+    await expect(receiverPage.locator('[data-status=done]')).toHaveCount(1, { timeout: 15000 });
+
+    // Files added through the plain input cannot be read back after a reload, so the cut-off file is gone
+    senderPage.on('dialog', (dialog) => dialog.accept());
+    await senderPage.reload();
+    await expect(receiverPage.getByTestId('transfer-summary')).toContainText('Reconnecting', { timeout: 15000 });
+    await addFile(senderPage, 'other.txt', 'something else');
+
+    await expect(receiverPage.getByText('Download was interrupted.')).toBeVisible({ timeout: 30000 });
+    await receiverPage.getByTestId('start-download').click();
+    await expect(receiverPage.getByTestId('transfer-summary')).toContainText('Done', { timeout: 15000 });
+    await close();
+  });
+
   // The link bar with the sharing settings is hidden until it is behind a feature flag
   test.fixme('PIN-protected transfer hides files until the correct PIN is entered', async ({ browser }) => {
     const { senderPage, receiverPage, close } = await openPeers(browser);
@@ -292,12 +317,13 @@ test.describe('DropWave Application End-to-End Tests', () => {
   });
 });
 
-/** A receiver in its own browser context, with file pickers stubbed to write nowhere. */
-async function openReceiver(browser: Browser) {
+/** A receiver in its own browser context, with file pickers stubbed to write nowhere (each write taking `writeDelayMs`). */
+async function openReceiver(browser: Browser, { writeDelayMs = 0 }: { writeDelayMs?: number } = {}) {
   const context = await newLocalContext(browser);
   const page = await context.newPage();
-  await page.addInitScript(() => {
-    const createWritable = async () => ({ write: async () => {}, close: async () => {}, abort: async () => {} });
+  await page.addInitScript((delayMs) => {
+    const write = () => new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    const createWritable = async () => ({ write, close: async () => {}, abort: async () => {} });
     const fileHandle = { createWritable };
     const directoryHandle = {
       getFileHandle: async () => fileHandle,
@@ -305,15 +331,15 @@ async function openReceiver(browser: Browser) {
     };
     (window as any).showSaveFilePicker = async () => fileHandle;
     (window as any).showDirectoryPicker = async () => directoryHandle;
-  });
+  }, writeDelayMs);
   return { page, close: () => context.close() };
 }
 
 /** Two isolated browser contexts: a sender and one receiver. */
-async function openPeers(browser: Browser) {
+async function openPeers(browser: Browser, receiverOptions: { writeDelayMs?: number } = {}) {
   const senderContext = await newLocalContext(browser, { permissions: ['clipboard-read', 'clipboard-write'] });
   const senderPage = await senderContext.newPage();
-  const receiver = await openReceiver(browser);
+  const receiver = await openReceiver(browser, receiverOptions);
   const receiverPage = receiver.page;
   const close = async () => {
     await senderContext.close();
