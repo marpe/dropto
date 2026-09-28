@@ -1,1 +1,1 @@
-export const REPOSITORY_URL = 'https://github.com/marpe/send';
+export const REPOSITORY_URL = 'https://github.com/marpe/dropto';

@@ -25,7 +25,7 @@ test.describe('dropto.space Application End-to-End Tests', () => {
     await expect(page.locator('html')).toHaveClass(/dark/);
     await page.getByRole('button', { name: 'Light' }).click();
     await expect(page.locator('html')).not.toHaveClass(/dark/);
-    const githubLink = page.locator('a[href="https://github.com/marpe/send"]');
+    const githubLink = page.locator('a[href="https://github.com/marpe/dropto"]');
     await expect(githubLink).toHaveAttribute('target', '_blank');
 
     await page.locator('button:has-text("Cancel")').click();
