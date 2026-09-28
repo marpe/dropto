@@ -343,6 +343,28 @@ describe('useReceiverSession', () => {
     expect(connection.disconnectPeer).not.toHaveBeenCalled();
   });
 
+  it('starts the next download without the corrupted files of the one before', async () => {
+    const session = renderReceiverSession();
+    const { engine } = await connectWithManifest(session);
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: ['hello.txt'] });
+    });
+    expect(session.effects.onTransferEnded).toHaveBeenLastCalledWith(false);
+
+    await act(async () => {
+      await session.result.current.actions.startSaving();
+    });
+    act(() => {
+      engine.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    expect(session.result.current.state.corruptedFiles).toEqual([]);
+    expect(session.effects.onTransferEnded).toHaveBeenLastCalledWith(true);
+  });
+
   it('downloads again from the same list after finishing', async () => {
     const session = renderReceiverSession();
     const { engine } = await connectWithManifest(session);
@@ -757,6 +779,26 @@ describe('useReceiverSession: a download cut off by a dropped connection', () =>
     });
 
     expect(session.result.current.state).toMatchObject({ status: 'transferring', isInterrupted: false, selectedFileIndices: [1] });
+  });
+
+  it('still reports a file corrupted before the cut once the download carried on finishes', async () => {
+    const { session, engine } = await downloading();
+    act(() => {
+      engine.events.onConnectionLost?.({ finishedCount: 1, corruptedFiles: ['one.txt'], resume: resumePoint() });
+    });
+    await waitFor(() => expect(session.engines).toHaveLength(2));
+    const next = session.engines[1];
+
+    act(() => {
+      next.events.onManifest?.(twoFiles);
+      next.events.onResumed?.([1]);
+    });
+    act(() => {
+      next.events.onAllCompleted?.({ corruptedFiles: [] });
+    });
+
+    expect(session.result.current.state).toMatchObject({ status: 'completed', corruptedFiles: ['one.txt'] });
+    expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
   });
 
   it('offers what is still missing when it cannot carry on', async () => {

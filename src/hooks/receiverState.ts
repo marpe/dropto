@@ -64,6 +64,10 @@ export type ReceiverAction =
 
 const noProgress = { metrics: null, isPaused: false } as const;
 
+function mergeCorrupted(earlier: string[], later: string[]): string[] {
+  return [...new Set([...earlier, ...later])];
+}
+
 export const initialReceiverState: ReceiverSessionState = {
   status: 'idle',
   roomCode: '',
@@ -162,7 +166,8 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         status: 'completed',
         isPaused: false,
         queuePosition: null,
-        corruptedFiles: action.result.corruptedFiles,
+        // A download carried on after a cut adds what it found to what failed before the cut
+        corruptedFiles: mergeCorrupted(state.corruptedFiles, action.result.corruptedFiles),
         finishedFiles: {
           ...state.finishedFiles,
           ...finishedFilesOf(pickFiles(state.manifest?.files ?? [], state.selectedFileIndices), state.metrics, action.result),
@@ -200,6 +205,7 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         isInterrupted: true,
         isPaused: false,
         queuePosition: null,
+        corruptedFiles: mergeCorrupted(state.corruptedFiles, action.corruptedFiles),
         finishedFiles: {
           ...state.finishedFiles,
           ...finishedFilesOf(
@@ -217,7 +223,6 @@ export function receiverReducer(state: ReceiverSessionState, action: ReceiverAct
         isInterrupted: false,
         selectedFileIndices: action.fileIndices,
         queuePosition: null,
-        corruptedFiles: [],
       };
     case 'RESUME_FAILED':
       return { ...state, ...noProgress, status: 'connected', isInterrupted: false, hasInterruptedDownload: true, queuePosition: null };
