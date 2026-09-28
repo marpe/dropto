@@ -40,6 +40,9 @@ interface Reservation {
   timer: ReturnType<typeof setTimeout>;
 }
 
+// A connection back to carry on a cut-off download, gone again before it did: nothing more was finished
+const NOTHING_FINISHED: DownloadInterruption = { finishedCount: 0, corruptedFiles: [], resume: null };
+
 // Three attempts per connection, three connections: then guessing has to stop
 const MAX_PIN_LOCKOUTS_PER_ROOM = 3;
 export const PIN_LOCKOUT_NOTICE =
@@ -186,8 +189,7 @@ export class SenderRoom {
   public stop(peerId: string) {
     const sessionId = this.sessionOf.get(peerId);
     const engine = this.engines.get(peerId);
-    const reservation = sessionId ? this.reservations.get(sessionId) : undefined;
-    if (!engine && reservation?.peerId !== peerId) {
+    if (!engine && !this.isReconnecting(peerId)) {
       return;
     }
     // Sent away on purpose: coming back from the same tab must not skip the approval they would otherwise need
@@ -335,7 +337,7 @@ export class SenderRoom {
     const previousEngine = this.engines.get(previous.peer);
     if (previousEngine) {
       // Its close has not been noticed yet; the new connection replaces it
-      const interruption = previousEngine.interrupt();
+      const interruption = previousEngine.interrupt() ?? (this.isReconnecting(previous.peer) ? NOTHING_FINISHED : null);
       if (interruption) {
         this.interruptDownload(previous.peer, interruption);
       } else {
@@ -432,6 +434,10 @@ export class SenderRoom {
     }
     this.engines.delete(peerId);
     this.leaveLine(peerId);
+    if (this.isReconnecting(peerId)) {
+      // Back, then gone again before carrying on: what was kept stays kept, on the clock it started with
+      return;
+    }
     const timer = setTimeout(() => this.expireReservation(sessionId), this.reservedSlotMs);
     this.reservations.set(sessionId, { peerId, hasSlot: this.busy.has(peerId), timer });
   }
@@ -442,11 +448,17 @@ export class SenderRoom {
     if (!reservation) {
       return;
     }
-    if (reservation.hasSlot) {
-      this.busy.delete(reservation.peerId);
+    // Only a slot still held moves; one already given back must not be taken twice
+    if (reservation.hasSlot && this.busy.delete(reservation.peerId)) {
       this.busy.add(peerId);
     }
     reservation.peerId = peerId;
+  }
+
+  /** A connection back to carry on a cut-off download that has not carried on yet. */
+  private isReconnecting(peerId: string): boolean {
+    const sessionId = this.sessionOf.get(peerId);
+    return !!sessionId && this.reservations.get(sessionId)?.peerId === peerId;
   }
 
   /** Not carried on in time: someone still away failed, and the slot goes to the line. */
@@ -510,13 +522,21 @@ export class SenderRoom {
         this.afterSlotFreed();
       }),
       onPeerLeft: ifCurrent(() => {
+        if (this.isReconnecting(peerId)) {
+          this.interruptDownload(peerId, NOTHING_FINISHED);
+          return;
+        }
         this.dispatch({ type: 'RECEIVER_LEFT', peerId });
         this.endEngine(peerId, false);
       }),
       onError: ifCurrent((error) => {
-        this.connection?.disconnectPeer(peerId);
         // A receiver closing or reloading the page before downloading is not a failed transfer
         const hasLeftEarly = !hasReceiverStarted && !conn.open;
+        if (hasLeftEarly && this.isReconnecting(peerId)) {
+          this.interruptDownload(peerId, NOTHING_FINISHED);
+          return;
+        }
+        this.connection?.disconnectPeer(peerId);
         this.dispatch(hasLeftEarly ? { type: 'RECEIVER_REMOVED', peerId } : { type: 'RECEIVER_FAILED', peerId, error });
         this.endEngine(peerId, false);
       }),
@@ -532,6 +552,11 @@ export class SenderRoom {
   }
 
   private endEngine(peerId: string, isSuccessful: boolean) {
+    const sessionId = this.sessionOf.get(peerId);
+    if (sessionId && this.isReconnecting(peerId)) {
+      // Back to carry on, but ended otherwise: the slot kept for it goes back with the rest
+      this.clearReservation(sessionId);
+    }
     this.engines.delete(peerId);
     this.leaveLine(peerId);
     this.releaseSlot(peerId, isSuccessful);
