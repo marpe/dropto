@@ -6,14 +6,15 @@ test.describe('DropWave Application End-to-End Tests', () => {
     await page.goto('/');
 
     await expect(page).toHaveTitle(/DropWave/i);
-    await expect(page.locator('header')).toHaveCount(0);
-    await expect(page.locator('footer')).toHaveCount(0);
+    // An app: a title bar with the screen name, no marketing header
+    await expect(page.getByRole('heading', { level: 1, name: 'Send files' })).toBeVisible();
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     // Receiving by code is one click away, and there is a way back
     await page.getByRole('button', { name: /receive files/i }).click();
     await expect(page.getByTestId('room-code-form')).toBeVisible();
-    await page.getByRole('button', { name: /send files instead/i }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Receive files' })).toBeVisible();
+    await page.getByTitle('Send files instead').click();
     await expect(page.getByTestId('drop-zone')).toBeVisible();
 
     await page.getByTitle('Settings').click();

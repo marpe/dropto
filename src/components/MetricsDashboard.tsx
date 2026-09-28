@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Files, Gauge, HardDrive, Pause, Play, Timer, TrendingUp, XCircle } from 'lucide-react';
 import { Button } from './ui/Button';
+import { BottomBar } from './ui/BottomBar';
 import { Card } from './ui/Card';
 import { ProgressRing } from './ui/ProgressRing';
 import { StatTile } from './ui/StatTile';
@@ -66,6 +67,7 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
   }, [isVerified]);
 
   return (
+    <>
     <Card padding="md" className="w-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -146,10 +148,8 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({
         className="pt-4 border-t border-border-1"
       />
 
-      {/* Equal full-width buttons on a phone, a centred row otherwise */}
-      {completion && (
-        <div className="grid gap-2 mt-5 sm:flex sm:justify-center sm:gap-3 sm:mt-6 *:w-full sm:*:w-auto">{completion.actions}</div>
-      )}
     </Card>
+    {completion && <BottomBar>{completion.actions}</BottomBar>}
+    </>
   );
 };

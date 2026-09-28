@@ -289,15 +289,6 @@ describe('ReceiverView Component UI & Interaction', () => {
     expect(document.querySelector('[data-file-kind="archive"]')).not.toBeNull();
   });
 
-  it('offers going back to sending from the room code form', () => {
-    const onSwitchToSend = vi.fn();
-    renderWaiting('idle', { onSwitchToSend });
-
-    fireEvent.click(screen.getByRole('button', { name: /send files instead/i }));
-
-    expect(onSwitchToSend).toHaveBeenCalledTimes(1);
-  });
-
   it('connects when Enter is pressed in the room code field', () => {
     const onConnect = vi.fn();
     renderWaiting('idle', { onConnect });

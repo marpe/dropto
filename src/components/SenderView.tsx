@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, Link2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
+import { BottomBar } from './ui/BottomBar';
+import { Inset } from './ui/Inset';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { IconBadge } from './ui/IconBadge';
 import { LinkButton } from './ui/LinkButton';
@@ -179,32 +181,36 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       )}
 
       {hasRoomError && (
-        <Notice tone="danger" icon={AlertCircle}>
-          <span className="flex flex-wrap items-center justify-between gap-3">
-            <span>{state.roomError}</span>
-            <Button variant="secondary" size="sm" onClick={actions.retryRoom}>
-              Retry
-            </Button>
-          </span>
-        </Notice>
+        <Inset>
+          <Notice tone="danger" icon={AlertCircle}>
+            <span className="flex flex-wrap items-center justify-between gap-3">
+              <span>{state.roomError}</span>
+              <Button variant="secondary" size="sm" onClick={actions.retryRoom}>
+                Retry
+              </Button>
+            </span>
+          </Notice>
+        </Inset>
       )}
 
       {hasEarlyVisitor && (
-        <Notice tone="brand" icon={Link2}>
-          Someone opened your link. Add files and share them to let them in.
-        </Notice>
+        <Inset>
+          <Notice tone="brand" icon={Link2}>
+            Someone opened your link. Add files and share them to let them in.
+          </Notice>
+        </Inset>
       )}
 
       {files.length === 0 ? (
         <>
           <FileDropZone onAddFiles={actions.addFiles} fileInputRef={fileInputRef} />
           {isLanding && onSwitchToReceive && (
-            <div className="text-center">
+            <Inset className="text-center">
               <LinkButton onClick={onSwitchToReceive}>
                 Got a code? Receive files
                 <ArrowRight className="w-4 h-4" />
               </LinkButton>
-            </div>
+            </Inset>
           )}
         </>
       ) : (
@@ -223,13 +229,16 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
       )}
 
       {files.length > 0 && !isShared && (
-        <Button data-testid="share-files" size="lg" onClick={actions.createLink} className="w-full">
-          <Link2 className="w-5 h-5" />
-          <span>Share</span>
-        </Button>
+        <BottomBar>
+          <Button data-testid="share-files" size="lg" onClick={actions.createLink}>
+            <Link2 className="w-5 h-5" />
+            <span>Share</span>
+          </Button>
+        </BottomBar>
       )}
 
       {isShared && files.length > 0 && (
+        <Inset>
         <LinkBar
           roomCode={roomCode}
           shareUrl={shareUrl}
@@ -239,6 +248,7 @@ export const SenderView: React.FC<SenderViewProps> = ({ session, onSwitchToRecei
           onStopSharing={actions.stopSharing}
           connectedCount={connectedCount}
         />
+        </Inset>
       )}
 
       {/* Whoever is connected, one person or several, is listed under the link */}

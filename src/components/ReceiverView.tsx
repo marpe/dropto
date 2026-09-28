@@ -1,8 +1,8 @@
 import React from 'react';
-import { AlertCircle, ArrowLeft, RotateCw } from 'lucide-react';
+import { AlertCircle, RotateCw } from 'lucide-react';
+import { Screen } from './ui/Screen';
 import { IconBadge } from './ui/IconBadge';
 import { Button } from './ui/Button';
-import { LinkButton } from './ui/LinkButton';
 import { Spinner } from './ui/Spinner';
 import { StatusCard } from './ui/StatusCard';
 import type { ReceiverStatus, TransferManifest, TransferMetrics } from '../types/transfer';
@@ -37,7 +37,6 @@ interface ReceiverViewProps {
   onReset: () => void;
   /** Connected through the sender's link, so there is no approval to wait for */
   isInvited?: boolean;
-  onSwitchToSend?: () => void;
   /** Manifest indices being downloaded; null means all of them */
   selectedFileIndices?: number[] | null;
   /** Place in the sender's line while it is busy with others */
@@ -90,7 +89,6 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   corruptedFiles,
   onReset,
   isInvited = false,
-  onSwitchToSend,
   selectedFileIndices = null,
   queuePosition = null,
 }) => {
@@ -98,7 +96,7 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
   const transferFiles = pickFiles(manifest?.files ?? [], selectedFileIndices);
 
   return (
-    <div className="w-full space-y-6 animate-fade-in">
+    <Screen>
       {/* Active Transfer State */}
       {connectionState === 'transferring' ? (
         transferMetrics ? (
@@ -164,22 +162,8 @@ export const ReceiverView: React.FC<ReceiverViewProps> = ({
       ) : manifest ? (
         <IncomingFilesCard manifest={manifest} isNativeFSA={isNativeFSA} onStartSaving={onStartSaving} />
       ) : (
-        <>
-          <RoomCodeForm
-            roomCode={roomCode}
-            onRoomCodeChange={onRoomCodeChange}
-            onConnect={onConnect}
-          />
-          {onSwitchToSend && (
-            <div className="text-center">
-              <LinkButton onClick={onSwitchToSend}>
-                <ArrowLeft className="w-4 h-4" />
-                Send files instead
-              </LinkButton>
-            </div>
-          )}
-        </>
+        <RoomCodeForm roomCode={roomCode} onRoomCodeChange={onRoomCodeChange} onConnect={onConnect} />
       )}
-    </div>
+    </Screen>
   );
 };

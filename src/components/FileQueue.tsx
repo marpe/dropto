@@ -53,7 +53,7 @@ function nextSort(current: Sort | null, key: SortKey): Sort | null {
 
 // One template for the header and every row keeps the columns aligned; "Modified" only when the card is wide enough
 const COLUMNS =
-  'grid items-center gap-x-3 grid-cols-[1rem_minmax(0,1fr)_4.5rem_1.75rem] @md:grid-cols-[1rem_minmax(0,1fr)_4.5rem_6.5rem_1.75rem]';
+  'grid items-center gap-x-3 grid-cols-[1rem_minmax(0,1fr)_4.5rem_2.25rem] @md:grid-cols-[1rem_minmax(0,1fr)_4.5rem_6.5rem_2.25rem]';
 
 interface SortHeaderProps {
   label: string;
@@ -92,7 +92,7 @@ const FileQueueRow: React.FC<FileQueueRowProps> = ({ file, onRemove }) => (
     data-testid="file-row"
     className={cn(
       COLUMNS,
-      'px-2 py-1 rounded-md text-xs hover:bg-surface-2 transition-[background-color,opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1 [content-visibility:auto] [contain-intrinsic-size:auto_2rem]'
+      'px-2 py-2.5 sm:py-1 rounded-md text-sm sm:text-xs hover:bg-surface-2 transition-[background-color,opacity,transform] duration-300 starting:opacity-0 starting:translate-y-1 [content-visibility:auto] [contain-intrinsic-size:auto_2rem]'
     )}
   >
     <FileTypeIcon name={file.name} mimeType={file.type} />
@@ -123,17 +123,6 @@ export const FileQueue: React.FC<FileQueueProps> = ({
 
   return (
     <Card padding="sm" data-testid="file-queue">
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <h2 className="text-sm font-bold text-text-1">Send files</h2>
-        <button
-          type="button"
-          onClick={onClearFiles}
-          className="shrink-0 text-xs text-text-danger-1 font-medium hover:underline"
-        >
-          Clear all
-        </button>
-      </div>
-
       <div className="@container">
         <div className={cn(COLUMNS, 'px-2 pb-1 border-b border-border-1 text-2xs font-semibold text-text-5')}>
           <span />
@@ -150,8 +139,13 @@ export const FileQueue: React.FC<FileQueueProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border-1">
-        <span className="text-xs font-semibold text-text-3 tabular-nums">
-          {files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(totalBytes)}
+        <span className="flex items-center gap-2 text-xs text-text-3 tabular-nums">
+          <span className="font-semibold">
+            {files.length} {files.length === 1 ? 'file' : 'files'} · {formatBytes(totalBytes)}
+          </span>
+          <button type="button" onClick={onClearFiles} className="text-text-danger-1 font-medium hover:underline">
+            Clear all
+          </button>
         </span>
         <div className="flex items-center gap-2">
           <FilePickerButtons onAddFiles={onAddFiles} fileInputRef={fileInputRef} size="sm" />

@@ -1,8 +1,7 @@
 import React from 'react';
-import { DownloadCloud, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
-import { IconBadge } from './ui/IconBadge';
 import { TextInput } from './ui/TextInput';
 import { getActiveBrand } from '../branding';
 
@@ -28,14 +27,13 @@ export const RoomCodeForm: React.FC<RoomCodeFormProps> = ({
 
   return (
     <Card data-testid="room-code-form">
-      <IconBadge icon={DownloadCloud} className="mx-auto mb-4" iconClassName="motion-safe:animate-float" />
-      <h2 className="text-xl font-bold text-center text-text-1 mb-2">Receive files</h2>
-      <p className="text-xs text-center text-text-4 mb-6 max-w-sm mx-auto">
+      {/* The app bar already says Receive files */}
+      <p className="text-sm sm:text-xs text-text-4 mb-4">
         Enter the room code the sender gave you, or paste their link.
       </p>
 
 
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
           <span className="block text-xs font-semibold uppercase tracking-wider text-text-5 mb-1.5">Room code</span>
           <TextInput

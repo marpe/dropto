@@ -9,18 +9,18 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const paddingClasses: Record<CardPadding, string> = {
   sm: 'p-4 sm:p-5',
-  md: 'p-4 sm:p-6',
-  lg: 'p-5 sm:p-8',
+  md: 'p-4 sm:p-5',
+  lg: 'px-4 py-6 sm:p-6',
 };
 
 /**
- * The raised surface every screen section sits on. On a phone it runs edge to edge (cancelling the page's
- * side padding), so screens feel full-screen rather than like floating boxes.
+ * A section of a screen. On a phone: a full-width grouped block with hairlines above and below, like a
+ * native list group. On desktop: one part of the utility panel, which draws the frame and the dividers.
  */
 export const Card: React.FC<CardProps> = ({ padding = 'lg', className, ...props }) => (
   <div
     className={cn(
-      'bg-surface-1 border-y border-border-2 -mx-4 sm:mx-0 sm:border-x sm:rounded-3xl sm:shadow-xl',
+      'bg-surface-1 border-y border-border-1 sm:border-0',
       paddingClasses[padding],
       className
     )}
