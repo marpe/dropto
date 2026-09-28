@@ -90,7 +90,7 @@ function newReceiver(peerId: string, details: PeerDetails, stage: ReceiverStage,
 }
 
 /** What went over the connection in the running download, beyond what an earlier cut-off one already counted. */
-function downloadBytesSent(receiver: SenderReceiver): number {
+export function downloadBytesSent(receiver: SenderReceiver): number {
   return Math.max((receiver.metrics?.bytesTransferred ?? 0) - receiver.downloadStartBytes, 0);
 }
 

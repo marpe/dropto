@@ -1053,6 +1053,41 @@ describe('resuming after a dropped connection', () => {
     expect(await waitFor(() => interruption !== null)).toBe(true);
     expect(interruption).toMatchObject({ resume: null, finishedCount: 1 });
   });
+
+  it('closes the next file opened after the receiver stopped, and never asks for it', async () => {
+    const a = createTestFile(10 * 1024, 'a.bin');
+    const b = createTestFile(10 * 1024, 'b.bin');
+    let finishPrepare: (isPrepared: boolean) => void = () => {};
+    let isPrepared = false;
+    let hasAbortedAfterPrepare = false;
+    const lateWriter = {
+      ...createFakeWriter(),
+      prepare: vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            finishPrepare = resolve;
+          })
+      ),
+      abort: vi.fn(async () => {
+        hasAbortedAfterPrepare ||= isPrepared;
+      }),
+    };
+    const pair = createTransferPair({
+      receiverOptions: {
+        chooseStorage: async () => (file) => (file.name === 'a.bin' ? createFakeWriter() : lateWriter),
+      },
+    });
+
+    pair.sender.start([a, b]);
+    await waitFor(() => lateWriter.prepare.mock.calls.length === 1);
+    pair.receiver.cancel();
+    isPrepared = true;
+    finishPrepare(true);
+    await sleep(20);
+
+    expect(hasAbortedAfterPrepare).toBe(true);
+    expect(pair.receiverConn.sentMessageTypes().filter((type) => type === 'FILE_START')).toHaveLength(1);
+  });
 });
 
 describe('storage and read failures', () => {

@@ -7,6 +7,7 @@ import { FILE_PROGRESS_COLUMN } from './FileProgressCell';
 import { FileTable, FileTableRow } from './FileTable';
 import { PeerIdentity } from './PeerIdentity';
 import type { Presence } from './ui/StatusDot';
+import { downloadBytesSent } from '../hooks/senderState';
 import { useNow } from '../hooks/useNow';
 import type { SenderReceiver } from '../types/sharing';
 import { cn } from '../utils/cn';
@@ -79,7 +80,7 @@ export const ReceiverRow: React.FC<ReceiverRowProps> = ({ receiver, queuePositio
   const stopTitles = STOP_TITLES[receiver.stage === 'queued' ? 'queued' : isDownloading ? 'transferring' : 'idle'];
   const sent = getSentFiles(receiver);
   const activity = describeActivity(receiver, queuePosition, nowMs);
-  const bytesSent = receiver.bytesSent + (receiver.stage === 'transferring' ? (receiver.metrics?.bytesTransferred ?? 0) : 0);
+  const bytesSent = receiver.bytesSent + (receiver.stage === 'transferring' ? downloadBytesSent(receiver) : 0);
   const downloadPercent = isDownloading
     ? (receiver.metrics?.overallPercent ?? 0)
     : receiver.stage === 'queued'
