@@ -18,6 +18,8 @@ interface TransferSummaryProps {
   queuePosition: number | null;
   /** Set once the download finished */
   completion: { corruptedFiles: string[] } | null;
+  /** A cut-off download waiting for the sender to be back */
+  isReconnecting?: boolean;
 }
 
 function describeProgress(metrics: TransferMetrics, isPaused: boolean): string {
@@ -29,7 +31,14 @@ function describeProgress(metrics: TransferMetrics, isPaused: boolean): string {
 }
 
 /** One line over the file list: how the download is going, or how it went. Each file shows its own progress. */
-export const TransferSummary: React.FC<TransferSummaryProps> = ({ metrics, files, isPaused, queuePosition, completion }) => {
+export const TransferSummary: React.FC<TransferSummaryProps> = ({
+  metrics,
+  files,
+  isPaused,
+  queuePosition,
+  completion,
+  isReconnecting = false,
+}) => {
   const corruptedCount = completion?.corruptedFiles.length ?? 0;
   const isVerified = completion !== null && corruptedCount === 0;
 
@@ -56,6 +65,9 @@ export const TransferSummary: React.FC<TransferSummaryProps> = ({ metrics, files
       final.elapsedSeconds >= 1
         ? `${formatBytes(final.totalBytes)} in ${formatDuration(final.elapsedSeconds)} · ${formatSpeed(final.averageSpeed)}`
         : formatBytes(final.totalBytes);
+  } else if (isReconnecting) {
+    icon = <Spinner className="w-4 h-4 border-2 text-text-4" />;
+    title = 'Reconnecting…';
   } else if (queuePosition !== null) {
     icon = <Clock className="w-4 h-4 shrink-0 text-text-4" />;
     title = 'In line';

@@ -73,4 +73,8 @@ describe('TransferSummary', () => {
     expect(text).toMatch(/1 file may be corrupted/);
     expect(fireCelebration).not.toHaveBeenCalled();
   });
+
+  it('says it is reconnecting while a cut-off download waits for the sender', () => {
+    expect(renderSummary({ isReconnecting: true })).toContain('Reconnecting…');
+  });
 });

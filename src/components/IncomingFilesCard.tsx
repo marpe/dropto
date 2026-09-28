@@ -27,6 +27,8 @@ interface IncomingFilesCardProps {
   finishedFiles?: Record<string, FinishedFile>;
   /** The sender went away after a finished download, so nothing more can be downloaded */
   hasSenderLeft?: boolean;
+  /** A cut-off download could not carry on: say so, and tick only what is still missing */
+  hasInterruptedDownload?: boolean;
   onTogglePause?: () => void;
   onCancel?: () => void;
   /** Once the sender has left: done with this list */
@@ -68,6 +70,7 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({
   download = null,
   finishedFiles = {},
   hasSenderLeft = false,
+  hasInterruptedDownload = false,
   onTogglePause,
   onCancel,
   onDone,
@@ -77,6 +80,15 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({
   const canStreamToDisk = supportsSaveFilePicker();
   // Unticked files are remembered (not ticked ones) so files the sender adds later arrive ticked
   const [excludedIds, setExcludedIds] = useState<ReadonlySet<string>>(new Set());
+
+  // When a cut-off download could not carry on, what was already saved starts unticked (adjusted during render)
+  const [shownInterruption, setShownInterruption] = useState(false);
+  if (hasInterruptedDownload !== shownInterruption) {
+    setShownInterruption(hasInterruptedDownload);
+    if (hasInterruptedDownload) {
+      setExcludedIds(new Set(Object.keys(finishedFiles)));
+    }
+  }
 
   const isSelectable = manifest.files.length > 1 && !download;
   const selectedIndices = manifest.files.flatMap((file, index) => (excludedIds.has(file.id) ? [] : [index]));
@@ -128,6 +140,12 @@ export const IncomingFilesCard: React.FC<IncomingFilesCardProps> = ({
         <div className="pt-3 border-t border-border-1">
           <FileTotals count={selectedIndices.length} ofCount={manifest.files.length} totalBytes={selectedBytes} />
         </div>
+
+        {hasInterruptedDownload && (
+          <Notice tone="warning" icon={Unplug} className="mt-3">
+            Download was interrupted.
+          </Notice>
+        )}
 
         {hasSenderLeft && (
           <Notice tone="warning" icon={Unplug} className="mt-3">
