@@ -79,6 +79,8 @@ export class SenderRoom {
   private readonly lastConnOfSession = new Map<string, DataConnection>();
   // Downloads cut off by a dropped connection, by browser tab, until they carry on or give up
   private readonly reservations = new Map<string, Reservation>();
+  // Tabs stopped while reconnecting: they would keep coming back, so they are turned away for the rest of the share
+  private readonly stoppedSessions = new Set<string>();
   private readonly reservedSlotMs: number;
   // Device effects (wake lock, sounds) span from the first slot taken to the last one freed
   private isRunning = false;
@@ -194,6 +196,10 @@ export class SenderRoom {
     }
     // Sent away on purpose: coming back from the same tab must not skip the approval they would otherwise need
     if (sessionId) {
+      if (!engine) {
+        // Away, so the cancel cannot reach them now; it is said when their tab reconnects
+        this.stoppedSessions.add(sessionId);
+      }
       this.lastConnOfSession.delete(sessionId);
       this.clearReservation(sessionId);
     }
@@ -232,6 +238,7 @@ export class SenderRoom {
     this.details.clear();
     this.sessionOf.clear();
     this.lastConnOfSession.clear();
+    this.stoppedSessions.clear();
     this.roomCode = null;
     this.shareKey = null;
     this.pinLockouts = 0;
@@ -240,6 +247,12 @@ export class SenderRoom {
   }
 
   private handleIncoming(conn: DataConnection, greeting: ReceiverGreeting) {
+    if (greeting.sessionId && this.stoppedSessions.has(greeting.sessionId)) {
+      // The cancel they missed while away; it ends their reconnecting, where a plain close would be retried
+      sendControlMessage(conn, { type: 'TRANSFER_CANCEL' });
+      this.connection?.disconnectPeer(conn.peer);
+      return;
+    }
     const { files, options, isShared } = this.config;
     this.services.effects.onPeerConnected();
     const { device, timeZone, formFactor, model, storage } = greeting;

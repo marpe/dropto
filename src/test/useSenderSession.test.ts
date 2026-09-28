@@ -1079,6 +1079,33 @@ describe('useSenderSession', () => {
         expect(session.effects.onTransferEnded).toHaveBeenCalledWith(false);
       });
 
+      it.each([
+        ['them', (session: Session) => session.result.current.actions.stopReceiver('p1')],
+        [
+          'everyone',
+          (session: Session) =>
+            session.result.current.actions.updateSharing({ ...session.result.current.state.options, pin: '1234' }, 'now'),
+        ],
+      ])('turns their tab away when it comes back after stopping %s while they reconnect', async (_, stop) => {
+        const session = await shareWithLimit(1);
+        connectPeer(session, 'p1', fromTab(session, tab));
+        startDownloading(session, 0);
+        act(() => {
+          session.engines[0].events.onConnectionLost?.(cut());
+        });
+        act(() => {
+          stop(session);
+        });
+
+        const again = connectPeer(session, 'p1-again', fromTab(session, tab));
+
+        expect(sentMessages(again).map((message) => message.type)).toEqual(['TRANSFER_CANCEL']);
+        expect(session.connection.disconnectPeer).toHaveBeenCalledWith('p1-again');
+        expect(session.result.current.state.receivers).toEqual([]);
+        expect(session.result.current.state.pendingPeers).toEqual([]);
+        expect(session.engines).toHaveLength(1);
+      });
+
       it('does not hold a slot for someone it could not recognise on return', async () => {
         const session = await shareWithLimit(1);
         connectPeer(session, 'p1', linkGreeting(session));
