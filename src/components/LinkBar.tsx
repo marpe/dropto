@@ -72,7 +72,7 @@ export const LinkBar: React.FC<LinkBarProps> = ({
         </Notice>
       )}
 
-      <div className="flex items-stretch rounded-xl border border-border-2 bg-surface-1 overflow-hidden shadow-sm focus-within:border-brand-500/60 transition-colors">
+      <div className="flex items-stretch h-10 rounded-xl border border-border-2 bg-surface-1 overflow-hidden shadow-sm focus-within:border-brand-500/60 transition-colors">
         <input
           readOnly
           aria-label="Share link"
