@@ -183,8 +183,14 @@ export function parseControlMessage(raw: string): ControlMessage | null {
       return isSelection(payload.fileIndices)
         ? { type: 'FILE_SELECTION', payload: { fileIndices: [...payload.fileIndices] } }
         : null;
-    case 'FILE_START':
-      return isIndex(payload.fileIndex) ? { type: 'FILE_START', payload: { fileIndex: payload.fileIndex } } : null;
+    case 'FILE_START': {
+      if (!isIndex(payload.fileIndex) || (payload.fromChunk !== undefined && !isIndex(payload.fromChunk))) {
+        return null;
+      }
+      return payload.fromChunk === undefined
+        ? { type: 'FILE_START', payload: { fileIndex: payload.fileIndex } }
+        : { type: 'FILE_START', payload: { fileIndex: payload.fileIndex, fromChunk: payload.fromChunk } };
+    }
     case 'FILE_COMPLETE':
       return isIndex(payload.fileIndex) && typeof payload.checksum === 'string'
         ? { type: 'FILE_COMPLETE', payload: { fileIndex: payload.fileIndex, checksum: payload.checksum } }
